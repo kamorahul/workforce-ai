@@ -54,6 +54,7 @@ export class OpenAIResponseHandler {
       // Retrieve events that are denoted with 'requires_action'
       // since these will have our tool_calls
       const { cid, id } = this.message;
+      console.log("Reached again", event)
       switch (event.event) {
         case 'thread.run.requires_action':
           console.log('Requires action');
@@ -154,21 +155,7 @@ export class OpenAIResponseHandler {
   };
 
   private getCurrentTemperature = async (location: string) => {
-    const apiKey = process.env.OPENWEATHER_API_KEY;
-    if (!apiKey) {
-      throw new Error(
-        'OpenWeatherMap API key is missing. Set it in the .env file.',
-      );
-    }
-    const encodedLocation = encodeURIComponent(location);
-    const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodedLocation}&units=metric&appid=${apiKey}`;
-
-    const response = await axios.get(url);
-    const { data } = response;
-    if (!data || !data.main || typeof data.main.temp !== 'number') {
-      throw new Error('Temperature data not found in the API response.');
-    }
-    return data.main.temp;
+    return 500
   };
 
   private submitToolOutputs = async (

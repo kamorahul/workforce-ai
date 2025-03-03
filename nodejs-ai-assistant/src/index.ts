@@ -42,7 +42,7 @@ app.post('/start-ai-agent', async (req, res) => {
   const {
     channel_id,
     channel_type = 'messaging',
-    platform = 'anthropic',
+    platform = 'openai',
   } = req.body;
 
   // Simple validation

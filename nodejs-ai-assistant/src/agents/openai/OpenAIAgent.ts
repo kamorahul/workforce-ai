@@ -35,20 +35,24 @@ export class OpenAIAgent implements AIAgent {
     this.openai = new OpenAI({ apiKey });
     this.assistant = await this.openai.beta.assistants.create({
       name: 'Stream AI Assistant',
-      instructions: 'You are an AI assistant. Help users with their questions.',
+      instructions: 'You are an AI assistant. Help users with Onboarding into the system by asking basic bio details one by one .',
       tools: [
         { type: 'code_interpreter' },
         {
           type: 'function',
           function: {
-            name: 'getCurrentTemperature',
-            description: 'Get the current temperature for a specific location',
+            name: 'createUser',
+            description: 'save users bio information step by step',
             parameters: {
               type: 'object',
               properties: {
-                location: {
+                name: {
                   type: 'string',
-                  description: 'The city and state, e.g., San Francisco, CA',
+                  description: 'Name of the employee',
+                },
+                email: {
+                  type: 'string',
+                  description: 'Email of the employee',
                 },
                 unit: {
                   type: 'string',
@@ -102,19 +106,23 @@ export class OpenAIAgent implements AIAgent {
       message_id: channelMessage.id,
     });
 
-    const run = this.openai.beta.threads.runs.stream(this.openAiThread.id, {
-      assistant_id: this.assistant.id,
-    });
+   try {
+     const run = this.openai.beta.threads.runs.stream(this.openAiThread.id, {
+       assistant_id: this.assistant.id,
+     });
 
-    const handler = new OpenAIResponseHandler(
-      this.openai,
-      this.openAiThread,
-      run,
-      this.chatClient,
-      this.channel,
-      channelMessage,
-    );
-    void handler.run();
-    this.handlers.push(handler);
+     const handler = new OpenAIResponseHandler(
+         this.openai,
+         this.openAiThread,
+         run,
+         this.chatClient,
+         this.channel,
+         channelMessage,
+     );
+     void handler.run();
+     this.handlers.push(handler);
+   } catch (e) {
+     console.log("Error: ", e)
+   }
   };
 }
