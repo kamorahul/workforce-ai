@@ -63,6 +63,14 @@ app.post('/join', async (req, res): Promise<void> => {
    res.status(200).json({ user: { username }, token });
 });
 
+/*
+* Handle Join chat user
+* */
+app.post('/getstream/webhooks', async (req, res): Promise<void> => {
+  console.log(req.body)
+  res.json({message: {...req.body.message, ...{message: "Changed Message"}}})
+});
+
 /**
  * Handle the request to start the AI Agent
  */
