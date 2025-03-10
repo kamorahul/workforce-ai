@@ -1,11 +1,14 @@
-import axios from 'axios';
 import OpenAI from 'openai';
 import type { AssistantStream } from 'openai/lib/AssistantStream';
-import type { Channel, MessageResponse, StreamChat } from 'stream-chat';
+import type { Channel, StreamChat } from 'stream-chat';
+
+interface FetchGroupConversationArguments {
+  groupId: string;
+  date: string;
+}
 
 export class OpenAIResponseHandler {
   private message_text = '';
-  private chunk_counter = 0;
   private run_id = '';
 
   constructor(
@@ -14,7 +17,6 @@ export class OpenAIResponseHandler {
     private readonly assistantStream: AssistantStream,
     private readonly chatClient: StreamChat,
     private readonly channel: Channel,
-    private readonly message: MessageResponse,
   ) {
     this.chatClient.on('ai_indicator.stop', this.handleStopGenerating);
   }
@@ -37,14 +39,6 @@ export class OpenAIResponseHandler {
     }
 
     this.openai.beta.threads.runs.cancel(this.openAiThread.id, this.run_id);
-    await this.chatClient.partialUpdateMessage(this.message.id, {
-      set: { generating: false },
-    });
-    await this.channel.sendEvent({
-      type: 'ai_indicator.clear',
-      cid: this.message.cid,
-      message_id: this.message.id,
-    });
   };
 
   private handle = async (
@@ -53,55 +47,26 @@ export class OpenAIResponseHandler {
     try {
       // Retrieve events that are denoted with 'requires_action'
       // since these will have our tool_calls
-      const { cid, id } = this.message;
-      console.log("Reached again", event)
       switch (event.event) {
         case 'thread.run.requires_action':
           console.log('Requires action');
-          await this.channel.sendEvent({
-            type: 'ai_indicator.update',
-            state: 'AI_STATE_EXTERNAL_SOURCES',
-            cid: cid,
-            message_id: id,
-          });
           await this.handleRequiresAction(
             event.data,
             event.data.id,
             event.data.thread_id,
           );
           break;
-        case 'thread.message.created':
-          await this.channel.sendEvent({
-            type: 'ai_indicator.update',
-            state: 'AI_STATE_GENERATING',
-            cid: cid,
-            message_id: id,
-          });
-          break;
         case 'thread.message.delta':
           const content = event.data.delta.content;
           if (!content || content[0]?.type !== 'text') return;
           this.message_text += content[0].text?.value ?? '';
-          if (
-            this.chunk_counter % 15 === 0 ||
-            (this.chunk_counter < 8 && this.chunk_counter % 2 === 0)
-          ) {
-            const text = this.message_text;
-            await this.chatClient.partialUpdateMessage(id, {
-              set: { text, generating: true },
-            });
-          }
-          this.chunk_counter += 1;
           break;
         case 'thread.message.completed':
           const text = this.message_text;
-          await this.chatClient.partialUpdateMessage(id, {
-            set: { text, generating: false },
-          });
-          await this.channel.sendEvent({
-            type: 'ai_indicator.clear',
-            cid: cid,
-            message_id: id,
+          await this.channel.sendMessage({
+            text,
+            type: 'system',
+            restricted_visibility: ['kamo_rahul_gmail_com'],
           });
           break;
         case 'thread.run.step.created':
@@ -126,17 +91,18 @@ export class OpenAIResponseHandler {
       const toolOutputs = await Promise.all(
         data.required_action.submit_tool_outputs.tool_calls.map(
           async (toolCall) => {
-            if (toolCall.function.name !== 'getCurrentTemperature') return;
+            if (toolCall.function.name !== 'fetch_group_conversation') return;
 
             const argumentsString = toolCall.function.arguments;
             console.log('Arguments: ', argumentsString);
-            const args = JSON.parse(argumentsString);
-            const location = args.location as string;
-            const temperature = await this.getCurrentTemperature(location);
-            const temperatureString = temperature.toString();
+            const args = JSON.parse(
+              argumentsString,
+            ) as FetchGroupConversationArguments;
+            const messages = await this.getGroupConversationsByDate(args);
+            console.log(messages)
             return {
               tool_call_id: toolCall.id,
-              output: temperatureString,
+              output: messages.join(", "),
             };
           },
         ),
@@ -152,10 +118,6 @@ export class OpenAIResponseHandler {
       this.openai.beta.threads.runs.cancel(threadId, runId);
       await this.handleError(error as Error);
     }
-  };
-
-  private getCurrentTemperature = async (location: string) => {
-    return 500
   };
 
   private submitToolOutputs = async (
@@ -179,19 +141,26 @@ export class OpenAIResponseHandler {
     }
   };
 
-  private handleError = async (error: Error) => {
-    await this.channel.sendEvent({
-      type: 'ai_indicator.update',
-      state: 'AI_STATE_ERROR',
-      cid: this.message.cid,
-      message_id: this.message.id,
-    });
-    await this.chatClient.partialUpdateMessage(this.message.id, {
-      set: {
-        text: 'Error generating the message',
-        message: error.toString(),
-        generating: false,
+  private getGroupConversationsByDate = async (
+    args: FetchGroupConversationArguments,
+  ) => {
+    console.log(new Date(args.date));
+    const page1 = await this.chatClient.search(
+      { cid: 'team:random' },
+      { created_at: { $gte: new Date(args.date).toISOString() } },
+      {
+        sort: [{ updated_at: 1 }],
+        limit: 100,
       },
+    );
+
+    return page1.results.map(({message}) => {
+      console.log(message);
+      return `${message.user?.name}: ${message.text}`;
     });
+  };
+
+  private handleError = async (error: Error) => {
+    throw new Error(`An error occurred while handling: ${error.message}`);
   };
 }

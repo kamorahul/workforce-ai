@@ -35,13 +35,41 @@ app.get('/', (req, res) => {
   });
 });
 
+/*
+* Handle Join chat user
+* */
+app.post('/join', async (req, res): Promise<void> => {
+  const { username } = req.body;
+  const token = serverClient.createToken(username);
+  try {
+    await serverClient.upsertUser(
+        {
+          id: username
+        }
+    );
+
+    const admin = { id: "admin" };
+    const channel = serverClient.channel("team", "random", {
+      name: "random",
+      created_by: admin
+    });
+
+    await channel.addMembers([username]);
+  } catch (err: any) {
+    res.status(500).json({ err: err.message });
+    return;
+  }
+
+   res.status(200).json({ user: { username }, token });
+});
+
 /**
  * Handle the request to start the AI Agent
  */
 app.post('/start-ai-agent', async (req, res) => {
   const {
     channel_id,
-    channel_type = 'messaging',
+    channel_type = 'team',
     platform = 'openai',
   } = req.body;
 

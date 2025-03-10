@@ -1,7 +1,6 @@
 import { AgentPlatform, AIAgent } from './types';
 import { StreamChat } from 'stream-chat';
 import { OpenAIAgent } from './openai/OpenAIAgent';
-import { AnthropicAgent } from './anthropic/AnthropicAgent';
 import { apiKey, serverClient } from '../serverClient';
 
 export const createAgent = async (
@@ -18,8 +17,5 @@ export const createAgent = async (
   const channel = client.channel(channel_type, channel_id);
   await channel.watch();
 
-  if (platform === AgentPlatform.OPENAI) {
-    return new OpenAIAgent(client, channel);
-  }
-  return new AnthropicAgent(client, channel);
+  return new OpenAIAgent(client, channel);
 };

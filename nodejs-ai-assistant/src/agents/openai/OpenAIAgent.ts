@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { OpenAIResponseHandler } from './OpenAIResponseHandler';
 import type { AIAgent } from '../types';
-import type { Channel, DefaultGenerics, Event, StreamChat } from 'stream-chat';
+import type { Channel, StreamChat } from 'stream-chat';
 
 export class OpenAIAgent implements AIAgent {
   private openai?: OpenAI;
@@ -17,7 +17,6 @@ export class OpenAIAgent implements AIAgent {
   ) {}
 
   dispose = async () => {
-    this.chatClient.off('message.new', this.handleMessage);
     await this.chatClient.disconnectUser();
 
     this.handlers.forEach((handler) => handler.dispose());
@@ -33,58 +32,24 @@ export class OpenAIAgent implements AIAgent {
     }
 
     this.openai = new OpenAI({ apiKey });
-    this.assistant = await this.openai.beta.assistants.create({
-      name: 'Stream AI Assistant',
-      instructions: 'You are an AI assistant. Help users with Onboarding into the system by asking basic bio details one by one .',
-      tools: [
-        { type: 'code_interpreter' },
-        {
-          type: 'function',
-          function: {
-            name: 'createUser',
-            description: 'save users bio information step by step',
-            parameters: {
-              type: 'object',
-              properties: {
-                name: {
-                  type: 'string',
-                  description: 'Name of the employee',
-                },
-                email: {
-                  type: 'string',
-                  description: 'Email of the employee',
-                },
-                unit: {
-                  type: 'string',
-                  enum: ['Celsius', 'Fahrenheit'],
-                  description:
-                    "The temperature unit to use. Infer this from the user's location.",
-                },
-              },
-              required: ['location', 'unit'],
-            },
-          },
-        },
-      ],
-      model: 'gpt-4o',
-    });
+    this.assistant = await this.openai.beta.assistants.retrieve("asst_wD1s9GID1EVsh7BSLZNbkdJr");
     this.openAiThread = await this.openai.beta.threads.create();
-
-    this.chatClient.on('message.new', this.handleMessage);
+    await this.handleMessage("Prepare update for Site Engineer in group id random");
   };
 
-  private handleMessage = async (e: Event<DefaultGenerics>) => {
+  private handleMessage = async (e: string) => {
+    console.log("Message Received")
     if (!this.openai || !this.openAiThread || !this.assistant) {
       console.log('OpenAI not initialized');
       return;
     }
 
-    if (!e.message || e.message.ai_generated) {
+    if (!e) {
       console.log('Skip handling ai generated message');
       return;
     }
 
-    const message = e.message.text;
+    const message = e;
     if (!message) return;
 
     this.lastInteractionTs = Date.now();
@@ -92,18 +57,6 @@ export class OpenAIAgent implements AIAgent {
     await this.openai.beta.threads.messages.create(this.openAiThread.id, {
       role: 'user',
       content: message,
-    });
-
-    const { message: channelMessage } = await this.channel.sendMessage({
-      text: '',
-      ai_generated: true,
-    });
-
-    await this.channel.sendEvent({
-      type: 'ai_indicator.update',
-      state: 'AI_STATE_THINKING',
-      cid: channelMessage.cid,
-      message_id: channelMessage.id,
     });
 
    try {
@@ -117,7 +70,6 @@ export class OpenAIAgent implements AIAgent {
          run,
          this.chatClient,
          this.channel,
-         channelMessage,
      );
      void handler.run();
      this.handlers.push(handler);
