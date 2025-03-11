@@ -66,7 +66,7 @@ app.post('/join', async (req, res): Promise<void> => {
 /*
 * Handle Join chat user
 * */
-app.post('/webhooks', async (req, res): Promise<void> => {
+app.post('/getstream/webhooks', async (req, res): Promise<void> => {
   console.log(req.body)
   res.json({message: {...req.body.message, ...{message: "Changed Message"}}})
 });
