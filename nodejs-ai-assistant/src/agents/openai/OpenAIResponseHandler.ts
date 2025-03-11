@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import type { AssistantStream } from 'openai/lib/AssistantStream';
 import type { Channel, StreamChat } from 'stream-chat';
+import {User} from "../createAgent";
 
 interface FetchGroupConversationArguments {
   groupId: string;
@@ -17,6 +18,7 @@ export class OpenAIResponseHandler {
     private readonly assistantStream: AssistantStream,
     private readonly chatClient: StreamChat,
     private readonly channel: Channel,
+    private readonly user: User,
   ) {
     this.chatClient.on('ai_indicator.stop', this.handleStopGenerating);
   }
@@ -65,8 +67,9 @@ export class OpenAIResponseHandler {
           const text = this.message_text;
           await this.channel.sendMessage({
             text,
+            user_id: this.user.id,
             type: 'system',
-            restricted_visibility: ['kamo_rahul_gmail_com'],
+            restricted_visibility: [this.user.id],
           });
           break;
         case 'thread.run.step.created':
@@ -154,8 +157,7 @@ export class OpenAIResponseHandler {
       },
     );
 
-    return page1.results.map(({message}) => {
-      console.log(message);
+    return page1.results.map(({ message }) => {
       return `${message.user?.name}: ${message.text}`;
     });
   };

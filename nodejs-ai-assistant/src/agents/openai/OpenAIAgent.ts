@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { OpenAIResponseHandler } from './OpenAIResponseHandler';
 import type { AIAgent } from '../types';
 import type { Channel, StreamChat } from 'stream-chat';
+import {User} from "../createAgent";
 
 export class OpenAIAgent implements AIAgent {
   private openai?: OpenAI;
@@ -14,6 +15,7 @@ export class OpenAIAgent implements AIAgent {
   constructor(
     readonly chatClient: StreamChat,
     readonly channel: Channel,
+    readonly user: User
   ) {}
 
   dispose = async () => {
@@ -34,10 +36,9 @@ export class OpenAIAgent implements AIAgent {
     this.openai = new OpenAI({ apiKey });
     this.assistant = await this.openai.beta.assistants.retrieve("asst_wD1s9GID1EVsh7BSLZNbkdJr");
     this.openAiThread = await this.openai.beta.threads.create();
-    await this.handleMessage("Prepare update for Site Engineer in group id random");
   };
 
-  private handleMessage = async (e: string) => {
+  public handleMessage = async (e: string) => {
     console.log("Message Received")
     if (!this.openai || !this.openAiThread || !this.assistant) {
       console.log('OpenAI not initialized');
@@ -70,6 +71,7 @@ export class OpenAIAgent implements AIAgent {
          run,
          this.chatClient,
          this.channel,
+         this.user,
      );
      void handler.run();
      this.handlers.push(handler);

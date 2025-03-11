@@ -1,21 +1,32 @@
-import { AgentPlatform, AIAgent } from './types';
 import { StreamChat } from 'stream-chat';
 import { OpenAIAgent } from './openai/OpenAIAgent';
-import { apiKey, serverClient } from '../serverClient';
+import {apiKey, apiSecret} from '../serverClient';
+import {AIAgent} from "./types";
+
+export interface User {
+    id: string
+    role: string,
+    created_at: Date,
+    updated_at: Date,
+    last_active: Date,
+    last_engaged_at: Date,
+    banned: Boolean,
+    online: Boolean,
+    name: string,
+    image: string
+}
 
 export const createAgent = async (
-  user_id: string,
-  platform: AgentPlatform,
+  user: User,
   channel_type: string,
   channel_id: string,
 ): Promise<AIAgent> => {
-  const client = new StreamChat(apiKey, { allowServerSideConnect: true });
-  const token = serverClient.createToken(user_id);
-  await client.connectUser({ id: user_id }, token);
-  console.log(`User ${user_id} connected successfully.`);
+  const serverClient = StreamChat.getInstance(apiKey, apiSecret, {
+    timeout: 20000
+  });
 
-  const channel = client.channel(channel_type, channel_id);
-  await channel.watch();
 
-  return new OpenAIAgent(client, channel);
+  const channel = serverClient.channel(channel_type, channel_id);
+
+  return new OpenAIAgent(serverClient, channel, user);
 };

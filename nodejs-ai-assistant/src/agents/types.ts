@@ -4,12 +4,9 @@ export interface AIAgent {
   init(): Promise<void>;
   dispose(): Promise<void>;
   getLastInteraction(): number;
+  handleMessage(e: string): Promise<void>;
 
   chatClient: StreamChat;
   channel: Channel;
 }
 
-export enum AgentPlatform {
-  ANTHROPIC = 'anthropic',
-  OPENAI = 'openai',
-}
