@@ -41,6 +41,8 @@ app.post('/join', async (req, res): Promise<void> => {
     res.status(500).json({ err: err.message });
     return;
   }
+
+   res.status(200).json({ user: { username }, token });
 });
 
 /*
