@@ -22,27 +22,13 @@ app.get('/', (req, res) => {
 * */
 app.post('/join', async (req, res): Promise<void> => {
   const { username } = req.body;
-  const token = serverClient.createToken(username);
   try {
-    await serverClient.upsertUser(
-        {
-          id: username
-        }
-    );
-
-    const admin = { id: "admin" };
-    const channel = serverClient.channel("team", "random", {
-      name: "random",
-      created_by: admin
-    });
-
-    await channel.addMembers([username]);
+  const token = serverClient.createToken(username);
+    res.status(200).json({ user: { username }, token });
   } catch (err: any) {
     res.status(500).json({ err: err.message });
     return;
   }
-
-   res.status(200).json({ user: { username }, token });
 });
 
 /*
@@ -77,7 +63,7 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
       );
 
       await agent.init();
-      agent.handleMessage(`Generate Summary for ${user.name}`)
+      agent.handleMessage(`Generate Summary for ${user.name} for group ${channelIdUpdated}`);
 
   res.json(req.body)
 });
