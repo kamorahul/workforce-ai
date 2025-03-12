@@ -22,6 +22,7 @@ app.get('/', (req, res) => {
 * */
 app.post('/join', async (req, res): Promise<void> => {
   const { username } = req.body;
+  const token = serverClient.createToken(username);
   try {
     await serverClient.upsertUser(
         {
