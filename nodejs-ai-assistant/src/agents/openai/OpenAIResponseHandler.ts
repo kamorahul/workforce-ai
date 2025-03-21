@@ -149,7 +149,7 @@ export class OpenAIResponseHandler {
   ) => {
     console.log(new Date(args.date));
     const page1 = await this.chatClient.search(
-      { cid: 'team:random' },
+      { cid: args.groupId },
       { created_at: { $gte: new Date(args.date).toISOString() } },
       {
         sort: [{ updated_at: 1 }],
