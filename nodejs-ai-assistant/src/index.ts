@@ -71,8 +71,7 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
 
       await agent.init();
       agent.handleMessage(`Generate Summary for ${user.name} for group ${channelIdUpdated}`);
-
-  res.json(req.body)
+      res.json(req.body)
 });
 
 

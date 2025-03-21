@@ -147,9 +147,8 @@ export class OpenAIResponseHandler {
   private getGroupConversationsByDate = async (
     args: FetchGroupConversationArguments,
   ) => {
-    console.log(new Date(args.date));
     const page1 = await this.chatClient.search(
-      { cid: args.groupId },
+      { cid: args.groupId, type: 'messaging' },
       { created_at: { $gte: new Date(args.date).toISOString() } },
       {
         sort: [{ updated_at: 1 }],
