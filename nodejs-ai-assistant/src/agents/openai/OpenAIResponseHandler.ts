@@ -148,10 +148,12 @@ export class OpenAIResponseHandler {
   ) => {
     const channel = this.chatClient.channel("messaging", args.groupId)
     const page1 = await channel.query({
-      messages: {limit: 100}
+      messages: { limit: 100, created_at_after_or_equal:  new Date(args.date).toISOString() }
     });
 
-    return page1.messages.map((message) => {
+    return page1.messages.filter(
+        (message) => message.type !== "system"
+    ).map((message) => {
       return `${message.user?.name}: ${message.text}`;
     });
   };
