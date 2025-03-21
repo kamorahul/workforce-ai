@@ -102,7 +102,6 @@ export class OpenAIResponseHandler {
               argumentsString,
             ) as FetchGroupConversationArguments;
             const messages = await this.getGroupConversationsByDate(args);
-            console.log(messages)
             return {
               tool_call_id: toolCall.id,
               output: messages.join(", "),
@@ -147,16 +146,12 @@ export class OpenAIResponseHandler {
   private getGroupConversationsByDate = async (
     args: FetchGroupConversationArguments,
   ) => {
-    const page1 = await this.chatClient.search(
-      { cid: args.groupId, type: 'messaging' },
-      { created_at: { $gte: new Date(args.date).toISOString() } },
-      {
-        sort: [{ updated_at: 1 }],
-        limit: 100,
-      },
-    );
+    const channel = this.chatClient.channel("messaging", args.groupId)
+    const page1 = await channel.query({
+      messages: {limit: 20}
+    });
 
-    return page1.results.map(({ message }) => {
+    return page1.messages.map((message) => {
       return `${message.user?.name}: ${message.text}`;
     });
   };
