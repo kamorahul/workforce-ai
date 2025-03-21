@@ -148,7 +148,7 @@ export class OpenAIResponseHandler {
   ) => {
     const channel = this.chatClient.channel("messaging", args.groupId)
     const page1 = await channel.query({
-      messages: {limit: 20}
+      messages: {limit: 100}
     });
 
     return page1.messages.map((message) => {
