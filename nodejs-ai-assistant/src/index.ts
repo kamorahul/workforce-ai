@@ -30,6 +30,18 @@ app.post('/join', async (req, res): Promise<void> => {
           id: username
         }
     );
+
+    // Ensure the user "Kai" exists
+    await serverClient.upsertUser({ id: "Kai", name: "Kai" });
+
+    // Create a new channel (if it doesn’t exist)
+    const channel = serverClient.channel('messaging', `kai${username}`, {
+      name: `Kai`,
+      created_by_id: username, // Set the joining user as the creator
+    });
+
+    await channel.create(); // Create channel
+    await channel.addMembers([username, "Kai"]); // Add both users
   } catch (err: any) {
     res.status(500).json({ err: err.message });
     return;
