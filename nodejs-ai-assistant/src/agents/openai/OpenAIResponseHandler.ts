@@ -29,6 +29,8 @@ export class OpenAIResponseHandler {
     for await (const event of this.assistantStream) {
       console.log('Received event', event);
       const reply = await this.handle(event);
+      console.log('Received reply', reply);
+
       if (reply) {
         replies.push(reply);
       }
