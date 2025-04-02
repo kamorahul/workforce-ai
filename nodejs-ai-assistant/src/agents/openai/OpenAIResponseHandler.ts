@@ -65,12 +65,20 @@ export class OpenAIResponseHandler {
           break;
         case 'thread.message.completed':
           const text = this.message_text;
-          await this.channel.sendMessage({
-            text,
-            user_id: this.user.id,
-            type: 'system',
-            restricted_visibility: [this.user.id],
-          });
+          if(this.channel.data?.name?.indexOf('kai') === 0) {
+            await this.channel.sendMessage({
+              text,
+              user: { id: this.user.id },
+            });
+          } else {
+            await this.channel.sendMessage({
+              text,
+              user_id: this.user.id,
+              type: 'system',
+              restricted_visibility: [this.user.id],
+            });
+          }
+
           break;
         case 'thread.run.step.created':
           this.run_id = event.data.id;
