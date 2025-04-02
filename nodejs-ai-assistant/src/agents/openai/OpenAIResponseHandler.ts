@@ -56,32 +56,37 @@ export class OpenAIResponseHandler {
   private handle = async (
     event: OpenAI.Beta.Assistants.AssistantStreamEvent,
   ): Promise<string> => {
+    console.log('Received event', event);
       return new Promise(async (resolve, reject) => {
+        console.log('Received event internal', event);
         try {
-        switch (event.event) {
-          case 'thread.run.requires_action':
-            await this.handleRequiresAction(
-                event.data,
-                event.data.id,
-                event.data.thread_id,
-            );
-            break;
-          case 'thread.message.delta':
-            const content = event.data.delta.content;
-            if (!content || content[0]?.type !== 'text') return;
-            console.log('Partial Response:', content[0].text?.value);
+          switch (event.event) {
+            case 'thread.run.requires_action':
+              console.log('thread.run.requires_action', event);
+              await this.handleRequiresAction(
+                  event.data,
+                  event.data.id,
+                  event.data.thread_id,
+              );
+              break;
+            case 'thread.message.delta':
+              console.log('thread.message.delta', event);
+              const content = event.data.delta.content;
+              if (!content || content[0]?.type !== 'text') return;
+              console.log('Partial Response:', content[0].text?.value);
 
-            this.message_text += content[0].text?.value ?? '';
-            break;
-          case 'thread.message.completed':
-            const text = this.message_text;
-            console.log('Response Compiled:', text);
-            resolve(text);
-            break;
-          case 'thread.run.step.created':
-            this.run_id = event.data.id;
-            break;
-        }
+              this.message_text += content[0].text?.value ?? '';
+              break;
+            case 'thread.message.completed':
+              const text = this.message_text;
+              console.log('Response Compiled:', text);
+              resolve(text);
+              break;
+            case 'thread.run.step.created':
+              console.log('thread.run.step.created', event);
+              this.run_id = event.data.id;
+              break;
+          }
       } catch (error) {
       console.error('Error handling event:', error);
       reject(error);
