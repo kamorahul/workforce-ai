@@ -70,6 +70,7 @@ export class OpenAIResponseHandler {
             break;
           case 'thread.message.completed':
             const text = this.message_text;
+            console.log('Response Compiled:', text);
             resolve(text);
             break;
           case 'thread.run.step.created':

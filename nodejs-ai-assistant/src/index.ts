@@ -106,14 +106,6 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
       res.json(req.body)
 });
 
-
-async function run() {
-  // 4. Connect to MongoDB
-  await connect('mongodb://127.0.0.1:27017/test');
-}
-
-run()
-
 // Start the Express server
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
