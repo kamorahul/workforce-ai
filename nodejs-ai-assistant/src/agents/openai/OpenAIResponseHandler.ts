@@ -24,6 +24,7 @@ export class OpenAIResponseHandler {
   }
 
   run = async (): Promise<string[] | undefined> => {
+    console.log("Running OpenAI Response");
     const replies = []
     for await (const event of this.assistantStream) {
       const reply = await this.handle(event);
@@ -31,7 +32,7 @@ export class OpenAIResponseHandler {
         replies.push(reply);
       }
     }
-
+    console.log('Replies: ', replies);
     return replies;
   };
 
