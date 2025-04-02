@@ -66,6 +66,8 @@ export class OpenAIResponseHandler {
           case 'thread.message.delta':
             const content = event.data.delta.content;
             if (!content || content[0]?.type !== 'text') return;
+            console.log('Partial Response:', content[0].text?.value);
+
             this.message_text += content[0].text?.value ?? '';
             break;
           case 'thread.message.completed':
