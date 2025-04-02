@@ -68,7 +68,7 @@ export class OpenAIResponseHandler {
           if(this.channel.id?.indexOf('kai') === 0) {
             await this.channel.sendMessage({
               text,
-              user: { id: this.user.id },
+              user: { id: "kai" },
             });
           } else {
             await this.channel.sendMessage({
