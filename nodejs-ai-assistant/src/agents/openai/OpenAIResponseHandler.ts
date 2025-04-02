@@ -23,10 +23,16 @@ export class OpenAIResponseHandler {
     this.chatClient.on('ai_indicator.stop', this.handleStopGenerating);
   }
 
-  run = async () => {
+  run = async (): Promise<string[] | undefined> => {
+    const replies = []
     for await (const event of this.assistantStream) {
-      await this.handle(event);
+      const reply = await this.handle(event);
+      if (reply) {
+        replies.push(reply);
+      }
     }
+
+    return replies;
   };
 
   dispose = () => {
@@ -45,40 +51,38 @@ export class OpenAIResponseHandler {
 
   private handle = async (
     event: OpenAI.Beta.Assistants.AssistantStreamEvent,
-  ) => {
-    try {
+  ): Promise<string> => {
+      return new Promise(async (resolve, reject) => {
+        try {
+        switch (event.event) {
+          case 'thread.run.requires_action':
+            await this.handleRequiresAction(
+                event.data,
+                event.data.id,
+                event.data.thread_id,
+            );
+            break;
+          case 'thread.message.delta':
+            const content = event.data.delta.content;
+            if (!content || content[0]?.type !== 'text') return;
+            this.message_text += content[0].text?.value ?? '';
+            break;
+          case 'thread.message.completed':
+            const text = this.message_text;
+            resolve(text);
+            break;
+          case 'thread.run.step.created':
+            this.run_id = event.data.id;
+            break;
+        }
+      } catch (error) {
+      console.error('Error handling event:', error);
+      reject(error);
+    }
+      })
       // Retrieve events that are denoted with 'requires_action'
       // since these will have our tool_calls
-      switch (event.event) {
-        case 'thread.run.requires_action':
-          console.log('Requires action');
-          await this.handleRequiresAction(
-            event.data,
-            event.data.id,
-            event.data.thread_id,
-          );
-          break;
-        case 'thread.message.delta':
-          const content = event.data.delta.content;
-          if (!content || content[0]?.type !== 'text') return;
-          this.message_text += content[0].text?.value ?? '';
-          break;
-        case 'thread.message.completed':
-          const text = this.message_text;
-          await this.channel.sendMessage({
-            text,
-            user_id: this.user.id,
-            type: 'system',
-            restricted_visibility: [this.user.id],
-          });
-          break;
-        case 'thread.run.step.created':
-          this.run_id = event.data.id;
-          break;
-      }
-    } catch (error) {
-      console.error('Error handling event:', error);
-    }
+
   };
 
   private handleRequiresAction = async (
@@ -135,7 +139,7 @@ export class OpenAIResponseHandler {
         { tool_outputs: toolOutputs },
       );
       for await (const event of stream) {
-        await this.handle(event);
+        const res = await this.handle(event);
       }
     } catch (error) {
       console.error('Error submitting tool outputs:', error);

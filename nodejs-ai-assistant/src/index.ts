@@ -59,6 +59,7 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
       user
   } = req.body;
 
+  console.log("Message Body: ", JSON.stringify(req.body))
   const {cid: channelId} = message
   // Simple validation
   if (!channelId) {
@@ -82,7 +83,22 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
       );
 
       await agent.init();
-      agent.handleMessage(`Generate Summary for ${user.name} for group ${channelIdUpdated}`);
+
+      agent.handleMessage(`Generate Summary for ${user.name} for group ${channelIdUpdated}`)
+          .then((messages) => {
+            if(messages)
+            for (const generatedMessage of messages) {
+                switch (message.text) {
+                  case '/summary':
+                    const channel = serverClient.channel('messaging', channelIdUpdated);
+                    channel.sendMessage({
+                      text: generatedMessage,
+                      user: { id: user.id }, // Send message as the user
+                    });
+                }
+            }
+      });
+
       res.json(req.body)
 });
 

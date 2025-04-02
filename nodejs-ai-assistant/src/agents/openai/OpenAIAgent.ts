@@ -38,7 +38,7 @@ export class OpenAIAgent implements AIAgent {
     this.openAiThread = await this.openai.beta.threads.create();
   };
 
-  public handleMessage = async (e: string) => {
+  public handleMessage = async (e: string): Promise<string[] | undefined> => {
     console.log("Message Received")
     if (!this.openai || !this.openAiThread || !this.assistant) {
       console.log('OpenAI not initialized');
@@ -73,8 +73,9 @@ export class OpenAIAgent implements AIAgent {
          this.channel,
          this.user,
      );
-     void handler.run();
+     const message = await handler.run();
      this.handlers.push(handler);
+     return message
    } catch (e) {
      console.log("Error: ", e)
    }
