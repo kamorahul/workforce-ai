@@ -65,6 +65,9 @@ export class OpenAIResponseHandler {
           break;
         case 'thread.message.completed':
           const text = this.message_text;
+          console.log(this.channel.data?.name);
+          console.log(this.channel.data);
+          console.log(this.channel);
           if(this.channel.data?.name?.indexOf('kai') === 0) {
             await this.channel.sendMessage({
               text,
