@@ -86,16 +86,20 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
 
       agent.handleMessage(`Generate Summary for ${user.name} for group ${channelIdUpdated}`)
           .then((messages) => {
-            if(messages)
-            for (const generatedMessage of messages) {
-                switch (message.text) {
-                  case '/summary':
+            if(messages) {
+              console.log("Reply Generated: ", messages);
+              for (const generatedMessage of messages) {
+                switch (message.command) {
+                  case 'summary':
+                    console.log("Command Found", message.command);
+                    console.log("Sending a summary to channel:", channelIdUpdated);
                     const channel = serverClient.channel('messaging', channelIdUpdated);
                     channel.sendMessage({
                       text: generatedMessage,
                       user: { id: user.id }, // Send message as the user
                     });
                 }
+              }
             }
       });
 
