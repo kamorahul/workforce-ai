@@ -59,9 +59,12 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
       user
   } = req.body;
 
-  console.log(message);
 
-  const {cid: channelId} = message
+  let {cid: channelId, mentioned_users: mentionedUsers, args: channelName} = message;
+
+  if(mentionedUsers && mentionedUsers.length > 0) {
+    channelId = mentionedUsers[0].id;
+  }
   // Simple validation
   if (!channelId) {
     res.status(400).json({ error: 'Missing required fields' });
@@ -84,7 +87,11 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
       );
 
       await agent.init();
-      agent.handleMessage(`Generate Summary for ${user.name} for group ${channelIdUpdated}`);
+      if(mentionedUsers && mentionedUsers.length > 0) {
+        agent.handleMessage(`Generate Summary for ${user.name} for groupId ${channelIdUpdated} and channel name is ${channelName?.split('@')[1]}`);
+      } else {
+        agent.handleMessage(`Generate Summary for ${user.name} for group ${channelIdUpdated}`);
+      }
       res.json(req.body)
 });
 
