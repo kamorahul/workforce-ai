@@ -59,6 +59,8 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
       user
   } = req.body;
 
+  console.log(message);
+
   const {cid: channelId} = message
   // Simple validation
   if (!channelId) {
