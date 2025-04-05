@@ -59,11 +59,11 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
       user
   } = req.body;
 
-
+  let summaryChannel;
   let {cid: channelId, mentioned_users: mentionedUsers, args: channelName} = message;
 
   if(mentionedUsers && mentionedUsers.length > 0) {
-    channelId = mentionedUsers[0].id;
+    summaryChannel = mentionedUsers[0].id;
   }
   // Simple validation
   if (!channelId) {
@@ -88,7 +88,7 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
 
       await agent.init();
       if(mentionedUsers && mentionedUsers.length > 0) {
-        agent.handleMessage(`Generate today's Summary for ${user.name} for groupId ${channelIdUpdated} and channel name is ${channelName?.split('@')[1]}`);
+        agent.handleMessage(`Generate today's Summary for ${user.name} for groupId ${summaryChannel} and channel name is ${channelName?.split('@')[1]}`);
       } else {
         agent.handleMessage(`Generate today's Summary for ${user.name} for group ${channelIdUpdated}`);
       }
