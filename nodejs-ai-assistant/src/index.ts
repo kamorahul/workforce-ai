@@ -88,9 +88,9 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
 
       await agent.init();
       if(mentionedUsers && mentionedUsers.length > 0) {
-        agent.handleMessage(`Generate Summary for ${user.name} for groupId ${channelIdUpdated} and channel name is ${channelName?.split('@')[1]}`);
+        agent.handleMessage(`Generate today's Summary for ${user.name} for groupId ${channelIdUpdated} and channel name is ${channelName?.split('@')[1]}`);
       } else {
-        agent.handleMessage(`Generate Summary for ${user.name} for group ${channelIdUpdated}`);
+        agent.handleMessage(`Generate today's Summary for ${user.name} for group ${channelIdUpdated}`);
       }
       res.json(req.body)
 });
