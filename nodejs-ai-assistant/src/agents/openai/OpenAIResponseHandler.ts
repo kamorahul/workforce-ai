@@ -159,6 +159,7 @@ export class OpenAIResponseHandler {
       messages: { limit: 100, created_at_after_or_equal:  new Date().toISOString() }
     });
 
+    console.log(page1)
     return page1.messages.filter(
         (message) => message.type !== "system"
     ).map((message) => {
