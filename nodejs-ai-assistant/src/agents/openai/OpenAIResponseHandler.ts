@@ -154,9 +154,11 @@ export class OpenAIResponseHandler {
   private getGroupConversationsByDate = async (
     args: FetchGroupConversationArguments,
   ) => {
+    const start = new Date();
+    start.setUTCHours(0,0,0,0);
     const channel = this.chatClient.channel("messaging", args.groupId)
     const page1 = await channel.query({
-      messages: { limit: 100, created_at_after_or_equal:  new Date().toISOString() }
+      messages: { limit: 100, created_at_after_or_equal:  start.toISOString() }
     });
 
     return page1.messages.filter(
