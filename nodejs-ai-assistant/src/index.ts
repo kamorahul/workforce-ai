@@ -37,7 +37,8 @@ app.post('/join', async (req, res): Promise<void> => {
     // Create a new channel (if it doesn’t exist)
     const channel = serverClient.channel('messaging', `kai${username}`, {
       name: `Kai`,
-      created_by_id: username, // Set the joining user as the creator
+      created_by_id: username,
+      hidden: true,
     });
 
     await channel.create(); // Create channel
