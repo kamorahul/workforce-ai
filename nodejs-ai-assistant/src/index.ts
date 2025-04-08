@@ -54,6 +54,8 @@ app.post('/join', async (req, res): Promise<void> => {
 app.post('/getstream/webhooks', async (req, res): Promise<void> => {
   const { message, user } = req.body;
 
+  console.log("Req Body: ", req.body);
+
   let summaryChannel;
   let {
     cid: channelId,
