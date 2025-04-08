@@ -3,7 +3,6 @@ import express from 'express';
 import cors from 'cors';
 import { createAgent, User } from './agents/createAgent';
 import { apiKey, serverClient } from './serverClient';
-import {connect} from "mongoose";
 
 const app = express();
 app.use(express.json());
@@ -19,20 +18,18 @@ app.get('/', (req, res) => {
 });
 
 /*
-* Handle Join chat user
-* */
+ * Handle Join chat user
+ * */
 app.post('/join', async (req, res): Promise<void> => {
   const { username } = req.body;
   const token = serverClient.createToken(username);
   try {
-    await serverClient.upsertUser(
-        {
-          id: username
-        }
-    );
+    await serverClient.upsertUser({
+      id: username,
+    });
 
     // Ensure the user "Kai" exists
-    await serverClient.upsertUser({ id: "Kai", name: "Kai" });
+    await serverClient.upsertUser({ id: 'Kai', name: 'Kai' });
 
     // Create a new channel (if it doesn’t exist)
     const channel = serverClient.channel('messaging', `kai${username}`, {
@@ -42,37 +39,37 @@ app.post('/join', async (req, res): Promise<void> => {
     });
 
     await channel.create(); // Create channel
-    await channel.addMembers([username, "Kai"]); // Add both users
+    await channel.addMembers([username, 'Kai']); // Add both users
   } catch (err: any) {
     res.status(500).json({ err: err.message });
     return;
   }
 
-   res.status(200).json({ user: { username }, token });
+  res.status(200).json({ user: { username }, token });
 });
 
 /*
-* Handle Join chat user
-* */
+ * Handle Join chat user
+ * */
 app.post('/getstream/webhooks', async (req, res): Promise<void> => {
-  const {
-    message,
-      user
-  } = req.body;
+  const { message, user } = req.body;
 
-  console.log(req.body);
   let summaryChannel;
-  let {cid: channelId, mentioned_users: mentionedUsers, args: channelName} = message;
+  let {
+    cid: channelId,
+    args: channelName,
+  } = message;
 
-  if(mentionedUsers && mentionedUsers.length > 0) {
-    summaryChannel = mentionedUsers[0].id;
+  const [channel] = await searchChannelsByName(channelName.split('@')[1]);
+  if (channel && channel.id) {
+    summaryChannel = channel.id;
   }
   // Simple validation
   if (!channelId) {
     res.status(400).json({ error: 'Missing required fields' });
     return;
   }
-  let channelType = 'messaging'
+  let channelType = 'messaging';
   let channelIdUpdated = channelId;
   if (channelId.includes(':')) {
     const parts = channelId.split(':');
@@ -82,20 +79,20 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
     }
   }
 
-    const agent = await createAgent(
-          user as User,
-          channelType,
-          channelIdUpdated,
-      );
+  const agent = await createAgent(user as User, channelType, channelIdUpdated);
 
-      await agent.init();
-      if(mentionedUsers && mentionedUsers.length > 0) {
-        agent.handleMessage(`Generate today's Summary for ${user.name} for groupId ${summaryChannel} and channel name is ${channelName?.split('@')[1]}. `);
-      } else {
-        agent.handleMessage(`Generate today's Summary for ${user.name} for groupId ${channelIdUpdated}. Don't mention groupId in the result.`);
-      }
-      req.body.message.mentioned_users = []
-      res.json(req.body)
+  await agent.init();
+  if (summaryChannel) {
+    agent.handleMessage(
+      `Generate today's Summary for ${user.name} for groupId ${summaryChannel} and channel name is ${channelName?.split('@')[1]}. `,
+    );
+  } else {
+    agent.handleMessage(
+      `Generate today's Summary for ${user.name} for groupId ${channelIdUpdated}. Don't mention groupId in the result.`,
+    );
+  }
+
+  res.json(req.body);
 });
 
 // Start the Express server
@@ -103,3 +100,18 @@ const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });
+
+async function searchChannelsByName(name: string) {
+  const filters = {
+    type: 'messaging',
+    name: { $autocomplete: name }, // partial match
+  };
+
+  return await serverClient.queryChannels(
+    filters,
+    {},
+    {
+      limit: 1,
+    },
+  );
+}
