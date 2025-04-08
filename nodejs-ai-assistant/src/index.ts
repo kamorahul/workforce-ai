@@ -94,6 +94,7 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
       } else {
         agent.handleMessage(`Generate today's Summary for ${user.name} for groupId ${channelIdUpdated}. Don't mention groupId in the result.`);
       }
+      req.body.message.mentioned_users = []
       res.json(req.body)
 });
 
