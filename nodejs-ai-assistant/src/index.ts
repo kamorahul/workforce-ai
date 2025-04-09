@@ -102,7 +102,7 @@ app.post('/webhook', async (req, res): Promise<void> => {
   const agent = await createAgent(user as User, channel.type, channel.id);
   console.log("Body:", agent);
 
-  if(user.id==='kai' || channel.id.indexOf('kai') === 0) {
+  if(user.id==='kai' || channel.id.indexOf('kai') !== 0) {
     res.json(req.body);
     return;
 
