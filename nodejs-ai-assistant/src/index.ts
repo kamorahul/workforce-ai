@@ -35,10 +35,10 @@ app.post('/join', async (req, res): Promise<void> => {
     const channel = serverClient.channel('messaging', `kai${username}`, {
       name: `Kai`,
       created_by_id: username,
-      hidden: true,
     });
 
     await channel.create(); // Create channel
+    await channel.hide(username);
     await channel.addMembers([username, 'Kai']); // Add both users
   } catch (err: any) {
     res.status(500).json({ err: err.message });
@@ -94,6 +94,11 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
     );
   }
 
+  res.json(req.body);
+});
+
+app.post('/webhook', async (req, res): Promise<void> => {
+  console.log("Body:", req.body);
   res.json(req.body);
 });
 

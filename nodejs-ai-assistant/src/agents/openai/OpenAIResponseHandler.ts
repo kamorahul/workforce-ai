@@ -168,6 +168,23 @@ export class OpenAIResponseHandler {
     });
   };
 
+  private getGroupConversationsByLimit = async (
+    args: FetchGroupConversationArguments,
+  ) => {
+    const start = new Date();
+    start.setUTCHours(0,0,0,0);
+    const channel = this.chatClient.channel("messaging", args.groupId)
+    const page1 = await channel.query({
+      messages: { limit: 200, created_at_after_or_equal:  start.toISOString() }
+    });
+
+    return page1.messages.filter(
+        (message) => message.type !== "system"
+    ).map((message) => {
+      return `${message.user?.name}: ${message.text}`;
+    });
+  };
+
   private handleError = async (error: Error) => {
     throw new Error(`An error occurred while handling: ${error.message}`);
   };
