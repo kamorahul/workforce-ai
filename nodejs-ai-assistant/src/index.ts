@@ -83,7 +83,7 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
 
   const agent = await createAgent(user as User, channelType, channelIdUpdated);
 
-  
+
 
   await agent.init("asst_wD1s9GID1EVsh7BSLZNbkdJr");
   if (summaryChannel) {
@@ -101,8 +101,9 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
 
 app.post('/webhook', async (req, res): Promise<void> => {
   const {message, user, channel} = req.body
+  console.log("Body:", req.body);
+
   const agent = await createAgent(user as User, channel.type, channel.id);
-  console.log("Body:", agent);
 
   if(user.id==='kai' || channel.id.indexOf('kai') !== 0) {
     res.json(req.body);
