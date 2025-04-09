@@ -105,7 +105,7 @@ app.post('/webhook', async (req, res): Promise<void> => {
   await agent.init("asst_Q8vD9YOGcO3es62kFjeVZI5L");
   // if (summaryChannel) {
     agent.handleMessage(
-        channel.text
+        message.text
     );
   // } else {
   //   agent.handleMessage(
