@@ -27,14 +27,14 @@ export class OpenAIAgent implements AIAgent {
 
   getLastInteraction = (): number => this.lastInteractionTs;
 
-  init = async () => {
+  init = async (agentId: string) => {
     const apiKey = process.env.OPENAI_API_KEY as string | undefined;
     if (!apiKey) {
       throw new Error('OpenAI API key is required');
     }
 
     this.openai = new OpenAI({ apiKey });
-    this.assistant = await this.openai.beta.assistants.retrieve("asst_wD1s9GID1EVsh7BSLZNbkdJr");
+    this.assistant = await this.openai.beta.assistants.retrieve(agentId);
     this.openAiThread = await this.openai.beta.threads.create();
   };
 
