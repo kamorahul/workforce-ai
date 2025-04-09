@@ -83,6 +83,8 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
 
   const agent = await createAgent(user as User, channelType, channelIdUpdated);
 
+  
+
   await agent.init("asst_wD1s9GID1EVsh7BSLZNbkdJr");
   if (summaryChannel) {
     agent.handleMessage(
@@ -112,12 +114,6 @@ app.post('/webhook', async (req, res): Promise<void> => {
     agent.handleMessage(
         message.text
     );
-  // } else {
-  //   agent.handleMessage(
-  //       `Generate today's Summary for ${user.name} for groupId ${channelIdUpdated}. Don't mention groupId in the result.`,
-  //   );
-  // }
-
 });
 
 // Start the Express server
