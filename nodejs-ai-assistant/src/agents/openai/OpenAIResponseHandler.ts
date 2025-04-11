@@ -203,9 +203,6 @@ export class OpenAIResponseHandler {
     // const channel = this.chatClient.channel("messaging", args.username);
     const channelMessages = await this.chatClient.queryChannels({
       members: { $in: [args.username] },
-      messages: {
-        created_at_after: sevenDaysAgo.toISOString(),
-      }
     });
 
     console.log(channelMessages)
