@@ -240,8 +240,6 @@ export class OpenAIResponseHandler {
     return allMessages;
       // return messages
     }
-    ;
-  }
 
   private handleError = async (error: Error) => {
     throw new Error(`An error occurred while handling: ${error.message}`);
