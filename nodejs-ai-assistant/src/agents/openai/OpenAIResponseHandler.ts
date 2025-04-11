@@ -106,6 +106,7 @@ export class OpenAIResponseHandler {
       const toolOutputs = await Promise.all(
         data.required_action.submit_tool_outputs.tool_calls.map(
           async (toolCall) => {
+            console.log("TooCallSTART>>>>>>>>>", toolCall)
             const argumentsString = toolCall.function.arguments;
             console.log('Arguments: ', argumentsString);
             console.log('toolCall: ', toolCall.function.name);
