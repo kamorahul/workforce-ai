@@ -98,7 +98,7 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
       }
       break;
     case 'calender':
-      await agent.init("asst_Q8vD9YOGcO3es62kFjeVZI5L");
+      await agent.init("asst_iocLVsbx9oRarBKPdYbMACSY");
       if (summaryChannel) {
         console.log("Summary>>>>>>>>>>", summaryChannel)
         agent.handleMessage(
