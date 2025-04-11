@@ -237,7 +237,7 @@ export class OpenAIResponseHandler {
       });
     }
 
-    return allMessages.toString();
+    return allMessages;
       // return messages
     }
 
