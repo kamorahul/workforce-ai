@@ -8,6 +8,10 @@ interface FetchGroupConversationArguments {
   date: string;
 }
 
+interface FetchUserConversationsArguments {
+  username: string;
+}
+
 export class OpenAIResponseHandler {
   private message_text = '';
   private run_id = '';
@@ -102,18 +106,38 @@ export class OpenAIResponseHandler {
       const toolOutputs = await Promise.all(
         data.required_action.submit_tool_outputs.tool_calls.map(
           async (toolCall) => {
-            if (toolCall.function.name !== 'fetch_group_conversation') return;
-
             const argumentsString = toolCall.function.arguments;
             console.log('Arguments: ', argumentsString);
-            const args = JSON.parse(
-              argumentsString,
-            ) as FetchGroupConversationArguments;
-            const messages = await this.getGroupConversationsByDate(args);
-            return {
-              tool_call_id: toolCall.id,
-              output: messages.join(", "),
-            };
+
+            switch (toolCall.function.name){
+
+              case 'fetch_group_conversation' :
+                const args = JSON.parse(
+                    argumentsString,
+                ) as FetchGroupConversationArguments;
+                const groupMessages = await this.getGroupConversationsByDate(args);
+                return {
+                  tool_call_id: toolCall.id,
+                  output: groupMessages.join(", "),
+                };
+                break;
+
+              case 'fetch_user_conversations' :
+                const getUserConversationsArgs = JSON.parse(
+                    argumentsString,
+                ) as FetchUserConversationsArguments;
+                const userMessages = await this.getUserConversationsByLimit(getUserConversationsArgs);
+                return {
+                  tool_call_id: toolCall.id,
+                  output: userMessages.join(", "),
+                };
+                break;
+
+              default:
+                return
+            }
+
+
           },
         ),
       );
@@ -155,7 +179,9 @@ export class OpenAIResponseHandler {
     args: FetchGroupConversationArguments,
   ) => {
     const start = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     start.setUTCHours(0,0,0,0);
+
     const channel = this.chatClient.channel("messaging", args.groupId)
     const page1 = await channel.query({
       messages: { limit: 100, created_at_after_or_equal:  start.toISOString() }
@@ -168,21 +194,23 @@ export class OpenAIResponseHandler {
     });
   };
 
-  private getGroupConversationsByLimit = async (
-    args: FetchGroupConversationArguments,
+  private getUserConversationsByLimit = async (
+    args: FetchUserConversationsArguments,
   ) => {
-    const start = new Date();
-    start.setUTCHours(0,0,0,0);
-    const channel = this.chatClient.channel("messaging", args.groupId)
-    const page1 = await channel.query({
-      messages: { limit: 200, created_at_after_or_equal:  start.toISOString() }
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    // const channel = this.chatClient.channel("messaging", args.username);
+    const channelMessages = await this.chatClient.queryChannels({
+      members: { $in: [args.username] },
+      messages: {
+        limit: 200,
+        created_at_after_or_equal: sevenDaysAgo.toISOString(),
+      }
     });
 
-    return page1.messages.filter(
-        (message) => message.type !== "system"
-    ).map((message) => {
-      return `${message.user?.name}: ${message.text}`;
-    });
+    console.log(channelMessages)
+
+    return []
   };
 
   private handleError = async (error: Error) => {
