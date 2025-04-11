@@ -201,11 +201,11 @@ export class OpenAIResponseHandler {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     // const channel = this.chatClient.channel("messaging", args.username);
-    const channelMessages = await this.chatClient.queryChannels({
+    const channels = await this.chatClient.queryChannels({
       members: { $in: [args.username] },
-    });
+    }, {}, {message_limit: 100});
 
-    console.log(channelMessages)
+    console.log(JSON.stringify(channels[0].data))
 
     return []
   };
