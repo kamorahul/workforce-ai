@@ -201,22 +201,44 @@ export class OpenAIResponseHandler {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     // const channel = this.chatClient.channel("messaging", args.username);
+    // const channels = await this.chatClient.queryChannels({
+    //   members: {$in: [args.username]},
+    // }, {}, {message_limit: 100});
+    //
+    // let messages: MessageResponse<DefaultGenerics>[] = []
+    // for (const channel of channels) {
+    //   console.log("Fetching for: ", channel.data?.name)
+    //   const channelMessages = await channel.query({
+    //     messages: {
+    //       limit: 200,
+    //     }
+    //   })
+    //
+    //   messages = [...messages, ...channelMessages.messages]
+    //   console.log("Messages>>>>>>>>>>>>>", messages)
     const channels = await this.chatClient.queryChannels({
-      members: {$in: [args.username]},
-    }, {}, {message_limit: 100});
+      members: { $in: [args.username] },
+    });
 
-    let messages: MessageResponse<DefaultGenerics>[] = []
+    // Step 2: Query messages from each channel
+    const allMessages = [];
+
     for (const channel of channels) {
-      console.log("Fetching for: ", channel.data?.name)
-      const channelMessages = await channel.query({
+      const result = await channel.query({
         messages: {
-          limit: 200
-        }
-      })
+          created_at_after_or_equal: sevenDaysAgo.toISOString(),
+          limit: 200,
+        },
+      });
 
-      messages = [...messages, ...channelMessages.messages]
-      console.log("Messages>>>>>>>>>>>>>", messages)
-      return messages
+      allMessages.push({
+        channelId: channel.id,
+        messages: result.messages,
+      });
+    }
+
+    return allMessages;
+      // return messages
     }
     ;
   }
