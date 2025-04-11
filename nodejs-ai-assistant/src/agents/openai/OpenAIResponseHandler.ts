@@ -108,9 +108,9 @@ export class OpenAIResponseHandler {
           async (toolCall) => {
             const argumentsString = toolCall.function.arguments;
             console.log('Arguments: ', argumentsString);
+            console.log('toolCall: ', toolCall.function.name);
 
             switch (toolCall.function.name){
-
               case 'fetch_group_conversation' :
                 const args = JSON.parse(
                     argumentsString,
@@ -178,13 +178,13 @@ export class OpenAIResponseHandler {
   private getGroupConversationsByDate = async (
     args: FetchGroupConversationArguments,
   ) => {
-    const start = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    start.setUTCHours(0,0,0,0);
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 2);
+    sevenDaysAgo.setUTCHours(0,0,0,0);
 
     const channel = this.chatClient.channel("messaging", args.groupId)
     const page1 = await channel.query({
-      messages: { limit: 100, created_at_after_or_equal:  start.toISOString() }
+      messages: { limit: 100, created_at_after_or_equal:  sevenDaysAgo.toISOString() }
     });
 
     return page1.messages.filter(
