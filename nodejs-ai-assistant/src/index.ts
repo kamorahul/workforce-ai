@@ -102,12 +102,12 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
       if (summaryChannel) {
         console.log("Summary>>>>>>>>>>", summaryChannel)
         agent.handleMessage(
-            `Generate all the future events details for ${user.id} based on all the channel members.`,
+            `Generate all the future events details based on messages done in past seven days of all the channel members for ${user.id} .`,
         );
       } else {
         console.log("else>>>>>>>>>>", agent)
         agent.handleMessage(
-            `Generate all the future events details for ${user.id} based on all the channel members.`,
+            `Generate all the future events details based on messages done in past seven days of all the channel members for ${user.id} .`,
         );
       }
   }
