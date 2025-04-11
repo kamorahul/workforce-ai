@@ -215,7 +215,7 @@ export class OpenAIResponseHandler {
       })
 
       messages = [...messages, ...channelMessages.messages]
-
+      console.log("Messages>>>>>>>>>>>>>", messages)
       return messages
     }
     ;
