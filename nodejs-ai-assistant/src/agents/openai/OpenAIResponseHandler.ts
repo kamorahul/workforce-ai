@@ -219,7 +219,7 @@ export class OpenAIResponseHandler {
     });
 
     // Step 2: Query messages from each channel
-    const allMessages = [];
+    let allMessages: MessageResponse<DefaultGenerics>[] = [];
 
     for (const channel of channels) {
       const result = await channel.query({
@@ -229,14 +229,16 @@ export class OpenAIResponseHandler {
         },
       });
 
-      allMessages.push({
-        channelId: channel.id,
-        messages: result.messages,
-      });
+      allMessages = [...allMessages, ...result.messages];
     }
     console.log("ALl Messages>>>>>>>>>>>>>>", allMessages)
-    return allMessages;
+    // return allMessages;
       // return messages
+    return allMessages.filter(
+        (message) => message.type !== "system"
+    ).map((message) => {
+      return `${message.user?.name}: ${message.text}`;
+    });
     }
 
   private handleError = async (error: Error) => {
