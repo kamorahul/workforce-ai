@@ -204,8 +204,7 @@ export class OpenAIResponseHandler {
     const channelMessages = await this.chatClient.queryChannels({
       members: { $in: [args.username] },
       messages: {
-        limit: 200,
-        created_at_after_or_equal: sevenDaysAgo.toISOString(),
+        created_at_after: sevenDaysAgo.toISOString(),
       }
     });
 
