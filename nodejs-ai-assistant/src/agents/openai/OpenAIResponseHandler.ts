@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import type { AssistantStream } from 'openai/lib/AssistantStream';
-import type { Channel, StreamChat } from 'stream-chat';
+import type {Channel, DefaultGenerics, MessageResponse, StreamChat} from 'stream-chat';
 import {User} from "../createAgent";
 
 interface FetchGroupConversationArguments {
@@ -130,7 +130,7 @@ export class OpenAIResponseHandler {
                 const userMessages = await this.getUserConversationsByLimit(getUserConversationsArgs);
                 return {
                   tool_call_id: toolCall.id,
-                  output: userMessages.join(", "),
+                  output: userMessages?.join(", "),
                 };
                 break;
 
@@ -202,13 +202,24 @@ export class OpenAIResponseHandler {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     // const channel = this.chatClient.channel("messaging", args.username);
     const channels = await this.chatClient.queryChannels({
-      members: { $in: [args.username] },
+      members: {$in: [args.username]},
     }, {}, {message_limit: 100});
 
-    console.log(JSON.stringify(channels[0].data))
+    let messages: MessageResponse<DefaultGenerics>[] = []
+    for (const channel of channels) {
+      console.log("Fetching for: ", channel.data?.name)
+      const channelMessages = await channel.query({
+        messages: {
+          limit: 200
+        }
+      })
 
-    return []
-  };
+      messages = [...messages, ...channelMessages.messages]
+
+      return messages
+    }
+    ;
+  }
 
   private handleError = async (error: Error) => {
     throw new Error(`An error occurred while handling: ${error.message}`);
