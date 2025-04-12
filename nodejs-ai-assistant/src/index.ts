@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { createAgent, User } from './agents/createAgent';
 import { apiKey, serverClient } from './serverClient';
+import {auth} from 'express-oauth2-jwt-bearer'
 
 const app = express();
 app.use(express.json());
@@ -46,6 +47,23 @@ app.post('/join', async (req, res): Promise<void> => {
   }
 
   res.status(200).json({ user: { username }, token });
+});
+
+/*
+ * Handle Join chat user
+ * */
+app.post('/channel-join', async (req, res): Promise<void> => {
+  const { username, channelId } = req.body;
+  try {
+    // Create a new channel (if it doesn’t exist)
+    const channel = serverClient.channel('messaging', channelId);
+    await channel.addMembers([ username ]); // Add both users
+  } catch (err: any) {
+    res.status(500).json({ err: err.message });
+    return;
+  }
+
+  res.status(200).json({ status: 'ok', message: 'Channel joined successfully' });
 });
 
 /*
