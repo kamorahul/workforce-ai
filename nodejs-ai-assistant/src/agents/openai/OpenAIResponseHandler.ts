@@ -236,7 +236,7 @@ export class OpenAIResponseHandler {
     // return allMessages;
       // return messages
     return allMessages.filter(
-        (message) => message.type !== "system"
+        (message) => (message.type !== "system" && message.user?.name)
     ).map((message) => {
       return `${message.user?.name}: ${message.text}`;
     });
