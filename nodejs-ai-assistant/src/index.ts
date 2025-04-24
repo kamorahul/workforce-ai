@@ -80,6 +80,7 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
     args: channelName,
   } = message;
 
+  res.json(req.body);
   const [channel] = await searchChannelsByName(channelName.split('@')[1]);
   if (channel && channel.id) {
     summaryChannel = channel.id;
@@ -130,15 +131,13 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
       }
       break;
     case 'attendance':
-      await channel.sendMessage({
+      req.body.message = {...req.body.message, ...{
         text: 'Do you want to send this as a real message?',
-        type: 'ephemeral',
-        restricted_visibility: [user.id],
-      });
+            type: 'ephemeral',
+            restricted_visibility: [user.id],
+      }}
+      res.json(req.body);
   }
-
-
-  res.json(req.body);
 });
 
 app.post('/webhook', async (req, res): Promise<void> => {
