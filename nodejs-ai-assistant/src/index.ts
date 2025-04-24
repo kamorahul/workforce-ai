@@ -128,6 +128,13 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
             `Generate all future events(meetings, group call, work scheduling, timings, team events, company events, occasions etc.) details based on recent conversations with all the channel members for ${user.id} .`,
         );
       }
+      break;
+    case 'attendance':
+      await channel.sendMessage({
+        text: 'Do you want to send this as a real message?',
+        type: 'ephemeral',
+        restricted_visibility: [user.id],
+      });
   }
 
 
