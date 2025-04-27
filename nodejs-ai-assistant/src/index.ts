@@ -162,13 +162,17 @@ app.post('/webhook', async (req, res): Promise<void> => {
 //handle attendance
 app.post('/attendance', async (req, res) => {
   try {
-    const { userId, groupId, projectId, datetime, status } = req.body;
+    const { userId, groupId, projectId, datetime, status, messageId } = req.body;
     console.log("Body:", req.body);
     
     if (!userId || !groupId || !projectId || !datetime || !status) {
       res.status(400).json({ error: 'Missing required fields' });
       return;
     }
+    if (status === 'cancel') {
+      await serverClient.deleteMessage(messageId)
+    }
+
     if (status !== 'checkin' && status !== 'checkout') {
       res.status(400).json({ error: 'Invalid status. Must be either checkin or checkout' });
       return;
