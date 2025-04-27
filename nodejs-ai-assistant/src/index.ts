@@ -4,6 +4,8 @@ import cors from 'cors';
 import { createAgent, User } from './agents/createAgent';
 import { apiKey, serverClient } from './serverClient';
 import {auth} from 'express-oauth2-jwt-bearer'
+import { connectDB } from './config/mongodb';
+import { Attendance } from './models/Attendance';
 
 const app = express();
 app.use(express.json());
@@ -157,11 +159,74 @@ app.post('/webhook', async (req, res): Promise<void> => {
         message.text
     );
 });
+//handle attendance
+app.post('/attendance', async (req, res) => {
+  try {
+    const { userId, groupId, projectId, datetime, status } = req.body;
+    console.log("Body:", req.body);
+    
+    if (!userId || !groupId || !projectId || !datetime || !status) {
+      res.status(400).json({ error: 'Missing required fields' });
+      return;
+    }
+    if (status !== 'checkin' && status !== 'checkout') {
+      res.status(400).json({ error: 'Invalid status. Must be either checkin or checkout' });
+      return;
+    }
+
+    const attendance = new Attendance({
+      userId,
+      groupId,
+      projectId,
+      datetime: new Date(datetime),
+      status
+    });
+
+    await attendance.save();
+
+    res.status(201).json({
+      message: `Attendance ${status} recorded successfully`,
+      data: attendance
+    });
+  } catch (error) {
+    console.error('Error recording attendance:', error);
+    res.status(500).json({ error: 'Failed to record attendance' });
+  }
+});
+
+app.get('/attendance', async (req, res) => {
+  try {
+    const { userId, groupId, projectId, startDateTime, endDateTime } = req.query;
+
+    const query: any = {};
+    if (userId) query.userId = userId;
+    if (groupId) query.groupId = groupId;
+    if (projectId) query.projectId = projectId;
+    if (startDateTime && endDateTime) {
+      query.datetime = {
+        $gte: new Date(startDateTime as string),
+        $lte: new Date(endDateTime as string)
+      };
+    }
+
+    const records = await Attendance.find(query).sort({ datetime: -1 });
+    res.json(records);
+  } catch (error) {
+    console.error('Error fetching attendance records:', error);
+    res.status(500).json({ error: 'Failed to fetch attendance records' });
+  }
+});
 
 // Start the Express server
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+app.listen(port, async () => {
+  try {
+    await connectDB();
+    console.log(`Server is running on http://localhost:${port}`);
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
 });
 
 async function searchChannelsByName(name: string) {
