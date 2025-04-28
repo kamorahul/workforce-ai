@@ -165,12 +165,15 @@ app.post('/attendance', async (req, res) => {
     const { userId, groupId, projectId, datetime, status, messageId } = req.body;
     console.log("Body:", req.body);
     
-    if (!userId || !groupId || !projectId || !datetime || !status) {
+    if (!userId || !projectId || !status) {
       res.status(400).json({ error: 'Missing required fields' });
       return;
     }
     if (status === 'cancel') {
-      await serverClient.deleteMessage(messageId)
+      await serverClient.deleteMessage(messageId, true);
+      res.status(201).json({
+        message: `Attendance canceled successfully`,
+      });
     }
 
     if (status !== 'checkin' && status !== 'checkout') {
