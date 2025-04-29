@@ -170,10 +170,15 @@ app.post('/attendance', async (req, res) => {
       return;
     }
     if (status === 'cancel') {
-      await serverClient.deleteMessage(messageId, true);
+       await serverClient.deleteMessage(messageId, true);
       res.status(201).json({
-        message: `Attendance canceled successfully`,
+        message: {
+          text: 'Attendance canceled successfully',
+          type: 'regular',
+          restricted_visibility: [userId]
+        }
       });
+      return;
     }
 
     if (status !== 'checkin' && status !== 'checkout') {
@@ -192,7 +197,11 @@ app.post('/attendance', async (req, res) => {
     await attendance.save();
 
     res.status(201).json({
-      message: `Attendance ${status} recorded successfully`,
+      message: {
+        text: `User ${userId} has ${status === 'checkin' ? 'checkin' : 'checkout'} successfully in ${projectId}.`,
+        type: 'regular',
+        restricted_visibility: [userId]
+      },
       data: attendance
     });
   } catch (error) {
