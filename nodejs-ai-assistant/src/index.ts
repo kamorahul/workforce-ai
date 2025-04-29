@@ -216,12 +216,14 @@ app.post('/attendance', async (req, res) => {
     });
 
     await attendance.save();
+    await serverClient.deleteMessage(messageId, true);
 
-    await serverClient.updateMessage({
+    await serverClient.channel("messaging", projectId).sendMessage({
       user_id: userId,
       id: messageId,
       text: `${status === 'checkin' ? 'Checkin': 'Checkout' } Done`,
-      type: 'regular'
+      type: 'regular',
+      restricted_visibility: [userId]
     });
     res.status(201).json({
       status: 'success',
