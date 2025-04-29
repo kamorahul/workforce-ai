@@ -216,7 +216,7 @@ app.post('/attendance', async (req, res) => {
 
     await attendance.save();
 
-    await serverClient.updateMessage({id: messageId, text: `${status === 'checkin' ? 'Checkin': 'Checkout' } Done`, type: 'regular'});
+    await serverClient.updateMessage({user_id: userId, id: messageId, text: `${status === 'checkin' ? 'Checkin': 'Checkout' } Done`, type: 'regular'});
     res.status(201).json({
       status: 'success',
     });
