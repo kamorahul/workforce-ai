@@ -170,15 +170,36 @@ app.post('/attendance', async (req, res) => {
       return;
     }
     if (status === 'cancel') {
-       await serverClient.deleteMessage(messageId, true);
-      res.status(201).json({
-        message: {
-          text: 'Attendance canceled successfully',
-          type: 'regular',
-          restricted_visibility: [userId]
+      try {
+        await serverClient.deleteMessage(messageId, true);
+        res.status(201).json({
+          message: {
+            text: 'Attendance canceled successfully',
+            type: 'regular',
+            restricted_visibility: [userId]
+          }
+        });
+        return;
+      } catch (deleteError: any) {
+        console.error("Error deleting message:", deleteError);
+        // Check if error is due to message not found
+        if (deleteError.message && deleteError.message.includes('not found')) {
+          res.status(404).json({ 
+            error: 'Message not found',
+            message: {
+              text: 'Attendance message not found',
+              type: 'regular',
+              restricted_visibility: [userId]
+            }
+          });
+        } else {
+          res.status(500).json({ 
+            error: 'Failed to delete attendance message',
+            details: deleteError.message 
+          });
         }
-      });
-      return;
+        return;
+      }
     }
 
     if (status !== 'checkin' && status !== 'checkout') {
