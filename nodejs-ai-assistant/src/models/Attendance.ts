@@ -2,7 +2,6 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IAttendance extends Document {
   userId: string;
-  groupId: string;
   projectId: string;
   datetime: Date;
   status: 'checkin' | 'checkout';
@@ -12,11 +11,6 @@ export interface IAttendance extends Document {
 
 const AttendanceSchema: Schema = new Schema({
   userId: {
-    type: String,
-    required: true,
-    index: true
-  },
-  groupId: {
     type: String,
     required: true,
     index: true

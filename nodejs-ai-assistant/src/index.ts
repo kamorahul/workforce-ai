@@ -162,7 +162,7 @@ app.post('/webhook', async (req, res): Promise<void> => {
 //handle attendance
 app.post('/attendance', async (req, res) => {
   try {
-    const { userId, groupId, projectId, datetime, status, messageId } = req.body;
+    const { userId, projectId, datetime, status, messageId } = req.body;
     console.log("Body:", req.body);
     
     if (!userId || !projectId || !status) {
@@ -209,7 +209,6 @@ app.post('/attendance', async (req, res) => {
 
     const attendance = new Attendance({
       userId,
-      groupId,
       projectId,
       datetime: new Date(datetime),
       status
@@ -217,13 +216,9 @@ app.post('/attendance', async (req, res) => {
 
     await attendance.save();
 
+    await serverClient.updateMessage({id: messageId, text: `${status === 'checkin' ? 'Checkin': 'Checkout' } Done`, type: 'regular'});
     res.status(201).json({
-      message: {
-        text: `User ${userId} has ${status === 'checkin' ? 'checkin' : 'checkout'} successfully in ${projectId}.`,
-        type: 'regular',
-        restricted_visibility: [userId]
-      },
-      data: attendance
+      status: 'success',
     });
   } catch (error) {
     console.error('Error recording attendance:', error);
