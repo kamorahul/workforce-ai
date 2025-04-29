@@ -133,9 +133,10 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
       break;
     case 'attendance':
       req.body.message = {...req.body.message, ...{
-        text: 'Do you want to send this as a real message?',
-            type: 'ephemeral',
-            restricted_visibility: [user.id],
+        text: 'Attendance',
+        type: 'regular',
+        action_type: 'attendance',
+        restricted_visibility: [user.id],
       }}
       res.json(req.body);
   }
@@ -216,7 +217,12 @@ app.post('/attendance', async (req, res) => {
 
     await attendance.save();
 
-    await serverClient.updateMessage({user_id: userId, id: messageId, text: `${status === 'checkin' ? 'Checkin': 'Checkout' } Done`, type: 'regular'});
+    await serverClient.updateMessage({
+      user_id: userId,
+      id: messageId,
+      text: `${status === 'checkin' ? 'Checkin': 'Checkout' } Done`,
+      type: 'regular'
+    });
     res.status(201).json({
       status: 'success',
     });
