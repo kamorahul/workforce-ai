@@ -34,7 +34,7 @@ app.post('/join', async (req, res): Promise<void> => {
     // Ensure the user "Kai" exists
     await serverClient.upsertUser({ id: 'Kai', name: 'Kai' });
 
-    // Create a new channel (if it doesn’t exist)
+    // Create a new channel (if it doesn't exist)
     const channel = serverClient.channel('messaging', `kai${username}`, {
       name: `Kai`,
       created_by_id: username,
@@ -50,22 +50,77 @@ app.post('/join', async (req, res): Promise<void> => {
 
   res.status(200).json({ user: { username }, token });
 });
+// Function to convert email to stream format
+function convertEmailToStreamFormat(email: string) {
+  // Replace dots with underscores
+  let converted = email.replace(/\./g, '_');
+  // Replace @ with underscore
+  converted = converted.replace(/@/g, '_');
+  return converted;
+}
 
 /*
  * Handle Join chat user
  * */
 app.post('/channel-join', async (req, res): Promise<void> => {
-  const { username, channelId } = req.body;
+  const { isNewChannel, projectData, username, channelId } = req.body;
+
   try {
-    // Create a new channel (if it doesn’t exist)
-    const channel = serverClient.channel('messaging', channelId);
-    await channel.addMembers([ username ]); // Add both users
+    if (isNewChannel && projectData) {
+      const { email, projectName, projectDetails } = projectData;
+      
+      const newChannelId = `${projectName.toLowerCase().replace(/\s+/g, '-')}-${convertEmailToStreamFormat(email)}`;
+      
+      const channelData = {
+        name: projectName,
+        created_by_id: convertEmailToStreamFormat(email),
+        members: [convertEmailToStreamFormat(email)], // Initial member is the creator
+        custom: {
+          projectDetails: {
+            description: projectDetails?.description || '',
+            location: projectDetails?.location || '',
+            startTime: projectDetails?.startTime || null,
+            endTime: projectDetails?.endTime || null,
+            timeSheetRequirement: projectDetails?.timeSheetRequirement || false,
+            swms: projectDetails?.swms || ''
+          }
+        }
+      };
+
+      const channel = serverClient.channel('messaging', newChannelId, channelData);
+      await channel.create();
+
+      res.status(200).json({ 
+        status: 'success',
+        message: 'Channel created successfully',
+        channelId: newChannelId
+      });
+    } else {
+      // Handle joining existing channel
+      if (!username || !channelId) {
+        res.status(400).json({ 
+          error: 'Missing required fields',
+          details: 'username and channelId are required for joining a channel'
+        });
+        return;
+      }
+
+      const channel = serverClient.channel('messaging', channelId);
+      await channel.addMembers([username]);
+
+      res.status(200).json({ 
+        status: 'success',
+        message: 'Channel joined successfully'
+      });
+    }
   } catch (err: any) {
-    res.status(500).json({ err: err.message });
+    console.error('Channel operation error:', err);
+    res.status(500).json({ 
+      error: 'Operation failed',
+      details: err.message 
+    });
     return;
   }
-
-  res.status(200).json({ status: 'ok', message: 'Channel joined successfully' });
 });
 
 /*
