@@ -68,15 +68,14 @@ app.post('/channel-join', async (req, res): Promise<void> => {
   try {
     if (isNewChannel && projectData) {
       const { email, projectName, projectDetails } = projectData;
-      
       const newChannelId = `${projectName.toLowerCase().replace(/\s+/g, '-')}-${convertEmailToStreamFormat(email)}`;
-      
       const channelData = {
         name: projectName,
         created_by_id: convertEmailToStreamFormat(email),
-        members: [convertEmailToStreamFormat(email)], // Initial member is the creator
-        custom: {
-          projectDetails: {
+        members: [convertEmailToStreamFormat(email)],
+        projectId: projectData.projectId, 
+        qrCode: projectData.qrCode,
+        projectDetails: {
             description: projectDetails?.description || '',
             location: projectDetails?.location || '',
             startTime: projectDetails?.startTime || null,
@@ -84,11 +83,15 @@ app.post('/channel-join', async (req, res): Promise<void> => {
             timeSheetRequirement: projectDetails?.timeSheetRequirement || false,
             swms: projectDetails?.swms || ''
           }
-        }
       };
 
       const channel = serverClient.channel('messaging', newChannelId, channelData);
       await channel.create();
+
+      await channel.sendMessage({
+        text: `Welcome to ${projectName}! This channel has been created for project management and communication.`,
+        user_id: convertEmailToStreamFormat(email)
+      });
 
       res.status(200).json({ 
         status: 'success',
