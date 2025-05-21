@@ -75,6 +75,7 @@ app.post('/channel-join', async (req, res): Promise<void> => {
         members: [convertEmailToStreamFormat(email)],
         projectId: projectData.projectId, 
         qrCode: projectData.qrCode,
+        location: projectData.location,
         projectDetails: {
             description: projectDetails?.description || '',
             location: projectDetails?.location || '',
