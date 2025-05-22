@@ -6,6 +6,7 @@ import { apiKey, serverClient } from './serverClient';
 import {auth} from 'express-oauth2-jwt-bearer'
 import { connectDB } from './config/mongodb';
 import { Attendance } from './models/Attendance';
+import { convertEmailToStreamFormat, convertStreamToEmail } from './utils/index';
 
 const app = express();
 app.use(express.json());
@@ -50,14 +51,7 @@ app.post('/join', async (req, res): Promise<void> => {
 
   res.status(200).json({ user: { username }, token });
 });
-// Function to convert email to stream format
-function convertEmailToStreamFormat(email: string) {
-  // Replace dots with underscores
-  let converted = email.replace(/\./g, '_');
-  // Replace @ with underscore
-  converted = converted.replace(/@/g, '_');
-  return converted;
-}
+
 
 /*
  * Handle Join chat user
@@ -313,6 +307,104 @@ app.get('/attendance', async (req, res) => {
   } catch (error) {
     console.error('Error fetching attendance records:', error);
     res.status(500).json({ error: 'Failed to fetch attendance records' });
+  }
+});
+
+
+app.post('/send-attendance-message', async (req, res) => {
+  try {
+    const { userId, projectId } = req.body;
+    
+    if (!userId || !projectId) {
+      res.status(400).json({ error: 'Missing required fields' });
+      return;
+    }
+
+    const user = await serverClient.queryUsers({ id: userId });
+    const userName = user.users[0]?.name || convertStreamToEmail(userId);
+
+    const channel = serverClient.channel('messaging', projectId);
+
+    const messages = await channel.state.messages;
+    const userMessages = messages.filter(m => 
+      m.user_id === userId && 
+      m.action_type === 'attendance'
+    ).sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    const lastMessage = userMessages[0];
+    const shouldCheckIn = !lastMessage || (lastMessage.text && lastMessage.text.includes('Check-out'));
+
+    const response = await channel.sendMessage({
+      user_id: userId,
+      text: shouldCheckIn 
+        ? `Dear ${userName},
+        Please check in to the project to record your attendance. Your check-in time has not been registered yet.`
+        : `Dear ${userName},
+        Please check out from the project to record your attendance. Your check-out time has not been registered yet.`,
+      type: 'regular',
+      action_type: 'attendance',
+      show_in_channel: true
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    res.status(201).json({
+      status: 'success',
+      message: 'Attendance message sent successfully',
+      messageId: response.message.id,
+      action: shouldCheckIn ? 'checkin' : 'checkout'
+    });
+  } catch (error) {
+    console.error('Error sending attendance message:', error);
+    res.status(500).json({ error: 'Failed to send attendance message' });
+  }
+});
+
+app.get('/check-message-status', async (req, res) => {
+  try {
+    const { messageId, projectId } = req.query;
+
+    if (!messageId || !projectId) {
+      res.status(400).json({ error: 'Missing required fields: messageId and projectId' });
+      return;
+    }
+
+
+    const channel = serverClient.channel('messaging', projectId as string);
+    
+   
+    await channel.watch();
+
+  
+    const messages = await channel.state.messages;
+    const message = messages.find(m => m.id === messageId);
+
+    if (!message) {
+      res.status(404).json({ error: 'Message not found' });
+      return;
+    }
+
+    const messageDetails = {
+      id: message.id,
+      text: message.text,
+      user_id: message.user_id,
+      created_at: message.created_at,
+      status: message.status,
+      type: message.type,
+      action_type: message.action_type,
+      restricted_visibility: message.restricted_visibility
+    };
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Message details retrieved successfully',
+      data: messageDetails
+    });
+  } catch (error) {
+    console.error('Error checking message status:', error);
+    res.status(500).json({ error: 'Failed to check message status' });
   }
 });
 
