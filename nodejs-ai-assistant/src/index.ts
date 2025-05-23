@@ -324,41 +324,94 @@ app.post('/send-attendance-message', async (req, res) => {
     const userName = user.users[0]?.name || convertStreamToEmail(userId);
 
     const channel = serverClient.channel('messaging', projectId);
-
-    const messages = await channel.state.messages;
-    const userMessages = messages.filter(m => 
-      m.user_id === userId && 
-      m.action_type === 'attendance'
-    ).sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-
-    const lastMessage = userMessages[0];
-    const shouldCheckIn = !lastMessage || (lastMessage.text && lastMessage.text.includes('Check-out'));
-
-    const response = await channel.sendMessage({
-      user_id: userId,
-      text: shouldCheckIn 
-        ? `Dear ${userName},
-        Please check in to the project to record your attendance. Your check-in time has not been registered yet.`
-        : `Dear ${userName},
-        Please check out from the project to record your attendance. Your check-out time has not been registered yet.`,
-      type: 'regular',
-      action_type: 'attendance',
-      show_in_channel: true
-    });
-
+    
+    await channel.watch();
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    res.status(201).json({
-      status: 'success',
-      message: 'Attendance message sent successfully',
-      messageId: response.message.id,
-      action: shouldCheckIn ? 'checkin' : 'checkout'
+    const messages = await channel.state.messages;
+   
+    const userAttendanceMessages = messages
+      .filter(m => {
+        const isAttendance = m.action_type === 'attendance';
+        const isUserMessage = m.user?.id === userId;
+        return isAttendance && isUserMessage;
+      })
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+
+    if (userAttendanceMessages.length > 0) {
+      const lastMessage = userAttendanceMessages[0];
+      const messageTime = new Date(lastMessage.created_at);
+      const currentTime = new Date();
+      const hoursDiff = (currentTime.getTime() - messageTime.getTime()) / (1000 * 60 * 60);
+
+      if (hoursDiff < 12) {
+        const messageText = lastMessage.text || '';
+        
+        res.status(200).json({
+          status: 'success',
+          message: 'Attendance message already sent within last 12 hours',
+          messageId: lastMessage.id,
+          action: messageText.toLowerCase().includes('check in') ? 'checkin' : 'checkout'
+        });
+        return;
+      }
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const attendanceRecords = await Attendance.find({
+      userId,
+      projectId,
+      datetime: {
+        $gte: today,
+        $lt: tomorrow
+      }
+    }).sort({ datetime: -1 });
+
+    let shouldCheckIn = true;
+    if (attendanceRecords.length > 0) {
+      const lastRecord = attendanceRecords[0];
+      shouldCheckIn = lastRecord.status === 'checkout';
+    }
+
+    try {
+      const response = await channel.sendMessage({
+        user_id: userId,
+        text: shouldCheckIn 
+          ? `Dear ${userName},
+          Please check in to the project to record your attendance. Your check-in time has not been registered yet.`
+          : `Dear ${userName},
+          Please check out from the project to record your attendance. Your check-out time has not been registered yet.`,
+        type: 'regular',
+        action_type: 'attendance',
+        show_in_channel: true
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      res.status(201).json({
+        status: 'success',
+        message: 'Attendance message sent successfully',
+        messageId: response.message.id,
+        action: shouldCheckIn ? 'checkin' : 'checkout'
+      });
+    } catch (sendError: any) {
+      console.error('Error sending message:', sendError);
+      res.status(500).json({ 
+        error: 'Failed to send attendance message',
+        details: sendError.message 
+      });
+    }
+  } catch (error: any) {
+    console.error('Error in attendance message process:', error);
+    res.status(500).json({ 
+      error: 'Failed to process attendance message',
+      details: error.message 
     });
-  } catch (error) {
-    console.error('Error sending attendance message:', error);
-    res.status(500).json({ error: 'Failed to send attendance message' });
   }
 });
 
@@ -371,13 +424,8 @@ app.get('/check-message-status', async (req, res) => {
       return;
     }
 
-
     const channel = serverClient.channel('messaging', projectId as string);
-    
-   
     await channel.watch();
-
-  
     const messages = await channel.state.messages;
     const message = messages.find(m => m.id === messageId);
 
@@ -423,14 +471,28 @@ app.get('/projects', async (req, res) => {
       type: 'messaging'
     });
 
-    const projects = channels.map(channel => ({
-      projectId: channel.id,
-      projectName: channel.data?.name || '',
-      createdBy: channel.data?.created_by_id || '',
-      projectDetails: channel.data?.projectDetails || {},
-      qrCode: channel.data?.qrCode || '',
-      location: channel.data?.location || ''
-    }));
+    const projects = channels
+      .map(channel => {
+        const location = channel.data?.location;
+        const hasCoordinates = location && 
+          typeof location === 'object' && 
+          'type' in location && 
+          'coordinates' in location &&
+          Array.isArray(location.coordinates) &&
+          location.coordinates.length === 2;
+          
+        if (!hasCoordinates) return null;
+
+        return {
+          projectId: channel.id,
+          projectName: channel.data?.name || '',
+          createdBy: channel.data?.created_by_id || '',
+          projectDetails: channel.data?.projectDetails || {},
+          qrCode: channel.data?.qrCode || '',
+          location: location.coordinates
+        };
+      })
+      .filter(project => project !== null);
 
     res.status(200).json({
       status: 'success',
