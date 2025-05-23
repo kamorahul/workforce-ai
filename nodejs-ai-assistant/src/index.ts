@@ -408,6 +408,40 @@ app.get('/check-message-status', async (req, res) => {
   }
 });
 
+
+app.get('/projects', async (req, res) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId || typeof userId !== 'string') {
+      res.status(400).json({ error: 'Missing or invalid userId' });
+      return;
+    }
+
+    const channels = await serverClient.queryChannels({
+      members: { $in: [userId as string] },
+      type: 'messaging'
+    });
+
+    const projects = channels.map(channel => ({
+      projectId: channel.id,
+      projectName: channel.data?.name || '',
+      createdBy: channel.data?.created_by_id || '',
+      projectDetails: channel.data?.projectDetails || {},
+      qrCode: channel.data?.qrCode || '',
+      location: channel.data?.location || ''
+    }));
+
+    res.status(200).json({
+      status: 'success',
+      data: projects
+    });
+  } catch (error) {
+    console.error('Error fetching projects:', error);
+    res.status(500).json({ error: 'Failed to fetch projects' });
+  }
+});
+
 // Start the Express server
 const port = process.env.PORT || 3000;
 app.listen(port, async () => {
