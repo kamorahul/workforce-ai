@@ -83,11 +83,6 @@ app.post('/channel-join', async (req, res): Promise<void> => {
       const channel = serverClient.channel('messaging', newChannelId, channelData);
       await channel.create();
 
-      await channel.sendMessage({
-        text: `Welcome to ${projectName}! This channel has been created for project management and communication.`,
-        user_id: convertEmailToStreamFormat(email)
-      });
-
       res.status(200).json({ 
         status: 'success',
         message: 'Channel created successfully',
