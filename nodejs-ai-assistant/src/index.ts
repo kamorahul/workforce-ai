@@ -308,9 +308,9 @@ app.get('/attendance', async (req, res) => {
 
 app.post('/send-attendance-message', async (req, res) => {
   try {
-    const { userId, projectId } = req.body;
+    const { userId, projectId, action } = req.body;
     
-    if (!userId || !projectId) {
+    if (!userId || !projectId || !action) {
       res.status(400).json({ error: 'Missing required fields' });
       return;
     }
@@ -323,7 +323,7 @@ app.post('/send-attendance-message', async (req, res) => {
     await channel.watch();
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    const messages = await channel.state.messages;
+    const messages = channel.state.messages;
    
     const userAttendanceMessages = messages
       .filter(m => {
@@ -340,7 +340,7 @@ app.post('/send-attendance-message', async (req, res) => {
       const currentTime = new Date();
       const hoursDiff = (currentTime.getTime() - messageTime.getTime()) / (1000 * 60 * 60);
 
-      if (hoursDiff < 12) {
+      if (hoursDiff < 6) {
         const messageText = lastMessage.text || '';
         
         res.status(200).json({
@@ -383,7 +383,7 @@ app.post('/send-attendance-message', async (req, res) => {
           Please check out from the project to record your attendance. Your check-out time has not been registered yet.`,
         type: 'regular',
         action_type: 'attendance',
-        show_in_channel: true
+        restricted_visibility: [ userId ],
       });
 
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -421,7 +421,7 @@ app.get('/check-message-status', async (req, res) => {
 
     const channel = serverClient.channel('messaging', projectId as string);
     await channel.watch();
-    const messages = await channel.state.messages;
+    const messages = channel.state.messages;
     const message = messages.find(m => m.id === messageId);
 
     if (!message) {
