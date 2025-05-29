@@ -8,6 +8,7 @@ import { connectDB } from './config/mongodb';
 import { Attendance } from './models/Attendance';
 import { AttendanceLog } from '../models/AttendanceLog';
 import { convertEmailToStreamFormat, convertStreamToEmail } from './utils/index';
+import { setupAutoAttendanceCronJob } from './cron/autoAttendance';
 
 const app = express();
 app.use(express.json());
@@ -519,6 +520,7 @@ app.listen(port, async () => {
   try {
     await connectDB();
     console.log(`Server is running on http://localhost:${port}`);
+    setupAutoAttendanceCronJob(); // Initialize and start the cron job
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);
