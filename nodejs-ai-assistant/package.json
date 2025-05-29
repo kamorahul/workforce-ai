@@ -21,6 +21,7 @@
     "express": "^4.21.1",
     "express-oauth2-jwt-bearer": "^1.6.1",
     "mongoose": "^8.12.1",
+    "node-cron": "^4.0.7",
     "openai": "^4.73.1",
     "stream-chat": "^8.46.0"
   },
