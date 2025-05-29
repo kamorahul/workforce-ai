@@ -6,7 +6,9 @@ import { apiKey, serverClient } from './serverClient';
 import {auth} from 'express-oauth2-jwt-bearer'
 import { connectDB } from './config/mongodb';
 import { Attendance } from './models/Attendance';
+import { AttendanceLog } from './models/AttendanceLog';
 import { convertEmailToStreamFormat, convertStreamToEmail } from './utils/index';
+import { setupAutoAttendanceCronJob } from './cron/autoAttendance';
 
 const app = express();
 app.use(express.json());
@@ -264,6 +266,21 @@ app.post('/attendance', async (req, res) => {
     });
 
     await attendance.save();
+
+    // Create and save AttendanceLog
+    try {
+      const attendanceLog = new AttendanceLog({
+        userId: attendance.userId,
+        projectId: attendance.projectId,
+        timestamp: attendance.datetime,
+        action: attendance.status === 'checkin' ? 'ENTER' : 'EXIT',
+      });
+      await attendanceLog.save();
+    } catch (logError) {
+      console.error('Error saving AttendanceLog:', logError);
+      // For now, we just log the error and don't let it affect the main response
+    }
+
     await serverClient.deleteMessage(messageId, true);
 
     await serverClient.channel("messaging", projectId).sendMessage({
@@ -317,95 +334,93 @@ app.post('/send-attendance-message', async (req, res) => {
 
     const user = await serverClient.queryUsers({ id: userId });
     const userName = user.users[0]?.name || convertStreamToEmail(userId);
-
     const channel = serverClient.channel('messaging', projectId);
-    
-    await channel.watch();
-    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    const messages = channel.state.messages;
-   
-    const userAttendanceMessages = messages
-      .filter(m => {
-        const isAttendance = m.action_type === 'attendance';
-        const isUserMessage = m.user?.id === userId;
-        return isAttendance && isUserMessage;
-      })
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    // Determine Current Day Boundaries
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
 
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
 
-    if (userAttendanceMessages.length > 0) {
-      const lastMessage = userAttendanceMessages[0];
-      const messageTime = new Date(lastMessage.created_at);
-      const currentTime = new Date();
-      const hoursDiff = (currentTime.getTime() - messageTime.getTime()) / (1000 * 60 * 60);
+    if (action === 'checkin') {
+      // Query for existing check-in records for the day
+      const todaysCheckins = await Attendance.find({
+        userId,
+        projectId,
+        status: 'checkin',
+        datetime: {
+          $gte: todayStart,
+          $lte: todayEnd,
+        },
+      });
 
-      if (hoursDiff < 6) {
-        const messageText = lastMessage.text || '';
-        
+      if (todaysCheckins.length === 0) {
+        // First Enter: Send check-in prompt
+        try {
+          const response = await channel.sendMessage({
+            user_id: userId,
+            text: `Dear ${userName},\nPlease check in to the project to record your attendance. Your check-in time has not been registered yet.`,
+            type: 'regular',
+            action_type: 'attendance',
+            restricted_visibility: [userId],
+          });
+          // Adding a small delay, if necessary for message propagation, though typically not required for send and then respond.
+          // await new Promise(resolve => setTimeout(resolve, 1000)); 
+          res.status(201).json({
+            status: 'success',
+            message: 'Attendance message sent successfully',
+            messageId: response.message.id,
+            action: 'checkin',
+          });
+        } catch (sendError: any) {
+          console.error('Error sending check-in message:', sendError);
+          res.status(500).json({
+            error: 'Failed to send check-in message',
+            details: sendError.message,
+          });
+        }
+      } else {
+        // Already checked in today
         res.status(200).json({
-          status: 'success',
-          message: 'Attendance message already sent within last 12 hours',
-          messageId: lastMessage.id,
-          action: messageText.toLowerCase().includes('check in') ? 'checkin' : 'checkout'
+          status: 'info',
+          message: 'Already checked in today. No message sent.',
+          action: 'checkin',
         });
-        return;
       }
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const attendanceRecords = await Attendance.find({
-      userId,
-      projectId,
-      datetime: {
-        $gte: today,
-        $lt: tomorrow
+    } else if (action === 'checkout') {
+      // Last Exit: Send check-out prompt
+      try {
+        const response = await channel.sendMessage({
+          user_id: userId,
+          text: `Dear ${userName},\nPlease check out from the project to record your attendance. Your check-out time has not been registered yet.`,
+          type: 'regular',
+          action_type: 'attendance',
+          restricted_visibility: [userId],
+        });
+        // await new Promise(resolve => setTimeout(resolve, 1000));
+        res.status(201).json({
+          status: 'success',
+          message: 'Attendance message sent successfully',
+          messageId: response.message.id,
+          action: 'checkout',
+        });
+      } catch (sendError: any) {
+        console.error('Error sending check-out message:', sendError);
+        res.status(500).json({
+          error: 'Failed to send check-out message',
+          details: sendError.message,
+        });
       }
-    }).sort({ datetime: -1 });
-
-    let shouldCheckIn = true;
-    if (attendanceRecords.length > 0) {
-      const lastRecord = attendanceRecords[0];
-      shouldCheckIn = lastRecord.status === 'checkout';
-    }
-
-    try {
-      const response = await channel.sendMessage({
-        user_id: userId,
-        text: shouldCheckIn 
-          ? `Dear ${userName},
-          Please check in to the project to record your attendance. Your check-in time has not been registered yet.`
-          : `Dear ${userName},
-          Please check out from the project to record your attendance. Your check-out time has not been registered yet.`,
-        type: 'regular',
-        action_type: 'attendance',
-        restricted_visibility: [ userId ],
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      res.status(201).json({
-        status: 'success',
-        message: 'Attendance message sent successfully',
-        messageId: response.message.id,
-        action: shouldCheckIn ? 'checkin' : 'checkout'
-      });
-    } catch (sendError: any) {
-      console.error('Error sending message:', sendError);
-      res.status(500).json({ 
-        error: 'Failed to send attendance message',
-        details: sendError.message 
-      });
+    } else {
+      // Invalid action
+      res.status(400).json({ error: 'Invalid action specified. Must be "checkin" or "checkout".' });
     }
   } catch (error: any) {
-    console.error('Error in attendance message process:', error);
-    res.status(500).json({ 
+    console.error('Error in send-attendance-message process:', error);
+    res.status(500).json({
       error: 'Failed to process attendance message',
-      details: error.message 
+      details: error.message,
     });
   }
 });
@@ -505,6 +520,7 @@ app.listen(port, async () => {
   try {
     await connectDB();
     console.log(`Server is running on http://localhost:${port}`);
+    setupAutoAttendanceCronJob(); // Initialize and start the cron job
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);
