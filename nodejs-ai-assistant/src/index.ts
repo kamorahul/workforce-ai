@@ -6,7 +6,8 @@ import { apiKey, serverClient } from './serverClient';
 import {auth} from 'express-oauth2-jwt-bearer'
 import { connectDB } from './config/mongodb';
 import { Attendance } from './models/Attendance';
-import { AttendanceLog } from './models/AttendanceLog';
+import { AttendanceLog } from '../models/AttendanceLog';
+import { SentMessageLog } from './models/SentMessageLog';
 import { convertEmailToStreamFormat, convertStreamToEmail } from './utils/index';
 import { setupAutoAttendanceCronJob } from './cron/autoAttendance';
 
@@ -343,6 +344,8 @@ app.post('/send-attendance-message', async (req, res) => {
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999);
 
+    const eventDateForLog = new Date(todayStart); // For SentMessageLog
+
     if (action === 'checkin') {
       // Query for existing check-in records for the day
       const todaysCheckins = await Attendance.find({
@@ -356,7 +359,20 @@ app.post('/send-attendance-message', async (req, res) => {
       });
 
       if (todaysCheckins.length === 0) {
-        // First Enter: Send check-in prompt
+        // First Enter: Check if prompt already sent today
+        const existingPromptLog = await SentMessageLog.findOne({
+          userId,
+          projectId,
+          messageType: 'first_enter_prompt',
+          eventDate: eventDateForLog
+        });
+
+        if (existingPromptLog) {
+          res.status(200).json({ status: 'info', message: 'First enter prompt already sent today for this project.', action: 'checkin' });
+          return;
+        }
+
+        // Send check-in prompt
         try {
           const response = await channel.sendMessage({
             user_id: userId,
@@ -365,8 +381,19 @@ app.post('/send-attendance-message', async (req, res) => {
             action_type: 'attendance',
             restricted_visibility: [userId],
           });
-          // Adding a small delay, if necessary for message propagation, though typically not required for send and then respond.
-          // await new Promise(resolve => setTimeout(resolve, 1000)); 
+          
+          try {
+            await new SentMessageLog({
+              userId,
+              projectId,
+              messageType: 'first_enter_prompt',
+              eventDate: eventDateForLog
+            }).save();
+          } catch (logSaveError) {
+            console.error('Error saving SentMessageLog for first_enter_prompt:', logSaveError);
+            // Do not fail the main operation if logging fails
+          }
+
           res.status(201).json({
             status: 'success',
             message: 'Attendance message sent successfully',
@@ -381,7 +408,7 @@ app.post('/send-attendance-message', async (req, res) => {
           });
         }
       } else {
-        // Already checked in today
+        // Already checked in today, no prompt needed
         res.status(200).json({
           status: 'info',
           message: 'Already checked in today. No message sent.',
@@ -389,7 +416,20 @@ app.post('/send-attendance-message', async (req, res) => {
         });
       }
     } else if (action === 'checkout') {
-      // Last Exit: Send check-out prompt
+      // Last Exit: Check if prompt already sent today
+      const existingPromptLog = await SentMessageLog.findOne({
+        userId,
+        projectId,
+        messageType: 'last_exit_prompt',
+        eventDate: eventDateForLog
+      });
+
+      if (existingPromptLog) {
+        res.status(200).json({ status: 'info', message: 'Exit prompt already sent today for this project.', action: 'checkout' });
+        return;
+      }
+      
+      // Send check-out prompt
       try {
         const response = await channel.sendMessage({
           user_id: userId,
@@ -398,7 +438,19 @@ app.post('/send-attendance-message', async (req, res) => {
           action_type: 'attendance',
           restricted_visibility: [userId],
         });
-        // await new Promise(resolve => setTimeout(resolve, 1000));
+
+        try {
+          await new SentMessageLog({
+            userId,
+            projectId,
+            messageType: 'last_exit_prompt',
+            eventDate: eventDateForLog
+          }).save();
+        } catch (logSaveError) {
+          console.error('Error saving SentMessageLog for last_exit_prompt:', logSaveError);
+          // Do not fail the main operation if logging fails
+        }
+
         res.status(201).json({
           status: 'success',
           message: 'Attendance message sent successfully',
