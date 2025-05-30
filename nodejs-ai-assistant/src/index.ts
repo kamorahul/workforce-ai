@@ -436,6 +436,7 @@ app.post('/send-attendance-message', async (req, res) => {
           text: `Dear ${userName},\nPlease check out from the project to record your attendance. Your check-out time has not been registered yet.`,
           type: 'regular',
           action_type: 'attendance',
+
           restricted_visibility: [userId],
         });
 
