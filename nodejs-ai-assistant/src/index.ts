@@ -327,7 +327,8 @@ app.get('/attendance', async (req, res) => {
 app.post('/send-attendance-message', async (req, res) => {
   try {
     const { userId, projectId, action } = req.body;
-    
+
+    console.log("send-attendance-message Called: ", req.body);
     if (!userId || !projectId || !action) {
       res.status(400).json({ error: 'Missing required fields' });
       return;
