@@ -22,12 +22,14 @@
     "express-oauth2-jwt-bearer": "^1.6.1",
     "mongoose": "^8.12.1",
     "openai": "^4.73.1",
+    "node-cron": "^4.0.7",
     "stream-chat": "^8.46.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "prettier": "^3.4.1",
+    "@types/node-cron": "^3.0.11",
     "typescript": "^5.7.2"
   }
 }

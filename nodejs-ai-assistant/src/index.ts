@@ -6,7 +6,7 @@ import { apiKey, serverClient } from './serverClient';
 import {auth} from 'express-oauth2-jwt-bearer'
 import { connectDB } from './config/mongodb';
 import { Attendance } from './models/Attendance';
-import { AttendanceLog } from '../models/AttendanceLog';
+import { AttendanceLog } from './models/AttendanceLog';
 import { SentMessageLog } from './models/SentMessageLog';
 import { convertEmailToStreamFormat, convertStreamToEmail } from './utils/index';
 import { setupAutoAttendanceCronJob } from './cron/autoAttendance';
