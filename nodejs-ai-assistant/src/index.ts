@@ -41,11 +41,11 @@ app.post('/join', async (req, res): Promise<void> => {
     // Create a new channel (if it doesn't exist)
     const channel = serverClient.channel('messaging', `kai${username}`, {
       name: `Kai`,
-      members: [username, 'Kai'],
       created_by_id: username,
     });
 
     await channel.create(); // Create channel
+    await channel.addMembers([username, 'Kai']); // Add both users
     await channel.hide(username);
   } catch (err: any) {
     res.status(500).json({ err: err.message });
