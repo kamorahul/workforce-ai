@@ -48,9 +48,6 @@ app.post('/join', async (req, res): Promise<void> => {
     }
     await serverClient.upsertUser(userDataToUpsert);
 
-    // 2. "kai" Channel Logic
-    await serverClient.upsertUser({ id: 'Kai', name: 'Kai' }); // Ensure "Kai" user
-
     const channelKai = serverClient.channel('messaging', `kai${username}`, {
       name: 'Kai',
       created_by_id: username,
@@ -349,9 +346,9 @@ app.get('/attendance', async (req, res) => {
 
 app.post('/send-attendance-message', async (req, res) => {
   try {
-    const { userId, projectId, action } = req.body;
+    const { userId, projectId, projectName, action } = req.body;
 
-    console.log("send-attendance-message Called: ", req.body);
+    console.log('send-attendance-message Called: ', req.body);
     if (!userId || !projectId || !action) {
       res.status(400).json({ error: 'Missing required fields' });
       return;
@@ -359,9 +356,8 @@ app.post('/send-attendance-message', async (req, res) => {
 
     const user = await serverClient.queryUsers({ id: userId });
     const userName = user.users[0]?.name || convertStreamToEmail(userId);
-    const channel = serverClient.channel('messaging', `tai_${userId}`);
+    const channel = serverClient.channel('messaging', `tai${userId}`);
 
-    // Determine Current Day Boundaries
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
@@ -388,11 +384,18 @@ app.post('/send-attendance-message', async (req, res) => {
           userId,
           projectId,
           messageType: 'first_enter_prompt',
-          eventDate: eventDateForLog
+          eventDate: eventDateForLog,
         });
 
         if (existingPromptLog) {
-          res.status(200).json({ status: 'info', message: 'First enter prompt already sent today for this project.', action: 'checkin' });
+          res
+            .status(200)
+            .json({
+              status: 'info',
+              message:
+                'First enter prompt already sent today for this project.',
+              action: 'checkin',
+            });
           return;
         }
 
@@ -403,17 +406,21 @@ app.post('/send-attendance-message', async (req, res) => {
             text: `Dear ${userName},\nPlease check in to the project to record your attendance. Your check-in time has not been registered yet.`,
             type: 'regular',
             action_type: 'attendance',
+            projectId
           });
-          
+
           try {
             await new SentMessageLog({
               userId,
               projectId,
               messageType: 'first_enter_prompt',
-              eventDate: eventDateForLog
+              eventDate: eventDateForLog,
             }).save();
           } catch (logSaveError) {
-            console.error('Error saving SentMessageLog for first_enter_prompt:', logSaveError);
+            console.error(
+              'Error saving SentMessageLog for first_enter_prompt:',
+              logSaveError,
+            );
             // Do not fail the main operation if logging fails
           }
 
@@ -444,14 +451,20 @@ app.post('/send-attendance-message', async (req, res) => {
         userId,
         projectId,
         messageType: 'last_exit_prompt',
-        eventDate: eventDateForLog
+        eventDate: eventDateForLog,
       });
 
       if (existingPromptLog) {
-        res.status(200).json({ status: 'info', message: 'Exit prompt already sent today for this project.', action: 'checkout' });
+        res
+          .status(200)
+          .json({
+            status: 'info',
+            message: 'Exit prompt already sent today for this project.',
+            action: 'checkout',
+          });
         return;
       }
-      
+
       // Send check-out prompt
       try {
         const response = await channel.sendMessage({
@@ -459,8 +472,8 @@ app.post('/send-attendance-message', async (req, res) => {
           text: `Dear ${userName},\nPlease check out from the project to record your attendance. Your check-out time has not been registered yet.`,
           type: 'regular',
           action_type: 'attendance',
-
-          restricted_visibility: [userId],
+          projectId,
+          projectName
         });
 
         try {
@@ -468,10 +481,13 @@ app.post('/send-attendance-message', async (req, res) => {
             userId,
             projectId,
             messageType: 'last_exit_prompt',
-            eventDate: eventDateForLog
+            eventDate: eventDateForLog,
           }).save();
         } catch (logSaveError) {
-          console.error('Error saving SentMessageLog for last_exit_prompt:', logSaveError);
+          console.error(
+            'Error saving SentMessageLog for last_exit_prompt:',
+            logSaveError,
+          );
           // Do not fail the main operation if logging fails
         }
 
@@ -490,7 +506,11 @@ app.post('/send-attendance-message', async (req, res) => {
       }
     } else {
       // Invalid action
-      res.status(400).json({ error: 'Invalid action specified. Must be "checkin" or "checkout".' });
+      res
+        .status(400)
+        .json({
+          error: 'Invalid action specified. Must be "checkin" or "checkout".',
+        });
     }
   } catch (error: any) {
     console.error('Error in send-attendance-message process:', error);
