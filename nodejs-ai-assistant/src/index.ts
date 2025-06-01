@@ -407,6 +407,7 @@ app.post('/send-attendance-message', async (req, res) => {
             type: 'regular',
             action_type: 'attendance',
             projectId,
+            checkInTime: new Date(),
             projectName
           });
 
@@ -474,7 +475,8 @@ app.post('/send-attendance-message', async (req, res) => {
           type: 'regular',
           action_type: 'attendance',
           projectId,
-          projectName
+          projectName,
+          checkOutTime: new Date(),
         });
 
         try {
