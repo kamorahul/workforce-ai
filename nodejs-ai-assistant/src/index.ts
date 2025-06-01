@@ -356,7 +356,7 @@ app.post('/send-attendance-message', async (req, res) => {
 
     const user = await serverClient.queryUsers({ id: userId });
     const userName = user.users[0]?.name || convertStreamToEmail(userId);
-    const channel = serverClient.channel('messaging', `tai${userId}`);
+    const channel = serverClient.channel('messaging', `tai_${userId}`);
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
