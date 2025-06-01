@@ -27,33 +27,56 @@ app.get('/', (req, res) => {
 /*
  * Handle Join chat user
  * */
-app.post('/join', async (req, res): Promise<void> => {
-  const { username } = req.body;
-  const token = serverClient.createToken(username);
-  try {
-    await serverClient.upsertUser({
-      id: username,
-    });
+async (req, res): Promise<void> => {
+  // Use 'name' and 'image' from req.body
+  const { username, name, image } = req.body;
 
-    // Ensure the user "Kai" exists
-    await serverClient.upsertUser({ id: 'Kai', name: 'Kai' });
-
-    // Create a new channel (if it doesn't exist)
-    const channel = serverClient.channel('messaging', `kai${username}`, {
-      name: `Kai`,
-      created_by_id: username,
-    });
-
-    await channel.create(); // Create channel
-    await channel.addMembers([username, 'Kai']); // Add both users
-    await channel.hide(username);
-  } catch (err: any) {
-    res.status(500).json({ err: err.message });
+  if (!username) {
+    res.status(400).json({ err: "Username is required" });
     return;
   }
 
-  res.status(200).json({ user: { username }, token });
-});
+  const token = serverClient.createToken(username);
+  try {
+    // 1. User Upsert Logic
+    const userDataToUpsert: { id: string; name?: string; image?: string } = { id: username };
+    if (name) { // Use 'name'
+      userDataToUpsert.name = name;
+    }
+    if (image) { // Use 'image'
+      userDataToUpsert.image = image;
+    }
+    await serverClient.upsertUser(userDataToUpsert);
+
+    // 2. "kai" Channel Logic
+    await serverClient.upsertUser({ id: 'Kai', name: 'Kai' }); // Ensure "Kai" user
+
+    const channelKai = serverClient.channel('messaging', `kai${username}`, {
+      name: 'Kai',
+      created_by_id: username,
+    });
+    await channelKai.create();
+    await channelKai.addMembers([username, 'Kai']);
+    await channelKai.hide(username); // Hide for "kai" channel
+
+    // 3. "tai" Channel Logic
+    const channelTai = serverClient.channel('messaging', `tai_${username}`, {
+      name: 'Tai',
+      created_by_id: username,
+    });
+    await channelTai.create();
+    await channelTai.addMembers([username]);
+    // DO NOT hide for "tai" channel: await channelTai.hide(username);
+
+    // Respond with user details, reflecting parameters used for upsert
+    res.status(200).json({ user: { username, name: userDataToUpsert.name, image: userDataToUpsert.image }, token });
+
+  } catch (err: any) {
+    console.error(`Error in /join endpoint for user ${username}:`, err);
+    res.status(500).json({ err: err.message });
+    return;
+  }
+}
 
 
 /*
