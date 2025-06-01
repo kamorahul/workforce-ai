@@ -8,10 +8,10 @@ import { connectDB } from './config/mongodb';
 import { Attendance } from './models/Attendance';
 import { AttendanceLog } from './models/AttendanceLog';
 import { SentMessageLog } from './models/SentMessageLog';
+import { UserSettings } from './models/UserSettings';
 import { convertEmailToStreamFormat, convertStreamToEmail } from './utils/index';
 import { setupAutoAttendanceCronJob } from './cron/autoAttendance';
-
-const app = express();
+import { zonedTimeToUtc, utcToZonedTime, format } from 'date-fns-tz';
 app.use(express.json());
 app.use(cors({ origin: '*' }));
 
@@ -116,6 +116,43 @@ app.post('/channel-join', async (req, res): Promise<void> => {
       details: err.message 
     });
     return;
+  }
+});
+
+app.post('/user-settings/timezone', async (req, res) => {
+  try {
+    const { userId, timezone } = req.body;
+
+    if (!userId || !timezone) {
+      return res.status(400).json({ error: 'Missing required fields: userId and timezone' });
+    }
+
+    // Validate timezone format (optional, but good practice)
+    // A simple check for now, can be expanded with a library like moment-timezone if needed for strict validation
+    if (typeof timezone !== 'string' || timezone.split('/').length < 2) {
+        // Basic IANA format check (e.g., "America/New_York")
+        // This is a very basic check. For robust validation, consider a library.
+        // However, date-fns-tz will error out if the timezone is invalid during usage.
+    }
+
+    const updatedSettings = await UserSettings.findOneAndUpdate(
+      { userId: userId },
+      { timezone: timezone },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    res.status(200).json({
+      status: 'success',
+      message: 'User timezone settings saved successfully.',
+      data: updatedSettings,
+    });
+
+  } catch (error: any) {
+    console.error('Error saving user timezone settings:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ error: 'Validation failed', details: error.message });
+    }
+    res.status(500).json({ error: 'Failed to save user timezone settings', details: error.message });
   }
 });
 
@@ -325,8 +362,9 @@ app.get('/attendance', async (req, res) => {
 
 
 app.post('/send-attendance-message', async (req, res) => {
+  // Expected body: { userId: string, projectId: string, action: 'checkin' | 'checkout', timezone?: string (IANA format e.g., 'America/New_York') }
   try {
-    const { userId, projectId, action } = req.body;
+    const { userId, projectId, action, timezone: timezoneFromRequest } = req.body; // Renamed userTimezoneFromRequest to timezoneFromRequest
 
     console.log("send-attendance-message Called: ", req.body);
     if (!userId || !projectId || !action) {
@@ -336,16 +374,49 @@ app.post('/send-attendance-message', async (req, res) => {
 
     const user = await serverClient.queryUsers({ id: userId });
     const userName = user.users[0]?.name || convertStreamToEmail(userId);
+
+    // Timezone determination priority:
+    // 1. UserSettings from DB.
+    // 2. 'userTimezone' field from the request body.
+    // 3. Default to 'UTC'.
+    let finalUserTimezone = 'UTC'; // Default
+    try {
+      const userSettings = await UserSettings.findOne({ userId: userId });
+      if (userSettings && userSettings.timezone) {
+        finalUserTimezone = userSettings.timezone;
+        console.log(`Using timezone from UserSettings for ${userId}: ${finalUserTimezone}`);
+      } else {
+        if (timezoneFromRequest) {
+          finalUserTimezone = timezoneFromRequest;
+          console.log(`Using timezone from request body for ${userId}: ${finalUserTimezone}`);
+        } else {
+          console.log(`Defaulting to UTC timezone for ${userId}`);
+        }
+      }
+    } catch (settingsError) {
+      console.error(`Error fetching user settings for ${userId}, using request body or default UTC:`, settingsError);
+      if (timezoneFromRequest) {
+        finalUserTimezone = timezoneFromRequest;
+      }
+    }
+    const timeZoneToUse = finalUserTimezone;
+    console.log(`Processing /send-attendance-message for userId: ${userId}, projectId: ${projectId} using timezone: ${timeZoneToUse}`);
+
     const channel = serverClient.channel('messaging', projectId);
 
-    // Determine Current Day Boundaries
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    // Determine Current Day Boundaries in User's Timezone
+    const now = new Date(); // Current time in server's local timezone (or UTC if server is set to UTC)
+    const zonedNow = utcToZonedTime(now, timeZoneToUse);
 
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
+    let todayStartUserTz = new Date(zonedNow);
+    todayStartUserTz.setHours(0, 0, 0, 0);
+    const todayStart = zonedTimeToUtc(todayStartUserTz, timeZoneToUse);
 
-    const eventDateForLog = new Date(todayStart); // For SentMessageLog
+    let todayEndUserTz = new Date(zonedNow);
+    todayEndUserTz.setHours(23, 59, 59, 999);
+    const todayEnd = zonedTimeToUtc(todayEndUserTz, timeZoneToUse);
+
+    const eventDateForLog = todayStart; // For SentMessageLog, representing start of day in user's TZ (stored as UTC)
 
     if (action === 'checkin') {
       // Query for existing check-in records for the day
@@ -365,7 +436,7 @@ app.post('/send-attendance-message', async (req, res) => {
           userId,
           projectId,
           messageType: 'first_enter_prompt',
-          eventDate: eventDateForLog
+          eventDate: eventDateForLog // Uses new timezone-aware eventDateForLog
         });
 
         if (existingPromptLog) {
@@ -388,7 +459,7 @@ app.post('/send-attendance-message', async (req, res) => {
               userId,
               projectId,
               messageType: 'first_enter_prompt',
-              eventDate: eventDateForLog
+              eventDate: eventDateForLog // Uses new timezone-aware eventDateForLog
             }).save();
           } catch (logSaveError) {
             console.error('Error saving SentMessageLog for first_enter_prompt:', logSaveError);
@@ -422,7 +493,7 @@ app.post('/send-attendance-message', async (req, res) => {
         userId,
         projectId,
         messageType: 'last_exit_prompt',
-        eventDate: eventDateForLog
+        eventDate: eventDateForLog // Uses new timezone-aware eventDateForLog
       });
 
       if (existingPromptLog) {
@@ -446,7 +517,7 @@ app.post('/send-attendance-message', async (req, res) => {
             userId,
             projectId,
             messageType: 'last_exit_prompt',
-            eventDate: eventDateForLog
+              eventDate: eventDateForLog // Uses new timezone-aware eventDateForLog
           }).save();
         } catch (logSaveError) {
           console.error('Error saving SentMessageLog for last_exit_prompt:', logSaveError);

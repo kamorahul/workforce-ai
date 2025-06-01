@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 import cron from 'node-cron';
 import { Attendance } from '../models/Attendance';
 import { AttendanceLog } from '../models/AttendanceLog';
+import { UserSettings } from '../models/UserSettings'; // Adjust path if necessary
+import { zonedTimeToUtc, utcToZonedTime } from 'date-fns-tz'; // For timezone calculations
 // import { connectDB } from '../config/mongodb'; // If using shared connection logic
 
 // Placeholder for DB connection if run standalone
@@ -17,15 +19,16 @@ export const processDailyAutoCheckins = async (processingDate: Date) => {
   // await connect(); // Connect if needed, assuming handled by caller for now
   console.log(`Starting auto check-in processing for ${processingDate.toDateString()}`);
 
-  const dayStart = new Date(processingDate);
-  dayStart.setHours(0, 0, 0, 0);
+  // Broad phase: Get all ENTER logs for the processing day (using server's local time for boundaries)
+  const processingDayBoundaryStart = new Date(processingDate);
+  processingDayBoundaryStart.setHours(0, 0, 0, 0);
 
-  const dayEnd = new Date(processingDate);
-  dayEnd.setHours(23, 59, 59, 999);
+  const processingDayBoundaryEnd = new Date(processingDate);
+  processingDayBoundaryEnd.setHours(23, 59, 59, 999);
 
   try {
     const distinctUserProjects = await AttendanceLog.aggregate([
-      { $match: { timestamp: { $gte: dayStart, $lte: dayEnd }, action: 'ENTER' } },
+      { $match: { timestamp: { $gte: processingDayBoundaryStart, $lte: processingDayBoundaryEnd }, action: 'ENTER' } },
       { $group: { _id: { userId: '$userId', projectId: '$projectId' } } },
       { $project: { userId: '$_id.userId', projectId: '$_id.projectId', _id: 0 } },
     ]);
@@ -41,11 +44,36 @@ export const processDailyAutoCheckins = async (processingDate: Date) => {
       const { userId, projectId } = userProject;
 
       try {
+        // --- Start of user-specific timezone logic ---
+        let userTimezone = 'UTC'; // Default timezone
+        try {
+          const userSettings = await UserSettings.findOne({ userId: userId });
+          if (userSettings && userSettings.timezone) {
+            userTimezone = userSettings.timezone;
+          }
+        } catch (settingsError) {
+          console.error(`Error fetching user settings for ${userId}, defaulting to UTC:`, settingsError);
+        }
+
+        // Define the start and end of the processingDate in the user's timezone
+        const zonedProcessingDate = utcToZonedTime(processingDate, userTimezone);
+
+        let dayStartUserTz = new Date(zonedProcessingDate);
+        dayStartUserTz.setHours(0, 0, 0, 0); // Midnight in user's timezone for that day
+        const dayStart = zonedTimeToUtc(dayStartUserTz, userTimezone); // Convert to UTC
+
+        let dayEndUserTz = new Date(zonedProcessingDate);
+        dayEndUserTz.setHours(23, 59, 59, 999); // End of day in user's timezone
+        const dayEnd = zonedTimeToUtc(dayEndUserTz, userTimezone); // Convert to UTC
+
+        console.log(`Processing CHECK-IN for userId: ${userId}, projectId: ${projectId} using timezone: ${userTimezone}. User-specific day boundaries (UTC): ${dayStart.toISOString()} - ${dayEnd.toISOString()}`);
+        // --- End of user-specific timezone logic ---
+
         const earliestEnterLog = await AttendanceLog.findOne({
           userId,
           projectId,
           action: 'ENTER',
-          timestamp: { $gte: dayStart, $lte: dayEnd },
+          timestamp: { $gte: dayStart, $lte: dayEnd }, // Uses user-specific dayStart/dayEnd
         }).sort({ timestamp: 1 });
 
         if (!earliestEnterLog) {
@@ -92,16 +120,17 @@ export const processDailyAutoCheckouts = async (processingDate: Date) => {
   // await connect(); // Connect if needed, assuming handled by caller for now
   console.log(`Starting auto check-out processing for ${processingDate.toDateString()}`);
 
-  const dayStart = new Date(processingDate);
-  dayStart.setHours(0, 0, 0, 0);
+  // Broad phase: Get all ENTER logs for the processing day (using server's local time for boundaries)
+  const processingDayBoundaryStart = new Date(processingDate);
+  processingDayBoundaryStart.setHours(0, 0, 0, 0);
 
-  const dayEnd = new Date(processingDate);
-  dayEnd.setHours(23, 59, 59, 999);
+  const processingDayBoundaryEnd = new Date(processingDate);
+  processingDayBoundaryEnd.setHours(23, 59, 59, 999);
 
   try {
     // Using the same distinctUserProjects logic as check-ins, assuming if they never 'ENTER'ed, no auto-checkout needed.
     const distinctUserProjects = await AttendanceLog.aggregate([
-      { $match: { timestamp: { $gte: dayStart, $lte: dayEnd }, action: 'ENTER' } },
+      { $match: { timestamp: { $gte: processingDayBoundaryStart, $lte: processingDayBoundaryEnd }, action: 'ENTER' } },
       { $group: { _id: { userId: '$userId', projectId: '$projectId' } } },
       { $project: { userId: '$_id.userId', projectId: '$_id.projectId', _id: 0 } },
     ]);
@@ -117,12 +146,37 @@ export const processDailyAutoCheckouts = async (processingDate: Date) => {
       const { userId, projectId } = userProject;
 
       try {
-        // Find their last check-in for the day
+        // --- Start of user-specific timezone logic ---
+        let userTimezone = 'UTC'; // Default timezone
+        try {
+          const userSettings = await UserSettings.findOne({ userId: userId });
+          if (userSettings && userSettings.timezone) {
+            userTimezone = userSettings.timezone;
+          }
+        } catch (settingsError) {
+          console.error(`Error fetching user settings for ${userId}, defaulting to UTC:`, settingsError);
+        }
+
+        // Define the start and end of the processingDate in the user's timezone
+        const zonedProcessingDate = utcToZonedTime(processingDate, userTimezone);
+
+        let dayStartUserTz = new Date(zonedProcessingDate);
+        dayStartUserTz.setHours(0, 0, 0, 0); // Midnight in user's timezone for that day
+        const dayStart = zonedTimeToUtc(dayStartUserTz, userTimezone); // Convert to UTC
+
+        let dayEndUserTz = new Date(zonedProcessingDate);
+        dayEndUserTz.setHours(23, 59, 59, 999); // End of day in user's timezone
+        const dayEnd = zonedTimeToUtc(dayEndUserTz, userTimezone); // Convert to UTC
+
+        console.log(`Processing CHECK-OUT for userId: ${userId}, projectId: ${projectId} using timezone: ${userTimezone}. User-specific day boundaries (UTC): ${dayStart.toISOString()} - ${dayEnd.toISOString()}`);
+        // --- End of user-specific timezone logic ---
+
+        // Find their last check-in for the day (user-specific timezone)
         const lastCheckinRecord = await Attendance.findOne({
           userId,
           projectId,
           status: 'checkin',
-          datetime: { $gte: dayStart, $lte: dayEnd },
+          datetime: { $gte: dayStart, $lte: dayEnd }, // Uses user-specific dayStart/dayEnd
         }).sort({ datetime: -1 });
 
         if (!lastCheckinRecord) {
