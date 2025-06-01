@@ -349,7 +349,7 @@ app.post('/send-attendance-message', async (req, res) => {
     const { userId, projectId, projectName, action } = req.body;
 
     console.log('send-attendance-message Called: ', req.body);
-    if (!userId || !projectId || !action) {
+    if (!userId || !projectId || !action || !projectName) {
       res.status(400).json({ error: 'Missing required fields' });
       return;
     }
@@ -406,7 +406,8 @@ app.post('/send-attendance-message', async (req, res) => {
             text: `Dear ${userName},\nPlease check in to the project to record your attendance. Your check-in time has not been registered yet.`,
             type: 'regular',
             action_type: 'attendance',
-            projectId
+            projectId,
+            projectName
           });
 
           try {
