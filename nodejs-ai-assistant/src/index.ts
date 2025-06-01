@@ -27,7 +27,7 @@ app.get('/', (req, res) => {
 /*
  * Handle Join chat user
  * */
-async (req, res): Promise<void> => {
+app.post('/join', async (req, res): Promise<void> => {
   // Use 'name' and 'image' from req.body
   const { username, name, image } = req.body;
 
@@ -76,7 +76,7 @@ async (req, res): Promise<void> => {
     res.status(500).json({ err: err.message });
     return;
   }
-}
+})
 
 
 /*
@@ -359,7 +359,7 @@ app.post('/send-attendance-message', async (req, res) => {
 
     const user = await serverClient.queryUsers({ id: userId });
     const userName = user.users[0]?.name || convertStreamToEmail(userId);
-    const channel = serverClient.channel('messaging', projectId);
+    const channel = serverClient.channel('messaging', `tai_${userId}`);
 
     // Determine Current Day Boundaries
     const todayStart = new Date();
@@ -403,7 +403,6 @@ app.post('/send-attendance-message', async (req, res) => {
             text: `Dear ${userName},\nPlease check in to the project to record your attendance. Your check-in time has not been registered yet.`,
             type: 'regular',
             action_type: 'attendance',
-            restricted_visibility: [userId],
           });
           
           try {
