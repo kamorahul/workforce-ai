@@ -307,7 +307,7 @@ app.post('/attendance', async (req, res) => {
     await serverClient.channel("messaging", `tai_${userId}`).sendMessage({
       user_id: userId,
       id: messageId,
-      text: `${status === 'checkin' ? 'Checkin': 'Checkout' } Done for project ${projectName} at ${new Date(datetime).toISOString()}`,
+      text: `${status === 'checkin' ? 'Checkin': 'Checkout' } Done for project ${projectName} at ${new Date(datetime).toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true })}`,
       type: 'regular',
     });
 
