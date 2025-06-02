@@ -403,13 +403,21 @@ app.post('/send-attendance-message', async (req, res) => {
         try {
           const response = await channel.sendMessage({
             user_id: userId,
-            text: `Dear ${userName},\nPlease check in to the project to record your attendance. Your check-in time has not been registered yet.`,
+            text: `Dear ${userName}, Please check in to the project to record your attendance. Your check-in time has not been registered yet.`,
             type: 'regular',
             action_type: 'attendance',
             projectId,
             checkInTime: new Date(),
-            projectName
-          });
+            projectName,
+            push_notifications: {
+              apns: {
+                aps: {
+                  alert: `Dear ${userName},\nPlease check in to the project to record your attendance. Your check-in time has not been registered yet.`,
+                  sound: "default"
+                }
+              }
+            }
+          }, {skip_push: false});
 
           try {
             await new SentMessageLog({
@@ -476,6 +484,14 @@ app.post('/send-attendance-message', async (req, res) => {
           action_type: 'attendance',
           projectId,
           projectName,
+          push_notifications: {
+            apns: {
+              aps: {
+                alert: `Dear ${userName},\nPlease check out from the project to record your attendance. Your check-out time has not been registered yet.`,
+                sound: "default"
+              }
+            }
+          },
           checkOutTime: new Date(),
         });
 
