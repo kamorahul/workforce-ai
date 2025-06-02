@@ -234,7 +234,7 @@ app.post('/webhook', async (req, res): Promise<void> => {
 //handle attendance
 app.post('/attendance', async (req, res) => {
   try {
-    const { userId, projectId, datetime, status, messageId } = req.body;
+    const { userId, projectId, datetime, status, messageId, projectName } = req.body;
     console.log("Body:", req.body);
     
     if (!userId || !projectId || !status) {
@@ -304,13 +304,13 @@ app.post('/attendance', async (req, res) => {
 
     await serverClient.deleteMessage(messageId, true);
 
-    await serverClient.channel("messaging", projectId).sendMessage({
+    await serverClient.channel("messaging", `tai_${userId}`).sendMessage({
       user_id: userId,
       id: messageId,
-      text: `${status === 'checkin' ? 'Checkin': 'Checkout' } Done`,
+      text: `${status === 'checkin' ? 'Checkin': 'Checkout' } Done for project ${projectName} at ${new Date(datetime).toISOString()}`,
       type: 'regular',
-      restricted_visibility: [userId]
     });
+
     res.status(201).json({
       status: 'success',
     });
