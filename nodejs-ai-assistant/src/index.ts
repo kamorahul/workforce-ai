@@ -62,7 +62,7 @@ app.post('/join', async (req, res): Promise<void> => {
       created_by_id: username,
     });
     await channelTai.create();
-    await channelTai.addMembers([username]);
+    await channelTai.addMembers([username, 'tai']);
     // DO NOT hide for "tai" channel: await channelTai.hide(username);
 
     // Respond with user details, reflecting parameters used for upsert
@@ -402,21 +402,13 @@ app.post('/send-attendance-message', async (req, res) => {
         // Send check-in prompt
         try {
           const response = await channel.sendMessage({
-            user_id: userId,
+            user_id: 'tai',
             text: `Dear ${userName}, Please check in to the project to record your attendance. Your check-in time has not been registered yet.`,
             type: 'regular',
             action_type: 'attendance',
             projectId,
             checkInTime: new Date(),
             projectName,
-            push_notifications: {
-              apns: {
-                aps: {
-                  alert: `Dear ${userName},\nPlease check in to the project to record your attendance. Your check-in time has not been registered yet.`,
-                  sound: "default"
-                }
-              }
-            }
           }, {skip_push: false});
 
           try {
@@ -478,20 +470,13 @@ app.post('/send-attendance-message', async (req, res) => {
       // Send check-out prompt
       try {
         const response = await channel.sendMessage({
-          user_id: userId,
+          show_in_channel: true,
           text: `Dear ${userName},\nPlease check out from the project to record your attendance. Your check-out time has not been registered yet.`,
           type: 'regular',
           action_type: 'attendance',
           projectId,
           projectName,
-          push_notifications: {
-            apns: {
-              aps: {
-                alert: `Dear ${userName},\nPlease check out from the project to record your attendance. Your check-out time has not been registered yet.`,
-                sound: "default"
-              }
-            }
-          },
+          user_id: 'tai',
           checkOutTime: new Date(),
         });
 
