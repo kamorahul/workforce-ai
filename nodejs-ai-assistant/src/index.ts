@@ -91,23 +91,23 @@ app.post('/channel-join', async (req, res): Promise<void> => {
         image: 'https://cdn-icons-png.flaticon.com/512/1077/1077012.png',
         created_by_id: convertEmailToStreamFormat(email),
         members: [convertEmailToStreamFormat(email)],
-        projectId: projectData.projectId, 
+        projectId: projectData.projectId,
         qrCode: projectData.qrCode,
         location: projectData.location,
         projectDetails: {
-            description: projectDetails?.description || '',
-            location: projectDetails?.location || '',
-            startTime: projectDetails?.startTime || null,
-            endTime: projectDetails?.endTime || null,
-            timeSheetRequirement: projectDetails?.timeSheetRequirement || false,
-            swms: projectDetails?.swms || ''
-          }
+          description: projectDetails?.description || '',
+          location: projectDetails?.location || '',
+          startTime: projectDetails?.startTime || null,
+          endTime: projectDetails?.endTime || null,
+          timeSheetRequirement: projectDetails?.timeSheetRequirement || false,
+          swms: projectDetails?.swms || ''
+        }
       };
 
       const channel = serverClient.channel('messaging', newChannelId, channelData);
       await channel.create();
 
-      res.status(200).json({ 
+      res.status(200).json({
         status: 'success',
         message: 'Channel created successfully',
         channelId: newChannelId
@@ -115,7 +115,7 @@ app.post('/channel-join', async (req, res): Promise<void> => {
     } else {
       // Handle joining existing channel
       if (!username || !channelId) {
-        res.status(400).json({ 
+        res.status(400).json({
           error: 'Missing required fields',
           details: 'username and channelId are required for joining a channel'
         });
@@ -125,16 +125,16 @@ app.post('/channel-join', async (req, res): Promise<void> => {
       const channel = serverClient.channel('messaging', channelId);
       await channel.addMembers([username]);
 
-      res.status(200).json({ 
+      res.status(200).json({
         status: 'success',
         message: 'Channel joined successfully'
       });
     }
   } catch (err: any) {
     console.error('Channel operation error:', err);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Operation failed',
-      details: err.message 
+      details: err.message
     });
     return;
   }
@@ -205,11 +205,11 @@ app.post('/getstream/webhooks', async (req, res): Promise<void> => {
       break;
     case 'attendance':
       req.body.message = {...req.body.message, ...{
-        text: 'Attendance',
-        type: 'regular',
-        action_type: 'attendance',
-        restricted_visibility: [user.id],
-      }}
+          text: 'Attendance',
+          type: 'regular',
+          action_type: 'attendance',
+          restricted_visibility: [user.id],
+        }}
       res.json(req.body);
   }
 
@@ -228,16 +228,16 @@ app.post('/webhook', async (req, res): Promise<void> => {
 
   }
   await agent.init("asst_Q8vD9YOGcO3es62kFjeVZI5L");
-    agent.handleMessage(
-        message.text
-    );
+  agent.handleMessage(
+      message.text
+  );
 });
 //handle attendance
 app.post('/attendance', async (req, res) => {
   try {
     const { userId, projectId, datetime, status, messageId, projectName } = req.body;
     console.log("Body:", req.body);
-    
+
     if (!userId || !projectId || !status) {
       res.status(400).json({ error: 'Missing required fields' });
       return;
@@ -257,7 +257,7 @@ app.post('/attendance', async (req, res) => {
         console.error("Error deleting message:", deleteError);
         // Check if error is due to message not found
         if (deleteError.message && deleteError.message.includes('not found')) {
-          res.status(404).json({ 
+          res.status(404).json({
             error: 'Message not found',
             message: {
               text: 'Attendance message not found',
@@ -266,9 +266,9 @@ app.post('/attendance', async (req, res) => {
             }
           });
         } else {
-          res.status(500).json({ 
+          res.status(500).json({
             error: 'Failed to delete attendance message',
-            details: deleteError.message 
+            details: deleteError.message
           });
         }
         return;
@@ -390,24 +390,24 @@ app.post('/send-attendance-message', async (req, res) => {
 
         if (existingPromptLog) {
           res
-            .status(200)
-            .json({
-              status: 'info',
-              message:
-                'First enter prompt already sent today for this project.',
-              action: 'checkin',
-            });
+              .status(200)
+              .json({
+                status: 'info',
+                message:
+                    'First enter prompt already sent today for this project.',
+                action: 'checkin',
+              });
           return;
         }
 
         // Send check-in prompt
         try {
-            await new SentMessageLog({
-              userId,
-              projectId,
-              messageType: 'first_enter_prompt',
-              eventDate: eventDateForLog,
-            }).save();
+          await new SentMessageLog({
+            userId,
+            projectId,
+            messageType: 'first_enter_prompt',
+            eventDate: eventDateForLog,
+          }).save();
 
           const response = await channel.sendMessage({
             user_id: 'tai',
@@ -451,23 +451,23 @@ app.post('/send-attendance-message', async (req, res) => {
 
       if (existingPromptLog) {
         res
-          .status(200)
-          .json({
-            status: 'info',
-            message: 'Exit prompt already sent today for this project.',
-            action: 'checkout',
-          });
+            .status(200)
+            .json({
+              status: 'info',
+              message: 'Exit prompt already sent today for this project.',
+              action: 'checkout',
+            });
         return;
       }
 
       // Send check-out prompt
       try {
-          await new SentMessageLog({
-            userId,
-            projectId,
-            messageType: 'last_exit_prompt',
-            eventDate: eventDateForLog,
-          }).save();
+        await new SentMessageLog({
+          userId,
+          projectId,
+          messageType: 'last_exit_prompt',
+          eventDate: eventDateForLog,
+        }).save();
 
         const response = await channel.sendMessage({
           show_in_channel: true,
@@ -496,10 +496,10 @@ app.post('/send-attendance-message', async (req, res) => {
     } else {
       // Invalid action
       res
-        .status(400)
-        .json({
-          error: 'Invalid action specified. Must be "checkin" or "checkout".',
-        });
+          .status(400)
+          .json({
+            error: 'Invalid action specified. Must be "checkin" or "checkout".',
+          });
     }
 
     // Create and save AttendanceLog
@@ -580,28 +580,34 @@ app.get('/projects', async (req, res) => {
       type: 'messaging'
     });
 
-    const projects = channels
-      .map(channel => {
-        const location = channel.data?.location;
-        const hasCoordinates = location && 
-          typeof location === 'object' && 
-          'type' in location && 
+    const projectsPromises = channels.map(async (channel) => {
+      const location = channel.data?.location;
+      const hasCoordinates = location &&
+          typeof location === 'object' &&
+          'type' in location &&
           'coordinates' in location &&
           Array.isArray(location.coordinates) &&
           location.coordinates.length === 2;
-          
-        if (!hasCoordinates) return null;
 
-        return {
-          projectId: channel.id,
-          projectName: channel.data?.name || '',
-          createdBy: channel.data?.created_by_id || '',
-          projectDetails: channel.data?.projectDetails || {},
-          qrCode: channel.data?.qrCode || '',
-          location: location.coordinates
-        };
-      })
-      .filter(project => project !== null);
+      if (!hasCoordinates) return null;
+
+      const lastLog = await AttendanceLog.findOne({
+        projectId: channel.id,
+        userId: userId as string,
+      }).sort({ timestamp: -1 }).limit(1);
+
+      return {
+        projectId: channel.id,
+        projectName: channel.data?.name || '',
+        createdBy: channel.data?.created_by_id || '',
+        projectDetails: channel.data?.projectDetails || {},
+        qrCode: channel.data?.qrCode || '',
+        location: location.coordinates,
+        lastAttendanceFlow: lastLog ? { action: lastLog.action, timestamp: lastLog.timestamp } : null,
+      };
+    });
+
+    const projects = (await Promise.all(projectsPromises)).filter(project => project !== null);
 
     res.status(200).json({
       status: 'success',
@@ -633,10 +639,10 @@ async function searchChannelsByName(name: string) {
   };
 
   return await serverClient.queryChannels(
-    filters,
-    {},
-    {
-      limit: 1,
-    },
+      filters,
+      {},
+      {
+        limit: 1,
+      },
   );
 }
