@@ -427,7 +427,7 @@ app.post('/send-attendance-message', async (req, res) => {
           });
         } catch (sendError: any) {
           console.error('Error sending check-in message:', sendError);
-          res.status(500).json({
+          res.status(200).json({
             error: 'Failed to send check-in message',
             details: sendError.message,
           });
@@ -488,7 +488,7 @@ app.post('/send-attendance-message', async (req, res) => {
         });
       } catch (sendError: any) {
         console.error('Error sending check-out message:', sendError);
-        res.status(500).json({
+        res.status(200).json({
           error: 'Failed to send check-out message',
           details: sendError.message,
         });
