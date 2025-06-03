@@ -35,6 +35,6 @@ const AttendanceLogSchema: Schema = new Schema({
 });
 
 // Compound index for querying logs per user/project efficiently
-AttendanceLogSchema.index({ userId: 1, projectId: 1, timestamp: -1 });
+AttendanceLogSchema.index({ userId: 1, projectId: 1, timestamp: 1 }, { unique: true });
 
 export const AttendanceLog = mongoose.model<IAttendanceLog>('AttendanceLog', AttendanceLogSchema);

@@ -501,6 +501,20 @@ app.post('/send-attendance-message', async (req, res) => {
           error: 'Invalid action specified. Must be "checkin" or "checkout".',
         });
     }
+
+    // Create and save AttendanceLog
+    try {
+      const attendanceLog = new AttendanceLog({
+        userId,
+        projectId,
+        timestamp: new Date(),
+        action: action === 'checkin' ? 'ENTER' : 'EXIT',
+      });
+      await attendanceLog.save();
+    } catch (logError) {
+      console.error('Error saving AttendanceLog:', logError);
+      // For now, we just log the error and don't let it affect the main response
+    }
   } catch (error: any) {
     console.error('Error in send-attendance-message process:', error);
     res.status(500).json({
