@@ -580,28 +580,34 @@ app.get('/projects', async (req, res) => {
       type: 'messaging'
     });
 
-    const projects = channels
-      .map(channel => {
-        const location = channel.data?.location;
-        const hasCoordinates = location && 
-          typeof location === 'object' && 
-          'type' in location && 
-          'coordinates' in location &&
-          Array.isArray(location.coordinates) &&
-          location.coordinates.length === 2;
-          
-        if (!hasCoordinates) return null;
+    const projectsPromises = channels.map(async (channel) => {
+      const location = channel.data?.location;
+      const hasCoordinates = location &&
+        typeof location === 'object' &&
+        'type' in location &&
+        'coordinates' in location &&
+        Array.isArray(location.coordinates) &&
+        location.coordinates.length === 2;
 
-        return {
-          projectId: channel.id,
-          projectName: channel.data?.name || '',
-          createdBy: channel.data?.created_by_id || '',
-          projectDetails: channel.data?.projectDetails || {},
-          qrCode: channel.data?.qrCode || '',
-          location: location.coordinates
-        };
-      })
-      .filter(project => project !== null);
+      if (!hasCoordinates) return null;
+
+      const lastLog = await AttendanceLog.findOne({
+        projectId: channel.id,
+        userId: userId as string,
+      }).sort({ timestamp: -1 }).limit(1);
+
+      return {
+        projectId: channel.id,
+        projectName: channel.data?.name || '',
+        createdBy: channel.data?.created_by_id || '',
+        projectDetails: channel.data?.projectDetails || {},
+        qrCode: channel.data?.qrCode || '',
+        location: location.coordinates,
+        lastAttendanceFlow: lastLog ? { action: lastLog.action, timestamp: lastLog.timestamp } : null,
+      };
+    });
+
+    const projects = (await Promise.all(projectsPromises)).filter(project => project !== null);
 
     res.status(200).json({
       status: 'success',
