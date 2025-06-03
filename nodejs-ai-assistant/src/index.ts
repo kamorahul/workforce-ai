@@ -88,6 +88,7 @@ app.post('/channel-join', async (req, res): Promise<void> => {
       const newChannelId = `${projectName.toLowerCase().replace(/\s+/g, '-')}-${convertEmailToStreamFormat(email)}`;
       const channelData = {
         name: projectName,
+        image: 'https://cdn-icons-png.flaticon.com/512/1077/1077012.png',
         created_by_id: convertEmailToStreamFormat(email),
         members: [convertEmailToStreamFormat(email)],
         projectId: projectData.projectId, 
@@ -401,6 +402,13 @@ app.post('/send-attendance-message', async (req, res) => {
 
         // Send check-in prompt
         try {
+            await new SentMessageLog({
+              userId,
+              projectId,
+              messageType: 'first_enter_prompt',
+              eventDate: eventDateForLog,
+            }).save();
+
           const response = await channel.sendMessage({
             user_id: 'tai',
             text: `Dear ${userName}, Please check in to the project to record your attendance. Your check-in time has not been registered yet.`,
@@ -410,21 +418,6 @@ app.post('/send-attendance-message', async (req, res) => {
             checkInTime: new Date(),
             projectName,
           }, {skip_push: false});
-
-          try {
-            await new SentMessageLog({
-              userId,
-              projectId,
-              messageType: 'first_enter_prompt',
-              eventDate: eventDateForLog,
-            }).save();
-          } catch (logSaveError) {
-            console.error(
-              'Error saving SentMessageLog for first_enter_prompt:',
-              logSaveError,
-            );
-            // Do not fail the main operation if logging fails
-          }
 
           res.status(201).json({
             status: 'success',
@@ -469,6 +462,13 @@ app.post('/send-attendance-message', async (req, res) => {
 
       // Send check-out prompt
       try {
+          await new SentMessageLog({
+            userId,
+            projectId,
+            messageType: 'last_exit_prompt',
+            eventDate: eventDateForLog,
+          }).save();
+
         const response = await channel.sendMessage({
           show_in_channel: true,
           text: `Dear ${userName},\nPlease check out from the project to record your attendance. Your check-out time has not been registered yet.`,
@@ -479,21 +479,6 @@ app.post('/send-attendance-message', async (req, res) => {
           user_id: 'tai',
           checkOutTime: new Date(),
         });
-
-        try {
-          await new SentMessageLog({
-            userId,
-            projectId,
-            messageType: 'last_exit_prompt',
-            eventDate: eventDateForLog,
-          }).save();
-        } catch (logSaveError) {
-          console.error(
-            'Error saving SentMessageLog for last_exit_prompt:',
-            logSaveError,
-          );
-          // Do not fail the main operation if logging fails
-        }
 
         res.status(201).json({
           status: 'success',
