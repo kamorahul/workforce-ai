@@ -1,12 +1,13 @@
 import mongoose from 'mongoose';
 import 'dotenv/config';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/workforce';
+const DEFAULT_MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/workforce';
 
-export const connectDB = async (): Promise<void> => {
+export const connectDB = async (uri?: string): Promise<void> => {
+  const connectionUri = uri || DEFAULT_MONGODB_URI;
   try {
-    await mongoose.connect(MONGODB_URI);
-    console.log('MongoDB connected successfully');
+    await mongoose.connect(connectionUri);
+    console.log(`MongoDB connected successfully to ${connectionUri}`);
   } catch (error) {
     console.error('MongoDB connection error:', error);
     process.exit(1);
