@@ -8,8 +8,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "start": "tsc && node dist/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "tsc && node dist/server.js",
+    "test": "jest"
   },
   "keywords": [],
   "author": "GetStream.io",
@@ -29,8 +29,14 @@
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
+    "@types/jest": "^29.5.14",
     "@types/node-cron": "^3.0.11",
+    "@types/supertest": "^6.0.3",
+    "jest": "^29.7.0",
+    "mongodb-memory-server": "^10.1.4",
     "prettier": "^3.4.1",
+    "supertest": "^7.1.1",
+    "ts-jest": "^29.3.4",
     "typescript": "^5.7.2"
   }
 }

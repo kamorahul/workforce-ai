@@ -8,7 +8,7 @@ import { connectDB } from './config/mongodb';
 import { Attendance } from './models/Attendance';
 import { AttendanceLog } from './models/AttendanceLog';
 import { SentMessageLog } from './models/SentMessageLog';
-import { ProjectDetails } from './models/Project'; // Added import
+import ProjectDetails from './models/Project'; // Changed to default import
 import { convertEmailToStreamFormat, convertStreamToEmail, getTimezoneFromCoordinates } from './utils/index'; // Added import
 import { setupAutoAttendanceCronJob } from './cron/autoAttendance';
 
@@ -119,8 +119,8 @@ app.post('/channel-join', async (req, res): Promise<void> => {
           email: projectData.email,
           location: projectData.location, // Assuming projectData.location is already in correct GeoJSON Point format
           description: projectData.projectDetails?.description,
-          startTime: projectData.projectDetails?.startTime,
-          endTime: projectData.projectDetails?.endTime,
+          startTime: projectData.projectDetails?.startTime ? new Date(projectData.projectDetails.startTime) : undefined,
+          endTime: projectData.projectDetails?.endTime ? new Date(projectData.projectDetails.endTime) : undefined,
           timeSheetRequirement: projectData.projectDetails?.timeSheetRequirement,
           swms: projectData.projectDetails?.swms,
           qrCode: projectData.qrCode,
@@ -650,19 +650,6 @@ app.get('/projects', async (req, res) => {
   }
 });
 
-// Start the Express server
-const port = process.env.PORT || 3000;
-app.listen(port, async () => {
-  try {
-    await connectDB();
-    console.log(`Server is running on http://localhost:${port}`);
-    setupAutoAttendanceCronJob(); // Initialize and start the cron job
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-  }
-});
-
 async function searchChannelsByName(name: string) {
   const filters = {
     type: 'messaging',
@@ -677,3 +664,5 @@ async function searchChannelsByName(name: string) {
       },
   );
 }
+
+export { app }; // Export the app instance
