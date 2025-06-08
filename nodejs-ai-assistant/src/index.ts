@@ -8,7 +8,8 @@ import { connectDB } from './config/mongodb';
 import { Attendance } from './models/Attendance';
 import { AttendanceLog } from './models/AttendanceLog';
 import { SentMessageLog } from './models/SentMessageLog';
-import { convertEmailToStreamFormat, convertStreamToEmail } from './utils/index';
+import { ProjectDetails } from './models/Project'; // Added import
+import { convertEmailToStreamFormat, convertStreamToEmail, getTimezoneFromCoordinates } from './utils/index'; // Added import
 import { setupAutoAttendanceCronJob } from './cron/autoAttendance';
 
 const app = express();
@@ -106,6 +107,36 @@ app.post('/channel-join', async (req, res): Promise<void> => {
 
       const channel = serverClient.channel('messaging', newChannelId, channelData);
       await channel.create();
+
+      // ---- Start: Save ProjectDetails to MongoDB ----
+      try {
+        const [longitude, latitude] = projectData.location.coordinates; // GeoJSON is [longitude, latitude]
+        const timezone = getTimezoneFromCoordinates(latitude, longitude);
+
+        const newProject = new ProjectDetails({
+          projectId: projectData.projectId,
+          projectName: projectData.projectName,
+          email: projectData.email,
+          location: projectData.location, // Assuming projectData.location is already in correct GeoJSON Point format
+          description: projectData.projectDetails?.description,
+          startTime: projectData.projectDetails?.startTime,
+          endTime: projectData.projectDetails?.endTime,
+          timeSheetRequirement: projectData.projectDetails?.timeSheetRequirement,
+          swms: projectData.projectDetails?.swms,
+          qrCode: projectData.qrCode,
+          timezone: timezone,
+          channelId: newChannelId,
+        });
+
+        await newProject.save();
+        console.log(`ProjectDetails saved successfully for projectId: ${projectData.projectId}, channelId: ${newChannelId}`);
+
+      } catch (dbError: any) {
+        console.error(`Error saving ProjectDetails for projectId: ${projectData.projectId}, channelId: ${newChannelId}:`, dbError);
+        // Decide if you want to let the channel creation fail or just log the error
+        // For now, just logging, channel creation response is sent below
+      }
+      // ---- End: Save ProjectDetails to MongoDB ----
 
       res.status(200).json({
         status: 'success',
