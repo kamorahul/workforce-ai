@@ -89,6 +89,5 @@ const projectDetailsSchema = new Schema<IProjectDetails>({
 }, { timestamps: true }); // Adds createdAt and updatedAt timestamps
 
 // Create and export the ProjectDetails model
-const ProjectDetails = mongoose.model<IProjectDetails>('ProjectDetails', projectDetailsSchema);
+export const ProjectDetails = mongoose.model<IProjectDetails>('ProjectDetails', projectDetailsSchema);
 
-export default ProjectDetails;
