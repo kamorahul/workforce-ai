@@ -3,7 +3,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import { serverClient } from './serverClient'; // To mock its methods
 import * as utils from './utils'; // To mock getTimezoneFromCoordinates
-import ProjectDetailsModel from './models/Project'; // This will be the mock constructor after jest.mock
+import { ProjectDetails as ProjectDetailsModel } from './models/Project'; // Corrected to named import and aliased
 import { connectDB } from './config/mongodb';
 import { app } from './index'; // Import the app from index.ts
 
@@ -39,18 +39,30 @@ jest.mock('./utils', () => {
 });
 
 const mockProjectDetailsSave = jest.fn();
-jest.mock('./models/Project', () => {
-  return jest.fn().mockImplementation(() => ({
-    save: mockProjectDetailsSave,
-  }));
-});
 
-const MockedProjectDetailsModel = ProjectDetailsModel as unknown as jest.Mock;
+jest.mock('./models/Project', () => ({
+  __esModule: true, // Indicate that this is an ES Module mock
+  // ProjectDetails itself is the constructor mock
+  ProjectDetails: jest.fn().mockImplementation(() => ({
+    save: mockProjectDetailsSave,
+  })),
+}));
+
+// ProjectDetailsModel is imported as "import { ProjectDetails as ProjectDetailsModel } from './models/Project';"
+// Now, ProjectDetailsModel refers to the jest.fn() defined above for ProjectDetails.
+// For using mock methods like .mockClear() and .mockImplementation(), we cast it.
+let MockedProjectDetailsModel: jest.Mock;
+
 
 describe('/channel-join API Endpoint', () => {
   // let consoleErrorSpy: jest.SpyInstance; // Moved into the specific test that needs it
 
   beforeAll(async () => {
+    // Initialize MockedProjectDetailsModel here after mocks have been set up
+    // We need to re-require or ensure the import gives the mocked version.
+    // The import { ProjectDetails as ProjectDetailsModel } from './models/Project';
+    // should already provide the mocked constructor due to jest.mock hoisting.
+    MockedProjectDetailsModel = ProjectDetailsModel as unknown as jest.Mock;
     const mongoUri = process.env.MONGODB_URI_TEST;
     if (!mongoUri) {
       throw new Error('MONGODB_URI_TEST is not set. Check jest.setup.js');
@@ -65,11 +77,13 @@ describe('/channel-join API Endpoint', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
+    // Use MockedProjectDetailsModel for Jest mock specific functions
     MockedProjectDetailsModel.mockClear();
-    mockProjectDetailsSave.mockClear();
+    mockProjectDetailsSave.mockClear(); // This is correct as mockProjectDetailsSave is a jest.fn()
 
     (utils.getTimezoneFromCoordinates as jest.Mock).mockReturnValue('America/New_York');
 
+    // Re-assign implementation for MockedProjectDetailsModel
     MockedProjectDetailsModel.mockImplementation(() => ({
       save: mockProjectDetailsSave.mockResolvedValue({}),
     }));
