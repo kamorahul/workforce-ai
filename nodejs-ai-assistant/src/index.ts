@@ -8,7 +8,7 @@ import { connectDB } from './config/mongodb';
 import { Attendance } from './models/Attendance';
 import { AttendanceLog } from './models/AttendanceLog';
 import { SentMessageLog } from './models/SentMessageLog';
-import ProjectDetails from './models/Project'; // Changed to default import
+import { ProjectDetails } from './models/Project'; // Changed to default import
 import { convertEmailToStreamFormat, convertStreamToEmail, getTimezoneFromCoordinates } from './utils/index'; // Added import
 import { setupAutoAttendanceCronJob } from './cron/autoAttendance';
 
