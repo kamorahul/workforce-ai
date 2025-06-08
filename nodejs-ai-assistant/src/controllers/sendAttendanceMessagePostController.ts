@@ -1,6 +1,8 @@
 import express, { Request, Response, Router } from 'express';
+import moment from 'moment-timezone';
 import { serverClient } from '../serverClient';
 import { Attendance } from '../models/Attendance';
+import { ProjectDetails } from '../models/Project';
 import { SentMessageLog } from '../models/SentMessageLog';
 import { AttendanceLog } from '../models/AttendanceLog';
 import { convertStreamToEmail } from '../utils/index';
@@ -21,13 +23,21 @@ router.post('/', async (req: Request, res: Response) => {
     const userName = user.users[0]?.name || convertStreamToEmail(userId);
     const channel = serverClient.channel('messaging', `tai_${userId}`);
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    let projectTimezone = 'UTC';
+    try {
+      const project = await ProjectDetails.findById(projectId);
+      if (project && project.timezone) {
+        projectTimezone = project.timezone;
+      } else {
+        console.warn(`Project timezone not found for projectId: ${projectId}. Defaulting to UTC.`);
+      }
+    } catch (error) {
+      console.warn(`Error fetching project details for projectId: ${projectId}. Defaulting to UTC. Error: ${error}`);
+    }
 
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
-
-    const eventDateForLog = new Date(todayStart); // For SentMessageLog
+    const todayStart = moment.tz(projectTimezone).startOf('day').toDate();
+    const todayEnd = moment.tz(projectTimezone).endOf('day').toDate();
+    const eventDateForLog = moment.tz(projectTimezone).startOf('day').toDate(); // For SentMessageLog
 
     if (action === 'checkin') {
       const todaysCheckins = await Attendance.find({
@@ -74,7 +84,7 @@ router.post('/', async (req: Request, res: Response) => {
             type: 'regular',
             action_type: 'attendance',
             projectId,
-            checkInTime: new Date(),
+            checkInTime: moment.tz(projectTimezone).toDate(),
             projectName,
           }, {skip_push: false});
 
@@ -133,7 +143,7 @@ router.post('/', async (req: Request, res: Response) => {
           projectId,
           projectName,
           user_id: 'tai',
-          checkOutTime: new Date(),
+          checkOutTime: moment.tz(projectTimezone).toDate(),
         });
 
         res.status(201).json({
@@ -166,8 +176,8 @@ router.post('/', async (req: Request, res: Response) => {
       const attendanceLog = new AttendanceLog({
         userId,
         projectId,
-        timestamp: new Date(), // Uses current time, not related to checkin/checkout time in message
-        action: action === 'checkin' ? 'ENTER' : 'EXIT', // This seems to map 'checkin' to 'ENTER' and 'checkout' to 'EXIT'
+        timestamp: moment.tz(projectTimezone).toDate(), // Uses current time in project's timezone
+        action: action === 'checkin' ? 'ENTER' : 'EXIT',
       });
       await attendanceLog.save();
     } catch (logError) {
