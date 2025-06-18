@@ -7,6 +7,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   // Use 'name' and 'image' from req.body
   const { username, name, image } = req.body;
 
+  console.log('Req.Body: ', JSON.stringify(req.body));
+
   if (!username) {
     res.status(400).json({ err: "Username is required" });
     return;
