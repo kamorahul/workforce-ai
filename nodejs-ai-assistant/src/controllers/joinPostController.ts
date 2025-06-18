@@ -43,6 +43,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     await channelTai.addMembers([username, 'tai']);
     // DO NOT hide for "tai" channel: await channelTai.hide(username);
 
+    console.log('Req.Body: ', JSON.stringify({ user: { username, name: userDataToUpsert.name, image: userDataToUpsert.image }, token }));
+
     // Respond with user details, reflecting parameters used for upsert
     res.status(200).json({ user: { username, name: userDataToUpsert.name, image: userDataToUpsert.image }, token });
 
