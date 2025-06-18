@@ -2,10 +2,10 @@ import express, { Request, Response, Router } from 'express';
 import { serverClient } from '../serverClient';
 import { Attendance } from '../models/Attendance';
 import { AttendanceLog } from '../models/AttendanceLog';
+import { ProjectDetails } from '../models/Project'; // Added import
 
-const router: Router = express.Router();
-
-router.post('/', async (req: Request, res: Response) => {
+// Export this function for testing
+export const handleAttendancePost = async (req: Request, res: Response) => {
   try {
     const { userId, projectId, datetime, status, messageId, projectName } = req.body;
     console.log("Body:", req.body);
@@ -77,10 +77,28 @@ router.post('/', async (req: Request, res: Response) => {
     // Replicating that behavior.
     await serverClient.deleteMessage(messageId, true);
 
+    let projectTimezone = 'UTC'; // Default timezone
+    try {
+      // Ensure projectId is treated as the document ID if that's how it's used elsewhere (e.g. in sendAttendanceMessagePostController)
+      const project = await ProjectDetails.findById(projectId);
+      if (project && project.timezone) {
+        projectTimezone = project.timezone;
+      } else {
+        // Log if project is found but timezone is missing, or if project is not found
+        if (project) {
+          console.warn(`Project timezone not found for projectId: ${projectId}. Defaulting to UTC.`);
+        } else {
+          console.warn(`Project with ID: ${projectId} not found. Defaulting to UTC timezone.`);
+        }
+      }
+    } catch (error) {
+      console.warn(`Error fetching project details for projectId: ${projectId}. Defaulting to UTC. Error: ${error}`);
+    }
+
     await serverClient.channel("messaging", `tai_${userId}`).sendMessage({
       user_id: userId,
       id: messageId, // This reuses the ID of the deleted message. This might be intentional or an oversight.
-      text: `${status === 'checkin' ? 'Checkin': 'Checkout' } Done for project ${projectName} at ${new Date(datetime).toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true })}`,
+      text: `${status === 'checkin' ? 'Checkin': 'Checkout' } Done for project ${projectName} at ${new Date(datetime).toLocaleString('en-US', { timeZone: projectTimezone, year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true })}`,
       type: 'regular',
     });
 
@@ -94,6 +112,9 @@ router.post('/', async (req: Request, res: Response) => {
       res.status(500).json({ error: 'Failed to record attendance' });
     }
   }
-});
+};
+
+const router: Router = express.Router();
+router.post('/', handleAttendancePost);
 
 export default router;
