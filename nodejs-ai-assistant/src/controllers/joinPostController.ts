@@ -6,9 +6,6 @@ const router: Router = express.Router();
 router.post('/', async (req: Request, res: Response): Promise<void> => {
   // Use 'name' and 'image' from req.body
   const { username, name, image } = req.body;
-
-  console.log('Req.Body: ', JSON.stringify(req.body));
-
   if (!username) {
     res.status(400).json({ err: "Username is required" });
     return;
@@ -16,16 +13,6 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
   const token = serverClient.createToken(username);
   try {
-    // 1. User Upsert Logic
-    const userDataToUpsert: { id: string; name?: string; image?: string } = { id: username };
-    if (name) { // Use 'name'
-      userDataToUpsert.name = name;
-    }
-    if (image) { // Use 'image'
-      userDataToUpsert.image = image;
-    }
-    await serverClient.upsertUser(userDataToUpsert);
-
     const channelKai = serverClient.channel('messaging', `kai${username}`, {
       name: 'Kai',
       created_by_id: username,
