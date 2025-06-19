@@ -11,6 +11,7 @@ import attendanceGetControllerRouter from './controllers/attendanceGetController
 import sendAttendanceMessagePostControllerRouter from './controllers/sendAttendanceMessagePostController';
 import checkMessageStatusGetControllerRouter from './controllers/checkMessageStatusGetController';
 import projectsGetControllerRouter from './controllers/projectsGetController';
+import profileUpdateControllerRouter from './controllers/profileUpdateController'; // Added import
 import { auth } from 'express-oauth2-jwt-bearer';
 import { connectDB } from './config/mongodb';
 import { setupAutoAttendanceCronJob } from './cron/autoAttendance';
@@ -40,6 +41,7 @@ app.use('/attendance', attendanceGetControllerRouter); // Note: Both POST and GE
 app.use('/send-attendance-message', sendAttendanceMessagePostControllerRouter);
 app.use('/check-message-status', checkMessageStatusGetControllerRouter);
 app.use('/projects', projectsGetControllerRouter);
+app.use('/profile', profileUpdateControllerRouter); // Added route
 
 // connectDB(); // Assuming this is called elsewhere or on startup
 // setupAutoAttendanceCronJob(); // Assuming this is called elsewhere or on startup
