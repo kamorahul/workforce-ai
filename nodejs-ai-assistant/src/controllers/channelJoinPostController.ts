@@ -19,6 +19,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         members: [convertEmailToStreamFormat(email)],
         projectId: projectData.projectId,
         qrCode: projectData.qrCode,
+        phoneNumber: projectData.phoneNumber,
         location: projectData.location,
         projectDetails: {
           description: projectDetails?.description || '',
@@ -49,6 +50,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
           timeSheetRequirement: projectData.projectDetails?.timeSheetRequirement,
           swms: projectData.projectDetails?.swms,
           qrCode: projectData.qrCode,
+          phoneNumber: projectData.phoneNumber,
           timezone: timezone,
           channelId: newChannelId,
         });

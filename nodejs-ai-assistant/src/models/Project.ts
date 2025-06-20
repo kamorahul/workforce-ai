@@ -18,6 +18,7 @@ export interface IProjectDetails extends Document {
   timeSheetRequirement?: boolean;
   swms?: string;
   qrCode?: string;
+  phoneNumber?: string;
   timezone?: string;
   channelId: string;
 }
@@ -75,6 +76,10 @@ const projectDetailsSchema = new Schema<IProjectDetails>({
     required: false,
   },
   qrCode: {
+    type: String,
+    required: false,
+  },
+  phoneNumber: {
     type: String,
     required: false,
   },
