@@ -16,11 +16,15 @@ export const uploadToS3 = async (fileBuffer: Buffer, fileName: string, contentTy
     throw new Error('S3_BUCKET_NAME environment variable is not set.');
   }
 
+  const folderPath = 'onboard-lo/local/employeeDocs/';
+  const fileKey = `${folderPath}${fileName}`;
+
   const params = {
     Bucket: bucketName,
-    Key: fileName,
+    Key: fileKey,
     Body: fileBuffer,
     ContentType: contentType,
+    ACL: 'public-read',
   };
 
   try {
