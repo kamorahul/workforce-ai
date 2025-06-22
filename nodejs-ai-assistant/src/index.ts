@@ -10,6 +10,7 @@ import attendanceGetControllerRouter from './controllers/attendanceGetController
 import sendAttendanceMessagePostControllerRouter from './controllers/sendAttendanceMessagePostController';
 import checkMessageStatusGetControllerRouter from './controllers/checkMessageStatusGetController';
 import projectsGetControllerRouter from './controllers/projectsGetController';
+import profileUpdatePostControllerRouter from './controllers/profileUpdatePostController';
 
 const app = express();
 app.use(express.json());
@@ -34,5 +35,6 @@ app.use('/attendance', attendanceGetControllerRouter); // Note: Both POST and GE
 app.use('/send-attendance-message', sendAttendanceMessagePostControllerRouter);
 app.use('/check-message-status', checkMessageStatusGetControllerRouter);
 app.use('/projects', projectsGetControllerRouter);
+app.use('/profile', profileUpdatePostControllerRouter);
 
 export { app }; // Export the app instance
