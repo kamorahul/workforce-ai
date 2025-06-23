@@ -32,7 +32,7 @@ router.post('/profile', upload.single('profilePicture'), async (req: Request, re
         return res.status(400).json({ error: 'Invalid profile picture file provided.' });
       }
       const s3Url = await uploadToS3(profilePictureFile.buffer, profilePictureFile.originalname, profilePictureFile.mimetype);
-      userDataToUpdate.profile_picture_s3_url = s3Url;
+      userDataToUpdate.image = s3Url;
     }
 
     if (Object.keys(userDataToUpdate).length === 0) {
