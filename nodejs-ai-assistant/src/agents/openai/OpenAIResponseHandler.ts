@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import type { AssistantStream } from 'openai/lib/AssistantStream';
 import type {Channel, DefaultGenerics, MessageResponse, StreamChat} from 'stream-chat';
 import {User} from "../createAgent";
+import { analyze_conversation } from '../../cron/taskManager';
 
 interface FetchGroupConversationArguments {
   groupId: string;
@@ -131,6 +132,23 @@ export class OpenAIResponseHandler {
                   tool_call_id: toolCall.id,
                   output: userMessages?.join(", "),
                 };
+                break;
+
+              case 'analyze_conversation':
+                try {
+                  const analyzeArgs = JSON.parse(argumentsString);
+                  const tasks = await analyze_conversation(analyzeArgs);
+                  return {
+                    tool_call_id: toolCall.id,
+                    output: JSON.stringify(tasks),
+                  };
+                } catch (error) {
+                  console.error('Error in analyze_conversation:', error);
+                  return {
+                    tool_call_id: toolCall.id,
+                    output: JSON.stringify({ error: 'Failed to analyze conversation' }),
+                  };
+                }
                 break;
 
               default:

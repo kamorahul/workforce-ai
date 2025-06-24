@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { app } from './index'; // Import the configured app instance
 import { connectDB } from './config/mongodb';
 import { setupAutoAttendanceCronJob } from './cron/autoAttendance';
+import { setupTaskManagerCronJob } from './cron/taskManager';
 
 const port = process.env.PORT || 3000;
 
@@ -20,6 +21,9 @@ const startServer = async () => {
       if (process.env.NODE_ENV !== 'test') {
         setupAutoAttendanceCronJob(); // Initialize and start the cron job only if not in test environment
         console.log('Auto attendance cron job started.');
+        
+        setupTaskManagerCronJob(); // Initialize and start the task manager cron job
+        console.log('Task manager cron job started.');
       }
     });
   } catch (error) {

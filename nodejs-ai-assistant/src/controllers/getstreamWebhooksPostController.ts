@@ -1,6 +1,7 @@
 import express, { Request, Response, Router } from 'express';
 import { serverClient } from '../serverClient';
 import { createAgent, User } from '../agents/createAgent';
+import { analyze_conversation } from '../cron/taskManager';
 
 const router: Router = express.Router();
 
@@ -97,6 +98,18 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       // We will replicate this behavior.
       res.json(req.body);
       return; // Return early as we've handled the response for 'attendance'
+    case 'taskmanager':
+      await agent.init("asst_3odIHIz3n0TakfdUJ8Y4IYl6");
+      if (summaryChannel) {
+        agent.handleMessage(
+            `First, fetch the conversation data from group ${summaryChannel} using the fetch_group_conversation tool. Then analyze that conversation data using the analyze_conversation function to generate potential tasks for ${user.name}. Focus on messages that mention or are directed to ${user.name}.`,
+        );
+      } else {
+        agent.handleMessage(
+            `First, fetch the conversation data from group ${channelIdUpdated} using the fetch_group_conversation tool. Then analyze that conversation data using the analyze_conversation function to generate potential tasks for ${user.name}. Focus on messages that mention or are directed to ${user.name}.`,
+        );
+      }
+      break;
   }
 
   // If the command is not 'attendance', and not handled by other cases,
