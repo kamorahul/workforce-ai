@@ -13,6 +13,20 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
   const token = serverClient.createToken(username);
   try {
+     // Create AI users first before adding them to channels
+    await serverClient.upsertUser({
+      id: 'Kai',
+      name: 'Kai',
+      role: 'admin',
+      image: 'https://cdn-icons-png.flaticon.com/512/1077/1077012.png'
+    });
+
+    await serverClient.upsertUser({
+      id: 'tai',
+      name: 'Tai',
+      role: 'admin',
+      image: 'https://cdn-icons-png.flaticon.com/512/1077/1077012.png'
+    });
     const channelKai = serverClient.channel('messaging', `kai${username}`, {
       name: 'Kai',
       created_by_id: username,
