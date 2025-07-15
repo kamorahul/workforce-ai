@@ -11,6 +11,7 @@ import sendAttendanceMessagePostControllerRouter from './controllers/sendAttenda
 import checkMessageStatusGetControllerRouter from './controllers/checkMessageStatusGetController';
 import projectsGetControllerRouter from './controllers/projectsGetController';
 import profileUpdatePostControllerRouter from './controllers/profileUpdatePostController';
+import taskPostControllerRouter from './controllers/taskPostController';
 
 const app = express();
 app.use(express.json());
@@ -36,5 +37,6 @@ app.use('/send-attendance-message', sendAttendanceMessagePostControllerRouter);
 app.use('/check-message-status', checkMessageStatusGetControllerRouter);
 app.use('/projects', projectsGetControllerRouter);
 app.use('/profile', profileUpdatePostControllerRouter);
+app.use('/task', taskPostControllerRouter);
 
 export { app }; // Export the app instance

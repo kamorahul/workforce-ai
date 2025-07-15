@@ -1,6 +1,7 @@
 import express, { Request, Response, Router } from 'express';
 import { serverClient } from '../serverClient';
 import { createAgent, User } from '../agents/createAgent';
+import { Channel } from '../models/Channel';
 
 const router: Router = express.Router();
 
@@ -23,6 +24,34 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   const { message, user } = req.body;
 
   console.log("Req Body: ", req.body);
+
+  // --- Extract and save channel data ---
+  try {
+    const channelId = message?.cid;
+    const channelType = message?.type || 'messaging';
+    const channelName = message?.args || '';
+    const createdBy = user?.id || '';
+    const members = message?.members || (user ? [user.id] : []);
+    const image = message?.image || '';
+
+    if (channelId && channelType && channelName && createdBy) {
+      await Channel.findOneAndUpdate(
+        { channelId },
+        {
+          channelId,
+          type: channelType,
+          name: typeof channelName === 'string' ? channelName : '',
+          createdBy,
+          members,
+          image,
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    }
+  } catch (err) {
+    console.error('Error saving channel data:', err);
+  }
+  // --- End channel data save ---
 
   let summaryChannel;
   let {
