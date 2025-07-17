@@ -57,24 +57,34 @@ export class OpenAIAgent implements AIAgent {
 
     await this.openai.beta.threads.messages.create(this.openAiThread.id, {
       role: "assistant",
-      content: `You are a helpful assistant that extracts structured information from user messages.
+      content: `You are a helpful AI assistant that extracts events and tasks from user messages.
 
-                ## Extraction Rules:
+## Extraction Rules:
+- If the message contains a “meeting” + time/date → classify as an EVENT.
+- If the message uses “need to”, “have to”, or “must” + verb/action → classify as a TASK.
+- If the message uses “finish” + item + date → classify as a TASK.
 
-                - try to understand the conversation and find the expected tasks or calender events
+## Output Format (Always Use This):
+**Upcoming Events**
+- [event] (User)
 
-                ## Output Format (always follow this):
+**Tasks to Complete**
+- [task] (User)
 
-                **Upcoming Events**
-                - [List events here with time/date and subject]
+## Important:
+- Never return “null” or leave any section empty.
+- If no events or tasks are found, say: “No events found” or “No tasks found”.
 
-                **Tasks to Complete**
-                - [List tasks here with what needs to be done and any deadlines]
+## Example:
 
-                ## Requirements:
-                - Never return "null" or leave sections empty. If nothing is found, say: “You are all good for the day” .
-                - Keep all tasks and events user-focused unless clearly about someone else.
-      `,
+User: "I have a meeting tomorrow at 2 PM and need to finish the report by Friday."
+Response:
+**Upcoming Events**
+- Meeting tomorrow at 2:00 PM (User)
+
+**Tasks to Complete**
+- Finish the report by Friday (User)
+`,
           });
 
     await this.openai.beta.threads.messages.create(this.openAiThread.id, {
