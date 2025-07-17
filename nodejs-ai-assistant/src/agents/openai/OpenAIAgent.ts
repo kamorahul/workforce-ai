@@ -56,7 +56,7 @@ export class OpenAIAgent implements AIAgent {
     this.lastInteractionTs = Date.now();
 
     await this.openai.beta.threads.messages.create(this.openAiThread.id, {
-      role: "assistant",
+      role: "user",
       content: `You are a helpful AI assistant that extracts events and tasks from user messages.
 
 ## Extraction Rules:
