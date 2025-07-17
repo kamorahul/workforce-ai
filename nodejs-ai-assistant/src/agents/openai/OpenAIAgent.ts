@@ -56,6 +56,28 @@ export class OpenAIAgent implements AIAgent {
     this.lastInteractionTs = Date.now();
 
     await this.openai.beta.threads.messages.create(this.openAiThread.id, {
+      role: "assistant",
+      content: `You are a helpful assistant that extracts structured information from user messages.
+
+                ## Extraction Rules:
+
+                - try to understand the conversation and find the expected tasks or calender events
+
+                ## Output Format (always follow this):
+
+                **Upcoming Events**
+                - [List events here with time/date and subject]
+
+                **Tasks to Complete**
+                - [List tasks here with what needs to be done and any deadlines]
+
+                ## Requirements:
+                - Never return "null" or leave sections empty. If nothing is found, say: “You are all good for the day” .
+                - Keep all tasks and events user-focused unless clearly about someone else.
+      `,
+          });
+
+    await this.openai.beta.threads.messages.create(this.openAiThread.id, {
       role: 'user',
       content: message,
     });
