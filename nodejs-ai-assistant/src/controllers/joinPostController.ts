@@ -43,8 +43,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       };
 
       const agent = await createAgent(agentUser, 'messaging', `kai${username}`);
-      await agent.init && agent.init('asst_1S24D5a6stMWlbPAMhJSsLIX'); // Use a default assistant id, adjust as needed
-      agent.handleMessage && agent.handleMessage('Daily event triggered for user.');
+      await agent.init('asst_1S24D5a6stMWlbPAMhJSsLIX'); // Use a default assistant id, adjust as needed
+      agent.handleMessage('Daily event triggered for user.');
     } else {
       console.log(`Daily event already triggered for userId: ${username} on ${today.toISOString()}`);
     }
