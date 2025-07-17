@@ -126,7 +126,6 @@ export class OpenAIResponseHandler {
                     argumentsString,
                 ) as FetchUserConversationsArguments;
                 const userMessages = await this.getUserConversationsByLimit(getUserConversationsArgs);
-                console.log("userMessages---------->>>>>>>>>>>>>>>>>>>>>>>",JSON.stringify(userMessages));
                 return {
                   tool_call_id: toolCall.id,
                   output: userMessages?.join(", "),
@@ -199,22 +198,6 @@ export class OpenAIResponseHandler {
   ) => {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    // const channel = this.chatClient.channel("messaging", args.username);
-    // const channels = await this.chatClient.queryChannels({
-    //   members: {$in: [args.username]},
-    // }, {}, {message_limit: 100});
-    //
-    // let messages: MessageResponse<DefaultGenerics>[] = []
-    // for (const channel of channels) {
-    //   console.log("Fetching for: ", channel.data?.name)
-    //   const channelMessages = await channel.query({
-    //     messages: {
-    //       limit: 200,
-    //     }
-    //   })
-    //
-    //   messages = [...messages, ...channelMessages.messages]
-    //   console.log("Messages>>>>>>>>>>>>>", messages)
     const channels = await this.chatClient.queryChannels({
       members: { $in: [args.username] },
     });
@@ -232,9 +215,7 @@ export class OpenAIResponseHandler {
 
       allMessages = [...allMessages, ...result.messages];
     }
-    console.log("ALl Messages>>>>>>>>>>>>>>", allMessages)
-    // return allMessages;
-      // return messages
+
     return allMessages.filter(
         (message) => (message.type !== "system" && message.user?.name)
     ).map((message) => {

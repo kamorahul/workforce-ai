@@ -1,5 +1,8 @@
 import express, { Request, Response, Router } from 'express';
 import { serverClient } from '../serverClient'; // Adjusted path
+import { UserJoinLog } from '../models/UserJoinLog';
+import { DailyEventLog } from '../models/DailyEventLog';
+import { createAgent, User as AgentUser } from '../agents/createAgent';
 
 const router: Router = express.Router();
 
@@ -9,6 +12,44 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   if (!username) {
     res.status(400).json({ err: "Username is required" });
     return;
+  }
+
+  // Track unique user join
+  try {
+    await UserJoinLog.updateOne(
+      { userId: username },
+      { $setOnInsert: { userId: username, joinedAt: new Date() } },
+      { upsert: true }
+    );
+    // Trigger daily event for this user if not already triggered today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const existingDaily = await DailyEventLog.findOne({ userId: username, eventDate: today });
+    if (!existingDaily) {
+      await DailyEventLog.create({ userId: username, eventDate: today });
+      console.log(`Daily event triggered for userId: ${username} on ${today.toISOString()}`);
+      // Call agent.handleMessage
+      const agentUser: AgentUser = {
+        id: username,
+        role: 'user',
+        created_at: new Date(),
+        updated_at: new Date(),
+        last_active: new Date(),
+        last_engaged_at: new Date(),
+        banned: false,
+        online: false,
+        name: name || username,
+        image: image || '',
+      };
+
+      const agent = await createAgent(agentUser, 'messaging', `kai${username}`);
+      await agent.init && agent.init('asst_1S24D5a6stMWlbPAMhJSsLIX'); // Use a default assistant id, adjust as needed
+      agent.handleMessage && agent.handleMessage('Daily event triggered for user.');
+    } else {
+      console.log(`Daily event already triggered for userId: ${username} on ${today.toISOString()}`);
+    }
+  } catch (err) {
+    console.error('Error logging user join or daily event:', err);
   }
 
   const token = serverClient.createToken(username);
