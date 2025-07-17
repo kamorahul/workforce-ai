@@ -8,12 +8,13 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const router: Router = express.Router();
 
-router.post('/profile', upload.single('profilePicture'), async (req: Request, res: Response) => {
+router.post('/profile', upload.single('profilePicture'), async (req: Request, res: Response): Promise<void> => {
   const { userId, name, email } = req.body;
-  const profilePictureFile = req.file;
+  const profilePictureFile = req?.file;
 
   if (!userId) {
-    return res.status(400).json({ error: 'User ID is required.' });
+    res.status(400).json({ error: 'User ID is required.' });
+    return;
   }
 
   const userDataToUpdate: { [key: string]: any } = {};
@@ -29,14 +30,16 @@ router.post('/profile', upload.single('profilePicture'), async (req: Request, re
   try {
     if (profilePictureFile) {
       if (!profilePictureFile.buffer || !profilePictureFile.originalname || !profilePictureFile.mimetype) {
-        return res.status(400).json({ error: 'Invalid profile picture file provided.' });
+        res.status(400).json({ error: 'Invalid profile picture file provided.' });
+        return;
       }
       const s3Url = await uploadToS3(profilePictureFile.buffer, profilePictureFile.originalname, profilePictureFile.mimetype);
       userDataToUpdate.image = s3Url;
     }
 
     if (Object.keys(userDataToUpdate).length === 0) {
-      return res.status(400).json({ error: 'No profile data provided to update.' });
+       res.status(400).json({ error: 'No profile data provided to update.' });
+       return;
     }
 
     const updatedUser = await serverClient.partialUpdateUser({
@@ -53,7 +56,8 @@ router.post('/profile', upload.single('profilePicture'), async (req: Request, re
     if (error instanceof Error) {
         // Check if the error message indicates S3 related issues
         if (error.message.toLowerCase().includes('s3') || error.message.toLowerCase().includes('bucket')) {
-            return res.status(500).json({ error: `Failed to upload profile picture: ${error.message}` });
+             res.status(500).json({ error: `Failed to upload profile picture: ${error.message}` });
+             return;
         }
     }
     res.status(500).json({ error: 'Failed to process profile update.' });
