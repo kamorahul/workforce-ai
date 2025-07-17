@@ -21,7 +21,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       { $setOnInsert: { userId: username, joinedAt: new Date() } },
       { upsert: true }
     );
-    // Trigger daily event for this user if not already triggered today
+    console.log("Trigger daily event for this user if not already triggered today")
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const existingDaily = await DailyEventLog.findOne({ userId: username, eventDate: today });
