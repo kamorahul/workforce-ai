@@ -36,7 +36,6 @@ router.get('/', async (req: Request, res: Response) => {
     const now = new Date();
     const query: any = {
       assignee: assignee as string,
-      completionDate: { $gt: now },
     };
     if (channelId) {
       query.channelId = channelId as string;
