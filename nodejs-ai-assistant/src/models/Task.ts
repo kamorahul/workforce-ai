@@ -1,8 +1,8 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface ISubtask {
-  title: string;
-  status: 'todo' | 'in progress' | 'done';
+  name: string;
+  completed: boolean;
 }
 
 export interface ITask extends Document {
@@ -19,15 +19,14 @@ export interface ITask extends Document {
 }
 
 const SubtaskSchema: Schema = new Schema({
-  title: {
+  name: {
     type: String,
     required: true,
   },
-  status: {
-    type: String,
-    enum: ['todo', 'in progress', 'done'],
-    default: 'todo',
+  completed: {
+    type: Boolean,
     required: true,
+    default: false,
   },
 }, { _id: false });
 
@@ -68,7 +67,6 @@ const TaskSchema: Schema = new Schema({
   subtasks: {
     type: [SubtaskSchema],
     default: [],
-    required: true,
   },
 }, {
   timestamps: true,
