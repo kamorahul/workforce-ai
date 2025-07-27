@@ -3,7 +3,7 @@ import { Task } from '../models/Task';
 
 export const handleTaskPost = async (req: Request, res: Response) => {
   try {
-    const { name, assignee, priority, completionDate, channelId, description, subtasks } = req.body;
+    const { name, assignee, priority, completionDate, channelId, description, subtasks, createdBy } = req.body;
     if (!name || !assignee || !priority || !completionDate || !channelId) {
       res.status(400).json({ error: 'Missing required fields' });
       return;
@@ -16,6 +16,7 @@ export const handleTaskPost = async (req: Request, res: Response) => {
       channelId,
       description,
       subtasks: subtasks || [],
+      createdBy: createdBy || assignee,
     });
     await task.save();
     res.status(201).json({ status: 'success', task });
@@ -30,15 +31,26 @@ router.post('/', handleTaskPost);
 
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { assignee, channelId } = req.query;
-    if (!assignee) {
-      res.status(400).json({ error: 'Missing required query parameter: assignee' });
+    const { assignee, channelId, createdBy } = req.query;
+    if (!assignee && !createdBy) {
+      res.status(400).json({ error: 'Missing required query parameter: assignee or createdBy' });
       return;
     }
     const now = new Date();
-    const query: any = {
-      assignee: assignee as string,
-    };
+    const query: any = {};
+    
+    if (assignee && createdBy) {
+      // Fetch tasks where user is either assignee or creator
+      query.$or = [
+        { assignee: assignee as string },
+        { createdBy: createdBy as string }
+      ];
+    } else if (assignee) {
+      query.assignee = assignee as string;
+    } else if (createdBy) {
+      query.createdBy = createdBy as string;
+    }
+    
     if (channelId) {
       query.channelId = channelId as string;
     }

@@ -16,6 +16,7 @@ export interface ITask extends Document {
   completed: boolean; // Added field
   description?: string; // Optional long text description
   subtasks: ISubtask[]; // Array of subtask objects
+  createdBy: string; // userId of the task creator
 }
 
 const SubtaskSchema: Schema = new Schema({
@@ -67,6 +68,11 @@ const TaskSchema: Schema = new Schema({
   subtasks: {
     type: [SubtaskSchema],
     default: [],
+  },
+  createdBy: {
+    type: String,
+    required: true,
+    index: true,
   },
 }, {
   timestamps: true,
