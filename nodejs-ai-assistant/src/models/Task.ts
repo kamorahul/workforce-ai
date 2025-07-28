@@ -7,7 +7,7 @@ export interface ISubtask {
 
 export interface ITask extends Document {
   name: string;
-  assignee: string; // userId of the assignee
+  assignee: string[]; // Array of userIds of the assignees
   priority: 'low' | 'medium' | 'high';
   completionDate: Date;
   channelId: string;
@@ -37,7 +37,7 @@ const TaskSchema: Schema = new Schema({
     required: true,
   },
   assignee: {
-    type: String,
+    type: [String],
     required: true,
     index: true,
   },

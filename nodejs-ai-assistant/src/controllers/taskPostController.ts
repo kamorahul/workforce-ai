@@ -4,8 +4,8 @@ import { Task } from '../models/Task';
 export const handleTaskPost = async (req: Request, res: Response) => {
   try {
     const { name, assignee, priority, completionDate, channelId, description, subtasks, createdBy } = req.body;
-    if (!name || !assignee || !priority || !completionDate || !channelId) {
-      res.status(400).json({ error: 'Missing required fields' });
+    if (!name || !assignee || !Array.isArray(assignee) || assignee.length === 0 || !priority || !completionDate || !channelId) {
+      res.status(400).json({ error: 'Missing required fields or assignee must be a non-empty array' });
       return;
     }
     const task = new Task({
@@ -16,7 +16,7 @@ export const handleTaskPost = async (req: Request, res: Response) => {
       channelId,
       description,
       subtasks: subtasks || [],
-      createdBy: createdBy || assignee,
+      createdBy: createdBy || assignee[0], // Use first assignee as default creator
     });
     await task.save();
     res.status(201).json({ status: 'success', task });
@@ -40,13 +40,13 @@ router.get('/', async (req: Request, res: Response) => {
     const query: any = {};
     
     if (assignee && createdBy) {
-      // Fetch tasks where user is either assignee or creator
+      // Fetch tasks where user is either in assignee array or creator
       query.$or = [
-        { assignee: assignee as string },
+        { assignee: { $in: [assignee as string] } },
         { createdBy: createdBy as string }
       ];
     } else if (assignee) {
-      query.assignee = assignee as string;
+      query.assignee = { $in: [assignee as string] };
     } else if (createdBy) {
       query.createdBy = createdBy as string;
     }
@@ -97,7 +97,13 @@ router.put('/:taskId', async (req: Request, res: Response) => {
     
     const updateData: any = {};
     if (name !== undefined) updateData.name = name;
-    if (assignee !== undefined) updateData.assignee = assignee;
+    if (assignee !== undefined) {
+      if (!Array.isArray(assignee) || assignee.length === 0) {
+        res.status(400).json({ error: 'Assignee must be a non-empty array' });
+        return;
+      }
+      updateData.assignee = assignee;
+    }
     if (priority !== undefined) updateData.priority = priority;
     if (completionDate !== undefined) updateData.completionDate = new Date(completionDate);
     if (channelId !== undefined) updateData.channelId = channelId;
