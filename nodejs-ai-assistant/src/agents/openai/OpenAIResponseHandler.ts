@@ -126,6 +126,10 @@ export class OpenAIResponseHandler {
                     argumentsString,
                 ) as FetchUserConversationsArguments;
                 const userMessages = await this.getUserConversationsByLimit(getUserConversationsArgs);
+
+                console.log("userMessages: ", userMessages);
+                
+
                 return {
                   tool_call_id: toolCall.id,
                   output: userMessages?.join(", "),
