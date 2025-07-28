@@ -28,23 +28,34 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     if (!existingDaily) {
       await DailyEventLog.create({ userId: username, eventDate: today });
       console.log(`Daily event triggered for userId: ${username} on ${today.toISOString()}`);
+      
+      // Fetch user info from getstream
+      let fetchedUser;
+      try {
+        const response = await serverClient.queryUsers({ id: username });
+        fetchedUser = response.users[0];
+      } catch (err) {
+        console.error('Error fetching user from getstream:', err);
+        fetchedUser = null;
+      }
+
       // Call agent.handleMessage
       const agentUser: AgentUser = {
         id: username,
         role: 'user',
-        created_at: new Date(),
-        updated_at: new Date(),
-        last_active: new Date(),
+        created_at: fetchedUser?.created_at ? new Date(fetchedUser.created_at) : new Date(),
+        updated_at: fetchedUser?.updated_at ? new Date(fetchedUser.updated_at) : new Date(),
+        last_active: fetchedUser?.last_active ? new Date(fetchedUser.last_active) : new Date(),
         last_engaged_at: new Date(),
-        banned: false,
-        online: false,
-        name: name || username,
-        image: image || '',
+        banned: fetchedUser?.banned || false,
+        online: fetchedUser?.online || false,
+        name: fetchedUser?.name || name || username,
+        image: fetchedUser?.image || image || '',
       };
 
       const agent = await createAgent(agentUser, 'messaging', `kai${username}`);
       await agent.init('asst_IvTo37LM3gDUZ2LTXIgUBeS1'); // Use a default assistant id, adjust as needed
-      agent.handleMessage(`Daily event triggered for ${username}.`);
+      agent.handleMessage(`Daily event triggered for Name: ${agentUser.name} Username: (${username}).`);
     } else {
       console.log(`Daily event already triggered for userId: ${username} on ${today.toISOString()}`);
     }
