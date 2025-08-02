@@ -9,7 +9,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
   const agent = await createAgent(user as User, channel.type, channel.id);
 
-  if(user.id==='kai' || channel.id.indexOf('kai') !== 0) {
+  if(user.id === 'kai' || channel.id.indexOf('kai') !== 0) {
     // If the user is 'kai' or the channel is not related to 'kai',
     // the original code sends back the request body and returns.
     // This behavior is replicated here.
@@ -18,6 +18,12 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   }
 
   await agent.init("asst_Q8vD9YOGcO3es62kFjeVZI5L");
+  if(message.attachment.length > 0) {
+    agent.handleMessage(
+      `${message.text}: ${message.attachment[0].toString()}`
+    );
+    return;
+  }
   agent.handleMessage(
       message.text
   );
