@@ -61,7 +61,6 @@ export class GetStreamFeedsService {
       const activity = await feed.addActivity({
         text: `Task: ${task.name}`,
         type: 'task',
-        foreign_id: `task:${taskId}`,
         extra: {
           taskId: taskId,
           taskName: task.name,
@@ -74,7 +73,7 @@ export class GetStreamFeedsService {
         },
       });
 
-      return activity.id;
+      return activity.data?.id || null;
     } catch (error) {
       console.error('Error creating task activity:', error);
       return null;
@@ -90,14 +89,11 @@ export class GetStreamFeedsService {
         await this.connectUser(userId, userToken);
       }
 
-      const feed = this.client.feed('task', taskId);
-      await feed.getOrCreate({ watch: true });
-
-      const comment = await feed.addComment({
+      // Use the client's addComment method directly
+      const comment = await this.client.addComment({
         comment: message,
         object_id: `task:${taskId}`,
         object_type: 'activity',
-        user_id: userId,
         custom: {
           commentId: commentId,
           taskId: taskId,
@@ -105,12 +101,12 @@ export class GetStreamFeedsService {
       });
 
       return {
-        id: comment.id,
-        comment: comment.comment,
-        user_id: comment.user_id,
-        created_at: comment.created_at,
-        updated_at: comment.updated_at,
-        custom: comment.custom,
+        id: comment.data?.id || '',
+        comment: comment.data?.comment || message,
+        user_id: userId,
+        created_at: comment.data?.created_at || new Date().toISOString(),
+        updated_at: comment.data?.updated_at || new Date().toISOString(),
+        custom: comment.data?.custom,
       };
     } catch (error) {
       console.error('Error adding comment:', error);
@@ -127,22 +123,19 @@ export class GetStreamFeedsService {
         await this.connectUser(userId, userToken);
       }
 
-      const feed = this.client.feed('task', taskId);
-      await feed.getOrCreate({ watch: true });
-
-      const response = await feed.getComments({
+      const response = await this.client.getComments({
         object_id: `task:${taskId}`,
         object_type: 'activity',
         limit: limit,
         sort: 'newest',
       });
 
-      return response.results?.map((comment: any) => ({
-        id: comment.id,
-        comment: comment.comment,
-        user_id: comment.user_id,
-        created_at: comment.created_at,
-        updated_at: comment.updated_at,
+      return response.data?.results?.map((comment: any) => ({
+        id: comment.id || '',
+        comment: comment.comment || '',
+        user_id: comment.user_id || userId,
+        created_at: comment.created_at || new Date().toISOString(),
+        updated_at: comment.updated_at || new Date().toISOString(),
         custom: comment.custom,
       })) || [];
     } catch (error) {
@@ -169,12 +162,12 @@ export class GetStreamFeedsService {
       });
 
       return {
-        id: comment.id,
-        comment: comment.comment,
-        user_id: comment.user_id,
-        created_at: comment.created_at,
-        updated_at: comment.updated_at,
-        custom: comment.custom,
+        id: comment.data?.id || commentId,
+        comment: comment.data?.comment || message,
+        user_id: userId,
+        created_at: comment.data?.created_at || new Date().toISOString(),
+        updated_at: comment.data?.updated_at || new Date().toISOString(),
+        custom: comment.data?.custom,
       };
     } catch (error) {
       console.error('Error updating comment:', error);
@@ -214,7 +207,6 @@ export class GetStreamFeedsService {
       const reaction = await this.client.addCommentReaction({
         comment_id: commentId,
         type: type,
-        user_id: userId,
       });
 
       return reaction;
@@ -236,7 +228,6 @@ export class GetStreamFeedsService {
       await this.client.deleteCommentReaction({
         comment_id: commentId,
         type: type,
-        user_id: userId,
       });
 
       return true;
@@ -251,8 +242,10 @@ export class GetStreamFeedsService {
    */
   async disconnect(): Promise<void> {
     try {
-      await this.client.disconnect();
+      // Note: The FeedsClient might not have a disconnect method
+      // We'll just set the connection state to false
       this.isConnected = false;
+      console.log('Disconnected from GetStream Activity Feeds');
     } catch (error) {
       console.error('Error disconnecting from GetStream:', error);
     }

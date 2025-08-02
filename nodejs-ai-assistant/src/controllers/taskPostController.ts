@@ -1,5 +1,6 @@
 import express, { Request, Response, Router } from 'express';
 import { Task } from '../models/Task';
+import { Comment } from '../models/Comment';
 
 export const handleTaskPost = async (req: Request, res: Response) => {
   try {
@@ -62,6 +63,35 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+// Get task details with comments
+router.get('/:taskId', async (req: Request, res: Response) => {
+  try {
+    const { taskId } = req.params;
+    if (!taskId) {
+      res.status(400).json({ error: 'Missing required parameter: taskId' });
+      return;
+    }
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+
+    // Fetch comments for the task
+    const comments = await Comment.find({ taskId }).sort({ createdAt: 1 });
+
+    res.status(200).json({ 
+      status: 'success', 
+      task,
+      comments 
+    });
+  } catch (error) {
+    console.error('Error fetching task details:', error);
+    res.status(500).json({ error: 'Failed to fetch task details' });
+  }
+});
+
 router.patch('/:taskId/complete', async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
@@ -78,6 +108,7 @@ router.patch('/:taskId/complete', async (req: Request, res: Response) => {
       res.status(404).json({ error: 'Task not found' });
       return;
     }
+
     res.status(200).json({ status: 'success', task });
   } catch (error) {
     console.error('Error marking task as complete:', error);
