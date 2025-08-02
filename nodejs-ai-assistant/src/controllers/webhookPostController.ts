@@ -18,7 +18,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   }
 
   await agent.init("asst_Q8vD9YOGcO3es62kFjeVZI5L");
-  if(message.attachment.length > 0) {
+  if(message.attachments.length > 0) {
     agent.handleMessage(
       `${message.text}: ${message.attachment[0].toString()}`
     );
