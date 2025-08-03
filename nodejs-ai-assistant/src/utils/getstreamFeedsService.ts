@@ -20,7 +20,7 @@ export interface GetStreamActivity {
 }
 
 export class GetStreamFeedsService {
-  private client: FeedsClient;
+  private client: StreamClient;
   private isConnected: boolean = false;
 
   constructor() {
