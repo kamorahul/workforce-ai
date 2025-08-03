@@ -1,4 +1,4 @@
-import { FeedsClient } from '@stream-io/feeds-client';
+import { StreamClient } from "@stream-io/node-sdk";
 
 export interface GetStreamComment {
   id: string;
@@ -25,21 +25,28 @@ export class GetStreamFeedsService {
 
   constructor() {
     const apiKey = process.env.STREAM_API_KEY;
+    const apiSecret = process.env.STREAM_API_SECRET;
+    
     if (!apiKey) {
       throw new Error('STREAM_API_KEY environment variable is required');
     }
     
-    this.client = new FeedsClient(apiKey);
+    if (!apiSecret) {
+      throw new Error('STREAM_API_SECRET environment variable is required');
+    }
+    
+    this.client = new StreamClient(apiKey, apiSecret);
   }
 
   /**
-   * Connect to GetStream with user credentials
+   * Connect to GetStream with server-side authentication
    */
-  async connectUser(userId: string, userToken: string): Promise<void> {
+  async connect(): Promise<void> {
     try {
-      await this.client.connectUser({ id: userId }, userToken);
+      // For server-side operations, we don't need to connect as a specific user
+      // The API secret provides the necessary authentication
       this.isConnected = true;
-      console.log('Connected to GetStream Activity Feeds');
+      console.log('Connected to GetStream Activity Feeds with server authentication');
     } catch (error) {
       console.error('Error connecting to GetStream:', error);
       throw error;
@@ -49,10 +56,10 @@ export class GetStreamFeedsService {
   /**
    * Create a task activity in GetStream Activity Feeds
    */
-  async createTaskActivity(taskId: string, task: any, userId: string, userToken: string): Promise<string | null> {
+  async createTaskActivity(taskId: string, task: any): Promise<string | null> {
     try {
       if (!this.isConnected) {
-        await this.connectUser(userId, userToken);
+        await this.connect();
       }
 
       const feed = this.client.feed('task', taskId);
@@ -75,10 +82,10 @@ export class GetStreamFeedsService {
   /**
    * Add a comment to a task activity
    */
-  async addComment(taskId: string, userId: string, userToken: string, message: string, commentId?: string): Promise<GetStreamComment | null> {
+  async addComment(taskId: string, userId: string, message: string, commentId?: string): Promise<GetStreamComment | null> {
     try {
       if (!this.isConnected) {
-        await this.connectUser(userId, userToken);
+        await this.connect();
       }
 
       // Use the client's addComment method directly
@@ -89,6 +96,7 @@ export class GetStreamFeedsService {
         custom: {
           commentId: commentId,
           taskId: taskId,
+          userId: userId,
         },
       });
 
@@ -117,10 +125,10 @@ export class GetStreamFeedsService {
   /**
    * Get comments for a task activity
    */
-  async getComments(taskId: string, userId: string, userToken: string, limit: number = 50): Promise<GetStreamComment[]> {
+  async getComments(taskId: string, limit: number = 50): Promise<GetStreamComment[]> {
     try {
       if (!this.isConnected) {
-        await this.connectUser(userId, userToken);
+        await this.connect();
       }
 
       const response = await this.client.getComments({
@@ -137,7 +145,7 @@ export class GetStreamFeedsService {
       return results.map((comment: any) => ({
         id: comment.id || '',
         comment: comment.comment || '',
-        user_id: comment.user_id || userId,
+        user_id: comment.user_id || '',
         created_at: comment.created_at || new Date().toISOString(),
         updated_at: comment.updated_at || new Date().toISOString(),
         custom: comment.custom,
@@ -151,10 +159,10 @@ export class GetStreamFeedsService {
   /**
    * Update a comment
    */
-  async updateComment(commentId: string, userId: string, userToken: string, message: string): Promise<GetStreamComment | null> {
+  async updateComment(commentId: string, userId: string, message: string): Promise<GetStreamComment | null> {
     try {
       if (!this.isConnected) {
-        await this.connectUser(userId, userToken);
+        await this.connect();
       }
 
       const comment = await this.client.updateComment({
@@ -162,6 +170,7 @@ export class GetStreamFeedsService {
         comment: message,
         custom: {
           edited: true,
+          userId: userId,
         },
       });
 
@@ -189,10 +198,10 @@ export class GetStreamFeedsService {
   /**
    * Delete a comment
    */
-  async deleteComment(commentId: string, userId: string, userToken: string): Promise<boolean> {
+  async deleteComment(commentId: string): Promise<boolean> {
     try {
       if (!this.isConnected) {
-        await this.connectUser(userId, userToken);
+        await this.connect();
       }
 
       await this.client.deleteComment({
@@ -209,10 +218,10 @@ export class GetStreamFeedsService {
   /**
    * Add reaction to a comment
    */
-  async addCommentReaction(commentId: string, userId: string, userToken: string, type: string): Promise<any> {
+  async addCommentReaction(commentId: string, userId: string, type: string): Promise<any> {
     try {
       if (!this.isConnected) {
-        await this.connectUser(userId, userToken);
+        await this.connect();
       }
 
       const reaction = await this.client.addCommentReaction({
@@ -230,10 +239,10 @@ export class GetStreamFeedsService {
   /**
    * Remove reaction from a comment
    */
-  async deleteCommentReaction(commentId: string, userId: string, userToken: string, type: string): Promise<boolean> {
+  async deleteCommentReaction(commentId: string, userId: string, type: string): Promise<boolean> {
     try {
       if (!this.isConnected) {
-        await this.connectUser(userId, userToken);
+        await this.connect();
       }
 
       await this.client.deleteCommentReaction({

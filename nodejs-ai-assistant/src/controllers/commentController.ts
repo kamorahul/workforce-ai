@@ -5,12 +5,7 @@ import { getStreamFeedsService } from '../utils/getstreamFeedsService';
 
 const router: Router = express.Router();
 
-// Helper function to generate user token (you should implement proper token generation)
-const generateUserToken = (userId: string): string => {
-  // This should be replaced with proper JWT token generation
-  // For now, using a simple token format
-  return `user_token_${userId}_${Date.now()}`;
-};
+
 
 // Post comment on task
 router.post('/:taskId/comments', async (req: Request, res: Response) => {
@@ -41,11 +36,9 @@ router.post('/:taskId/comments', async (req: Request, res: Response) => {
     // Add comment to GetStream Activity Feeds
     let getstreamComment: any = null;
     try {
-      const userToken = generateUserToken(userId);
       getstreamComment = await getStreamFeedsService.addComment(
         taskId,
         userId,
-        userToken,
         message,
         (comment._id as any).toString()
       );
@@ -93,19 +86,14 @@ router.get('/:taskId/comments', async (req: Request, res: Response) => {
 
     // Try to get comments from GetStream first
     let getstreamComments: any[] = [];
-    if (userId) {
-      try {
-        const userToken = generateUserToken(userId as string);
-        getstreamComments = await getStreamFeedsService.getComments(
-          taskId,
-          userId as string,
-          userToken,
-          50
-        );
-      } catch (error) {
-        console.error('Error fetching comments from GetStream:', error);
-        // Fall back to database comments
-      }
+    try {
+      getstreamComments = await getStreamFeedsService.getComments(
+        taskId,
+        50
+      );
+    } catch (error) {
+      console.error('Error fetching comments from GetStream:', error);
+      // Fall back to database comments
     }
 
     // If GetStream comments are available, use them
@@ -174,11 +162,9 @@ router.put('/:taskId/comments/:commentId', async (req: Request, res: Response) =
     let getstreamComment: any = null;
     if (comment.getstreamCommentId) {
       try {
-        const userToken = generateUserToken(userId);
         getstreamComment = await getStreamFeedsService.updateComment(
           comment.getstreamCommentId,
           userId,
-          userToken,
           message
         );
       } catch (error) {
@@ -228,11 +214,8 @@ router.delete('/:taskId/comments/:commentId', async (req: Request, res: Response
     // Delete comment from GetStream if it has a GetStream ID
     if (comment.getstreamCommentId) {
       try {
-        const userToken = generateUserToken(userId);
         await getStreamFeedsService.deleteComment(
-          comment.getstreamCommentId,
-          userId,
-          userToken
+          comment.getstreamCommentId
         );
       } catch (error) {
         console.error('Error deleting comment from GetStream:', error);
@@ -282,11 +265,9 @@ router.post('/:taskId/comments/:commentId/reactions', async (req: Request, res: 
     let reaction: any = null;
     if (comment.getstreamCommentId) {
       try {
-        const userToken = generateUserToken(userId);
         reaction = await getStreamFeedsService.addCommentReaction(
           comment.getstreamCommentId,
           userId,
-          userToken,
           type
         );
       } catch (error) {
@@ -333,11 +314,9 @@ router.delete('/:taskId/comments/:commentId/reactions', async (req: Request, res
     let success = false;
     if (comment.getstreamCommentId) {
       try {
-        const userToken = generateUserToken(userId);
         success = await getStreamFeedsService.deleteCommentReaction(
           comment.getstreamCommentId,
           userId,
-          userToken,
           type
         );
       } catch (error) {
