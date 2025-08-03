@@ -70,7 +70,7 @@ router.post('/:taskId/comments', async (req: Request, res: Response) => {
 router.get('/:taskId/comments', async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
-    const { userId } = req.query;
+
 
     if (!taskId) {
       res.status(400).json({ error: 'Missing required parameter: taskId' });

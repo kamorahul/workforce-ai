@@ -36,7 +36,7 @@ router.post('/', handleTaskPost);
 
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { assignee, channelId, createdBy } = req.query;
+    const { assignee, channelId, createdBy, isCompleted } = req.query;
     if (!assignee && !createdBy) {
       res.status(400).json({ error: 'Missing required query parameter: assignee or createdBy' });
       return;
@@ -59,6 +59,13 @@ router.get('/', async (req: Request, res: Response) => {
     if (channelId) {
       query.channelId = channelId as string;
     }
+
+    // Add completed filter if isCompleted is provided
+    if (isCompleted !== undefined) {
+      // Convert string 'true'/'false' to boolean
+      query.completed = isCompleted === 'true';
+    }
+
     const tasks = await Task.find(query).sort({ completionDate: 1 });
     res.status(200).json({ status: 'success', tasks });
   } catch (error) {
