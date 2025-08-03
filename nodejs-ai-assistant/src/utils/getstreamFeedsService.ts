@@ -62,17 +62,14 @@ export class GetStreamFeedsService {
         await this.connect();
       }
 
-      const feed = this.client.feed('task', taskId);
-      await feed.getOrCreate({ watch: true });
-
-      const activity = await feed.addActivity({
+      const feed = await this.client.feeds.addActivity({
+        fids: [taskId],
+        id: `task:${taskId}`,
         text: `Task: ${task.name}`,
         type: 'task',
-      });
-
-      // Access the response properly
-      const activityId = (activity as any)?.id || (activity as any)?.data?.id || null;
-      return activityId;
+      })
+            // Access the response properly
+      return taskId;
     } catch (error) {
       console.error('Error creating task activity:', error);
       return null;
@@ -89,7 +86,7 @@ export class GetStreamFeedsService {
       }
 
       // Use the client's addComment method directly
-      const comment = await this.client.addComment({
+      const comment = await this.client.feeds.addComment({
         comment: message,
         object_id: `task:${taskId}`,
         object_type: 'activity',
@@ -131,7 +128,7 @@ export class GetStreamFeedsService {
         await this.connect();
       }
 
-      const response = await this.client.getComments({
+      const response = await this.client.feeds.getComments({
         object_id: `task:${taskId}`,
         object_type: 'activity',
         limit: limit,
@@ -165,7 +162,7 @@ export class GetStreamFeedsService {
         await this.connect();
       }
 
-      const comment = await this.client.updateComment({
+      const comment = await this.client.feeds.updateComment({
         comment_id: commentId,
         comment: message,
         custom: {
@@ -204,7 +201,7 @@ export class GetStreamFeedsService {
         await this.connect();
       }
 
-      await this.client.deleteComment({
+      await this.client.feeds.deleteComment({
         comment_id: commentId,
       });
 
@@ -224,7 +221,7 @@ export class GetStreamFeedsService {
         await this.connect();
       }
 
-      const reaction = await this.client.addCommentReaction({
+      const reaction = await this.client.feeds.addCommentReaction({
         comment_id: commentId,
         type: type,
       });
@@ -245,7 +242,7 @@ export class GetStreamFeedsService {
         await this.connect();
       }
 
-      await this.client.deleteCommentReaction({
+      await this.client.feeds.deleteCommentReaction({
         comment_id: commentId,
         type: type,
       });
