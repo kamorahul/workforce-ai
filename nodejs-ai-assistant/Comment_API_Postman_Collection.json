@@ -1,0 +1,585 @@
+{
+  "info": {
+    "name": "Comment API Collection",
+    "description": "Complete collection for testing all comment-related API endpoints including dual storage (MongoDB + GetStream)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "taskId",
+      "value": "64f8a1b2c3d4e5f6a7b8c9d0",
+      "type": "string"
+    },
+    {
+      "key": "commentId",
+      "value": "64f8a1b2c3d4e5f6a7b8c9d1",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "user123",
+      "type": "string"
+    },
+    {
+      "key": "userId2",
+      "value": "user456",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Create Comment",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"message\": \"This is a great task! I will start working on it tomorrow.\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/task/{{taskId}}/comments",
+          "host": ["{{baseUrl}}"],
+          "path": ["task", "{{taskId}}", "comments"]
+        },
+        "description": "Create a new comment on a task. The comment will be stored in both MongoDB and GetStream Activity Feeds."
+      },
+      "response": []
+    },
+    {
+      "name": "2. Get Comments (With User ID - GetStream)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/task/{{taskId}}/comments?userId={{userId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["task", "{{taskId}}", "comments"],
+          "query": [
+            {
+              "key": "userId",
+              "value": "{{userId}}"
+            }
+          ]
+        },
+        "description": "Get all comments for a task from GetStream Activity Feeds. Requires userId parameter."
+      },
+      "response": []
+    },
+    {
+      "name": "3. Get Comments (Without User ID - Database Only)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/task/{{taskId}}/comments",
+          "host": ["{{baseUrl}}"],
+          "path": ["task", "{{taskId}}", "comments"]
+        },
+        "description": "Get all comments for a task from database only. This will fall back to MongoDB if GetStream is not available."
+      },
+      "response": []
+    },
+    {
+      "name": "4. Update Comment",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"message\": \"Updated: This is a great task! I will start working on it tomorrow and finish by Friday.\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/task/{{taskId}}/comments/{{commentId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["task", "{{taskId}}", "comments", "{{commentId}}"]
+        },
+        "description": "Update an existing comment. Will update both MongoDB and GetStream if the comment has a GetStream ID."
+      },
+      "response": []
+    },
+    {
+      "name": "5. Delete Comment",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/task/{{taskId}}/comments/{{commentId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["task", "{{taskId}}", "comments", "{{commentId}}"]
+        },
+        "description": "Delete a comment. Will delete from both MongoDB and GetStream if the comment has a GetStream ID."
+      },
+      "response": []
+    },
+    {
+      "name": "6. Add Reaction - Like",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"type\": \"like\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/task/{{taskId}}/comments/{{commentId}}/reactions",
+          "host": ["{{baseUrl}}"],
+          "path": ["task", "{{taskId}}", "comments", "{{commentId}}", "reactions"]
+        },
+        "description": "Add a like reaction to a comment. Only works for comments that have been synced to GetStream."
+      },
+      "response": []
+    },
+    {
+      "name": "7. Add Reaction - Thumbs Up",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"type\": \"thumbs_up\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/task/{{taskId}}/comments/{{commentId}}/reactions",
+          "host": ["{{baseUrl}}"],
+          "path": ["task", "{{taskId}}", "comments", "{{commentId}}", "reactions"]
+        },
+        "description": "Add a thumbs up reaction to a comment."
+      },
+      "response": []
+    },
+    {
+      "name": "8. Add Reaction - Heart",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"type\": \"heart\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/task/{{taskId}}/comments/{{commentId}}/reactions",
+          "host": ["{{baseUrl}}"],
+          "path": ["task", "{{taskId}}", "comments", "{{commentId}}", "reactions"]
+        },
+        "description": "Add a heart reaction to a comment."
+      },
+      "response": []
+    },
+    {
+      "name": "9. Add Reaction - Clap",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"type\": \"clap\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/task/{{taskId}}/comments/{{commentId}}/reactions",
+          "host": ["{{baseUrl}}"],
+          "path": ["task", "{{taskId}}", "comments", "{{commentId}}", "reactions"]
+        },
+        "description": "Add a clap reaction to a comment."
+      },
+      "response": []
+    },
+    {
+      "name": "10. Remove Reaction",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"type\": \"like\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/task/{{taskId}}/comments/{{commentId}}/reactions",
+          "host": ["{{baseUrl}}"],
+          "path": ["task", "{{taskId}}", "comments", "{{commentId}}", "reactions"]
+        },
+        "description": "Remove a reaction from a comment."
+      },
+      "response": []
+    },
+    {
+      "name": "Error Testing",
+      "item": [
+        {
+          "name": "Create Comment - Missing Fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/task/{{taskId}}/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["task", "{{taskId}}", "comments"]
+            },
+            "description": "Test error handling when required fields are missing."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Comment - Non-existent Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"message\": \"This should fail\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/task/nonexistent/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["task", "nonexistent", "comments"]
+            },
+            "description": "Test error handling when task does not exist."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Comment - Non-existent Comment",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"message\": \"This should fail\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/task/{{taskId}}/comments/nonexistent",
+              "host": ["{{baseUrl}}"],
+              "path": ["task", "{{taskId}}", "comments", "nonexistent"]
+            },
+            "description": "Test error handling when comment does not exist."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Complete Workflow",
+      "item": [
+        {
+          "name": "Step 1: Create Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Complete Project Documentation\",\n  \"description\": \"Write comprehensive documentation for the new API\",\n  \"priority\": \"high\",\n  \"assignee\": \"{{userId}}\",\n  \"completionDate\": \"2024-01-20\",\n  \"channelId\": \"project_channel_123\",\n  \"createdBy\": \"{{userId2}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/task",
+              "host": ["{{baseUrl}}"],
+              "path": ["task"]
+            },
+            "description": "Create a task first to work with comments."
+          },
+          "response": []
+        },
+        {
+          "name": "Step 2: Create First Comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"message\": \"I will start working on the documentation tomorrow morning.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/task/{{taskId}}/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["task", "{{taskId}}", "comments"]
+            },
+            "description": "Create the first comment on the task."
+          },
+          "response": []
+        },
+        {
+          "name": "Step 3: Create Second Comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId2}}\",\n  \"message\": \"Great! I can help review the documentation once it is ready.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/task/{{taskId}}/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["task", "{{taskId}}", "comments"]
+            },
+            "description": "Create the second comment on the task."
+          },
+          "response": []
+        },
+        {
+          "name": "Step 4: Get All Comments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/task/{{taskId}}/comments?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["task", "{{taskId}}", "comments"],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                }
+              ]
+            },
+            "description": "Retrieve all comments for the task."
+          },
+          "response": []
+        },
+        {
+          "name": "Step 5: Add Reaction to First Comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId2}}\",\n  \"type\": \"like\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/task/{{taskId}}/comments/{{commentId}}/reactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["task", "{{taskId}}", "comments", "{{commentId}}", "reactions"]
+            },
+            "description": "Add a like reaction to the first comment."
+          },
+          "response": []
+        },
+        {
+          "name": "Step 6: Update First Comment",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"message\": \"Updated: I will start working on the documentation tomorrow morning and aim to complete it by Friday.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/task/{{taskId}}/comments/{{commentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["task", "{{taskId}}", "comments", "{{commentId}}"]
+            },
+            "description": "Update the first comment with additional information."
+          },
+          "response": []
+        },
+        {
+          "name": "Step 7: Remove Reaction",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId2}}\",\n  \"type\": \"like\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/task/{{taskId}}/comments/{{commentId}}/reactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["task", "{{taskId}}", "comments", "{{commentId}}", "reactions"]
+            },
+            "description": "Remove the like reaction from the first comment."
+          },
+          "response": []
+        },
+        {
+          "name": "Step 8: Delete Second Comment",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId2}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/task/{{taskId}}/comments/{{commentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["task", "{{taskId}}", "comments", "{{commentId}}"]
+            },
+            "description": "Delete the second comment from the task."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Environment Variables",
+      "item": [
+        {
+          "name": "Set Base URL",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            },
+            "description": "Test the base URL to ensure the server is running."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Pre-request script to set up environment",
+          "console.log('Testing Comment API Collection');",
+          "console.log('Base URL:', pm.collectionVariables.get('baseUrl'));",
+          "console.log('Task ID:', pm.collectionVariables.get('taskId'));",
+          "console.log('User ID:', pm.collectionVariables.get('userId'));"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Test script to validate responses",
+          "pm.test('Status code is 200 or 201', function () {",
+          "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+          "});",
+          "",
+          "pm.test('Response has required fields', function () {",
+          "    const jsonData = pm.response.json();",
+          "    pm.expect(jsonData).to.have.property('status');",
+          "});",
+          "",
+          "pm.test('Status is success', function () {",
+          "    const jsonData = pm.response.json();",
+          "    pm.expect(jsonData.status).to.eql('success');",
+          "});"
+        ]
+      }
+    }
+  ]
+} 

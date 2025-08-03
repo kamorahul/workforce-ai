@@ -61,19 +61,11 @@ export class GetStreamFeedsService {
       const activity = await feed.addActivity({
         text: `Task: ${task.name}`,
         type: 'task',
-        extra: {
-          taskId: taskId,
-          taskName: task.name,
-          priority: task.priority,
-          assignee: task.assignee,
-          completionDate: task.completionDate,
-          description: task.description,
-          channelId: task.channelId,
-          createdBy: task.createdBy,
-        },
       });
 
-      return activity.data?.id || null;
+      // Access the response properly
+      const activityId = (activity as any)?.id || (activity as any)?.data?.id || null;
+      return activityId;
     } catch (error) {
       console.error('Error creating task activity:', error);
       return null;
@@ -100,13 +92,21 @@ export class GetStreamFeedsService {
         },
       });
 
+      if (!comment) {
+        console.error('Invalid comment response from GetStream');
+        return null;
+      }
+
+      // Access the response data properly
+      const commentData = (comment as any)?.data || comment;
+      
       return {
-        id: comment.data?.id || '',
-        comment: comment.data?.comment || message,
+        id: commentData?.id || '',
+        comment: commentData?.comment || message,
         user_id: userId,
-        created_at: comment.data?.created_at || new Date().toISOString(),
-        updated_at: comment.data?.updated_at || new Date().toISOString(),
-        custom: comment.data?.custom,
+        created_at: commentData?.created_at || new Date().toISOString(),
+        updated_at: commentData?.updated_at || new Date().toISOString(),
+        custom: commentData?.custom,
       };
     } catch (error) {
       console.error('Error adding comment:', error);
@@ -130,14 +130,18 @@ export class GetStreamFeedsService {
         sort: 'newest',
       });
 
-      return response.data?.results?.map((comment: any) => ({
+      // Access the response data properly
+      const responseData = (response as any)?.data || response;
+      const results = responseData?.results || [];
+
+      return results.map((comment: any) => ({
         id: comment.id || '',
         comment: comment.comment || '',
         user_id: comment.user_id || userId,
         created_at: comment.created_at || new Date().toISOString(),
         updated_at: comment.updated_at || new Date().toISOString(),
         custom: comment.custom,
-      })) || [];
+      }));
     } catch (error) {
       console.error('Error getting comments:', error);
       return [];
@@ -161,13 +165,20 @@ export class GetStreamFeedsService {
         },
       });
 
+      if (!comment) {
+        return null;
+      }
+
+      // Access the response data properly
+      const commentData = (comment as any)?.data || comment;
+
       return {
-        id: comment.data?.id || commentId,
-        comment: comment.data?.comment || message,
+        id: commentData?.id || commentId,
+        comment: commentData?.comment || message,
         user_id: userId,
-        created_at: comment.data?.created_at || new Date().toISOString(),
-        updated_at: comment.data?.updated_at || new Date().toISOString(),
-        custom: comment.data?.custom,
+        created_at: commentData?.created_at || new Date().toISOString(),
+        updated_at: commentData?.updated_at || new Date().toISOString(),
+        custom: commentData?.custom,
       };
     } catch (error) {
       console.error('Error updating comment:', error);

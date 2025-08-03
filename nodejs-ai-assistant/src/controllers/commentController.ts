@@ -39,7 +39,7 @@ router.post('/:taskId/comments', async (req: Request, res: Response) => {
     await comment.save();
 
     // Add comment to GetStream Activity Feeds
-    let getstreamComment = null;
+    let getstreamComment: any = null;
     try {
       const userToken = generateUserToken(userId);
       getstreamComment = await getStreamFeedsService.addComment(
@@ -51,7 +51,7 @@ router.post('/:taskId/comments', async (req: Request, res: Response) => {
       );
 
       // Update database comment with GetStream ID if successful
-      if (getstreamComment) {
+      if (getstreamComment && getstreamComment.id) {
         comment.getstreamCommentId = getstreamComment.id;
         await comment.save();
       }
@@ -109,7 +109,7 @@ router.get('/:taskId/comments', async (req: Request, res: Response) => {
     }
 
     // If GetStream comments are available, use them
-    if (getstreamComments.length > 0) {
+    if (getstreamComments && getstreamComments.length > 0) {
       const formattedComments = getstreamComments.map((comment: any) => ({
         _id: comment.custom?.commentId || comment.id,
         taskId: taskId,
@@ -171,7 +171,7 @@ router.put('/:taskId/comments/:commentId', async (req: Request, res: Response) =
     }
 
     // Update comment in GetStream if it has a GetStream ID
-    let getstreamComment = null;
+    let getstreamComment: any = null;
     if (comment.getstreamCommentId) {
       try {
         const userToken = generateUserToken(userId);
@@ -279,7 +279,7 @@ router.post('/:taskId/comments/:commentId/reactions', async (req: Request, res: 
     }
 
     // Add reaction in GetStream if comment has a GetStream ID
-    let reaction = null;
+    let reaction: any = null;
     if (comment.getstreamCommentId) {
       try {
         const userToken = generateUserToken(userId);

@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@stream-io/feeds-client": "^0.1.0",
     "moment-timezone": "^0.6.0"
   },
   "devDependencies": {
