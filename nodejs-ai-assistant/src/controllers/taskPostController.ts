@@ -1,6 +1,8 @@
 import express, { Request, Response, Router } from 'express';
 import { Task } from '../models/Task';
 import { Comment } from '../models/Comment';
+import { getStreamFeedsService } from '../utils/getstreamFeedsService'
+
 
 export const handleTaskPost = async (req: Request, res: Response) => {
   try {
@@ -20,6 +22,8 @@ export const handleTaskPost = async (req: Request, res: Response) => {
       createdBy: createdBy || assignee[0], // Use first assignee as default creator
     });
     await task.save();
+
+    await getStreamFeedsService.createTaskActivity(task._id as string, task);
     res.status(201).json({ status: 'success', task });
   } catch (error) {
     console.error('Error saving task:', error);
