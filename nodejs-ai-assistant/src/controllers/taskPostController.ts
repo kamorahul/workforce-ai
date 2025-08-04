@@ -6,7 +6,7 @@ import { getStreamFeedsService } from '../utils/getstreamFeedsService'
 export const handleTaskPost = async (req: Request, res: Response) => {
   try {
     const { name, assignee, priority, completionDate, channelId, description, subtasks, createdBy, parentTaskId } = req.body;
-    if (!name || !assignee || !Array.isArray(assignee) || assignee.length === 0 || !priority || !completionDate || !channelId) {
+    if (!name || !assignee || !Array.isArray(assignee) || assignee.length === 0 || !priority || !completionDate) {
       res.status(400).json({ error: 'Missing required fields or assignee must be a non-empty array' });
       return;
     }
