@@ -3,14 +3,15 @@ import { Task } from '../models/Task';
 import { Comment } from '../models/Comment';
 import { getStreamFeedsService } from '../utils/getstreamFeedsService'
 
-
 export const handleTaskPost = async (req: Request, res: Response) => {
   try {
-    const { name, assignee, priority, completionDate, channelId, description, subtasks, createdBy } = req.body;
+    const { name, assignee, priority, completionDate, channelId, description, subtasks, createdBy, parentTaskId } = req.body;
     if (!name || !assignee || !Array.isArray(assignee) || assignee.length === 0 || !priority || !completionDate || !channelId) {
       res.status(400).json({ error: 'Missing required fields or assignee must be a non-empty array' });
       return;
     }
+
+    // Create the main task
     const task = new Task({
       name,
       assignee,
@@ -18,13 +19,37 @@ export const handleTaskPost = async (req: Request, res: Response) => {
       completionDate: new Date(completionDate),
       channelId,
       description,
-      subtasks: subtasks || [],
       createdBy: createdBy || assignee[0], // Use first assignee as default creator
+      parentTaskId, // Will be undefined for top-level tasks
     });
     await task.save();
 
+    // Create subtasks if provided
+    const createdSubtasks = [];
+    if (subtasks && Array.isArray(subtasks)) {
+      for (const subtask of subtasks) {
+        const newSubtask = new Task({
+          name: subtask.name,
+          assignee: subtask.assignee || assignee, // Inherit assignees from parent if not specified
+          priority: subtask.priority || priority, // Inherit priority from parent if not specified
+          completionDate: subtask.completionDate ? new Date(subtask.completionDate) : new Date(completionDate),
+          channelId,
+          description: subtask.description,
+          createdBy: createdBy || assignee[0],
+          parentTaskId: task._id, // Link to parent task
+        });
+        await newSubtask.save();
+        await getStreamFeedsService.createTaskActivity(newSubtask._id as string, newSubtask);
+        createdSubtasks.push(newSubtask);
+      }
+    }
+
     await getStreamFeedsService.createTaskActivity(task._id as string, task);
-    res.status(201).json({ status: 'success', task });
+    res.status(201).json({ 
+      status: 'success', 
+      task,
+      subtasks: createdSubtasks 
+    });
   } catch (error) {
     console.error('Error saving task:', error);
     res.status(500).json({ error: 'Failed to save task' });
@@ -36,7 +61,7 @@ router.post('/', handleTaskPost);
 
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { assignee, channelId, createdBy, isCompleted } = req.query;
+    const { assignee, channelId, createdBy, isCompleted, includeSubtasks, parentTaskId } = req.query;
     if (!assignee && !createdBy) {
       res.status(400).json({ error: 'Missing required query parameter: assignee or createdBy' });
       return;
@@ -62,19 +87,39 @@ router.get('/', async (req: Request, res: Response) => {
 
     // Add completed filter if isCompleted is provided
     if (isCompleted !== undefined) {
-      // Convert string 'true'/'false' to boolean
       query.completed = isCompleted === 'true';
     }
 
+    // Filter by parent task ID if provided
+    if (parentTaskId) {
+      query.parentTaskId = parentTaskId;
+    } else if (includeSubtasks !== 'true') {
+      // If not explicitly including subtasks and no parent specified, only show top-level tasks
+      query.parentTaskId = { $exists: false };
+    }
+
     const tasks = await Task.find(query).sort({ completionDate: 1 });
-    res.status(200).json({ status: 'success', tasks });
+
+    // If includeSubtasks is true, fetch subtasks for each task
+    if (includeSubtasks === 'true' && !parentTaskId) {
+      const tasksWithSubtasks = await Promise.all(tasks.map(async (task) => {
+        const subtasks = await Task.find({ parentTaskId: task._id });
+        return {
+          ...task.toObject(),
+          subtasks,
+        };
+      }));
+      res.status(200).json({ status: 'success', tasks: tasksWithSubtasks });
+    } else {
+      res.status(200).json({ status: 'success', tasks });
+    }
   } catch (error) {
     console.error('Error fetching tasks:', error);
     res.status(500).json({ error: 'Failed to fetch tasks' });
   }
 });
 
-// Get task details with comments
+// Get task details with comments and subtasks
 router.get('/:taskId', async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
@@ -92,9 +137,13 @@ router.get('/:taskId', async (req: Request, res: Response) => {
     // Fetch comments for the task
     const comments = await Comment.find({ taskId }).sort({ createdAt: 1 });
 
+    // Fetch subtasks if this is a parent task
+    const subtasks = await Task.find({ parentTaskId: taskId });
+
     res.status(200).json({ 
       status: 'success', 
       task,
+      subtasks,
       comments 
     });
   } catch (error) {
@@ -106,21 +155,42 @@ router.get('/:taskId', async (req: Request, res: Response) => {
 router.patch('/:taskId/complete', async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
+    const { completeSubtasks } = req.query;
+    
     if (!taskId) {
       res.status(400).json({ error: 'Missing required parameter: taskId' });
       return;
     }
+
     const task = await Task.findByIdAndUpdate(
       taskId,
       { completed: true },
       { new: true }
     );
+
     if (!task) {
       res.status(404).json({ error: 'Task not found' });
       return;
     }
 
-    res.status(200).json({ status: 'success', task });
+    // If completeSubtasks is true, also complete all subtasks
+    if (completeSubtasks === 'true') {
+      await Task.updateMany(
+        { parentTaskId: taskId },
+        { completed: true }
+      );
+    }
+
+    // Fetch updated subtasks if any were completed
+    const subtasks = completeSubtasks === 'true' 
+      ? await Task.find({ parentTaskId: taskId })
+      : [];
+
+    res.status(200).json({ 
+      status: 'success', 
+      task,
+      subtasks: completeSubtasks === 'true' ? subtasks : undefined
+    });
   } catch (error) {
     console.error('Error marking task as complete:', error);
     res.status(500).json({ error: 'Failed to mark task as complete' });
@@ -135,7 +205,10 @@ router.put('/:taskId', async (req: Request, res: Response) => {
       return;
     }
     
-    const { name, assignee, priority, completionDate, channelId, description, subtasks, completed } = req.body;
+    const { 
+      name, assignee, priority, completionDate, channelId, 
+      description, completed, parentTaskId 
+    } = req.body;
     
     const updateData: any = {};
     if (name !== undefined) updateData.name = name;
@@ -150,8 +223,8 @@ router.put('/:taskId', async (req: Request, res: Response) => {
     if (completionDate !== undefined) updateData.completionDate = new Date(completionDate);
     if (channelId !== undefined) updateData.channelId = channelId;
     if (description !== undefined) updateData.description = description;
-    if (subtasks !== undefined) updateData.subtasks = subtasks;
     if (completed !== undefined) updateData.completed = completed;
+    if (parentTaskId !== undefined) updateData.parentTaskId = parentTaskId;
     
     const task = await Task.findByIdAndUpdate(
       taskId,
@@ -171,4 +244,4 @@ router.put('/:taskId', async (req: Request, res: Response) => {
   }
 });
 
-export default router; 
+export default router;
