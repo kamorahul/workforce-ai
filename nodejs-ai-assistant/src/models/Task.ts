@@ -36,7 +36,7 @@ const TaskSchema: Schema = new Schema({
   },
   channelId: {
     type: String,
-    required: true,
+    required: false,
     index: true,
   },
   completed: {
