@@ -101,19 +101,24 @@ router.get('/', async (req: Request, res: Response) => {
 
     const tasks = await Task.find(query).sort({ completionDate: 1 });
 
-    // If includeSubtasks is true, fetch subtasks for each task
-    if (includeSubtasks === 'true' && !parentTaskId) {
-      const tasksWithSubtasks = await Promise.all(tasks.map(async (task) => {
-        const subtasks = await Task.find({ parentTaskId: task._id });
-        return {
-          ...task.toObject(),
-          subtasks,
-        };
-      }));
-      res.status(200).json({ status: 'success', tasks: tasksWithSubtasks });
-    } else {
-      res.status(200).json({ status: 'success', tasks });
-    }
+    // Always fetch subtask counts for each task
+    const tasksWithCounts = await Promise.all(tasks.map(async (task) => {
+      const subtasks = await Task.find({ parentTaskId: task._id });
+      const totalSubtasks = subtasks.length;
+      const completedSubtasks = subtasks.filter(subtask => subtask.completed).length;
+      
+      return {
+        ...task.toObject(),
+        subtaskCounts: {
+          total: totalSubtasks,
+          completed: completedSubtasks
+        },
+        // Include full subtasks array only if explicitly requested
+        ...(includeSubtasks === 'true' && !parentTaskId ? { subtasks } : {})
+      };
+    }));
+
+    res.status(200).json({ status: 'success', tasks: tasksWithCounts });
   } catch (error) {
     console.error('Error fetching tasks:', error);
     res.status(500).json({ error: 'Failed to fetch tasks' });
