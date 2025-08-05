@@ -155,33 +155,38 @@ router.get('/:taskId', async (req: Request, res: Response) => {
 router.patch('/:taskId/complete', async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
-    const { completeSubtasks } = req.query;
+    const { completeSubtasks, completed } = req.query;
     
     if (!taskId) {
       res.status(400).json({ error: 'Missing required parameter: taskId' });
       return;
     }
 
-    const task = await Task.findByIdAndUpdate(
-      taskId,
-      { completed: true },
-      { new: true }
-    );
-
-    if (!task) {
+    // Get current task to determine new completion status
+    const currentTask = await Task.findById(taskId);
+    if (!currentTask) {
       res.status(404).json({ error: 'Task not found' });
       return;
     }
 
-    // If completeSubtasks is true, also complete all subtasks
+    // Toggle completion status if 'completed' query param is provided, otherwise default to true
+    const newCompletedStatus = completed !== undefined ? completed === 'true' : !currentTask.completed;
+
+    const task = await Task.findByIdAndUpdate(
+      taskId,
+      { completed: newCompletedStatus },
+      { new: true }
+    );
+
+    // If completeSubtasks is true, also toggle all subtasks
     if (completeSubtasks === 'true') {
       await Task.updateMany(
         { parentTaskId: taskId },
-        { completed: true }
+        { completed: newCompletedStatus }
       );
     }
 
-    // Fetch updated subtasks if any were completed
+    // Fetch updated subtasks if any were toggled
     const subtasks = completeSubtasks === 'true' 
       ? await Task.find({ parentTaskId: taskId })
       : [];
@@ -192,8 +197,8 @@ router.patch('/:taskId/complete', async (req: Request, res: Response) => {
       subtasks: completeSubtasks === 'true' ? subtasks : undefined
     });
   } catch (error) {
-    console.error('Error marking task as complete:', error);
-    res.status(500).json({ error: 'Failed to mark task as complete' });
+    console.error('Error toggling task completion:', error);
+    res.status(500).json({ error: 'Failed to toggle task completion' });
   }
 });
 
@@ -241,6 +246,40 @@ router.put('/:taskId', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error updating task:', error);
     res.status(500).json({ error: 'Failed to update task' });
+  }
+});
+
+// Delete a task
+router.delete('/:taskId', async (req: Request, res: Response) => {
+  try {
+    const { taskId } = req.params;
+    if (!taskId) {
+      res.status(400).json({ error: 'Missing required parameter: taskId' });
+      return;
+    }
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+
+    // If this is a parent task, also delete all subtasks
+    if (!task.parentTaskId) {
+      await Task.deleteMany({ parentTaskId: taskId });
+    }
+
+    // Delete the task itself
+    await Task.findByIdAndDelete(taskId);
+
+    res.status(200).json({ 
+      status: 'success', 
+      message: 'Task deleted successfully',
+      deletedTaskId: taskId 
+    });
+  } catch (error) {
+    console.error('Error deleting task:', error);
+    res.status(500).json({ error: 'Failed to delete task' });
   }
 });
 
