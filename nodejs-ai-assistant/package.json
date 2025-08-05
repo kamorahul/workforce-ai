@@ -24,7 +24,7 @@
     "express-oauth2-jwt-bearer": "^1.6.1",
     "geo-tz": "^8.1.4",
     "mongoose": "^8.12.1",
-    "multer": "^2.0.1",
+    "multer": "^2.0.2",
     "node-cron": "^4.0.7",
     "openai": "^4.73.1",
     "stream-chat": "^8.46.0"

@@ -1,7 +1,17 @@
 import express, { Request, Response, Router } from 'express';
 import { Task } from '../models/Task';
 import { Comment } from '../models/Comment';
-import { getStreamFeedsService } from '../utils/getstreamFeedsService'
+import { getStreamFeedsService } from '../utils/getstreamFeedsService';
+import multer from 'multer';
+import { uploadToS3 } from '../utils/s3';
+
+// Configure multer for memory storage
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  }
+});
 
 export const handleTaskPost = async (req: Request, res: Response) => {
   try {
@@ -292,13 +302,13 @@ router.delete('/:taskId', async (req: Request, res: Response) => {
 
 import { uploadToS3 } from '../utils/s3';
 
-// Get pre-signed URL for attachment upload
-router.post('/:taskId/attachments/upload', async (req: Request, res: Response) => {
+// Handle file upload
+router.post('/:taskId/attachments/upload', upload.single('file'), async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
-    const { fileName, fileType } = req.body;
+    const file = req.file;
     
-    if (!taskId || !fileName || !fileType) {
+    if (!taskId || !file) {
       res.status(400).json({ error: 'Missing required parameters' });
       return;
     }
@@ -310,16 +320,17 @@ router.post('/:taskId/attachments/upload', async (req: Request, res: Response) =
     }
 
     // Generate unique file name
-    const uniqueFileName = `${Date.now()}-${fileName}`;
+    const uniqueFileName = `${Date.now()}-${file.originalname}`;
     
     // Upload file to S3 and get URL
-    const fileUrl = await uploadToS3(req.body, uniqueFileName, fileType);
+    const fileUrl = await uploadToS3(file.buffer, uniqueFileName, file.mimetype);
 
     // Create attachment object
     const newAttachment = {
       uri: fileUrl,
-      name: fileName,
-      type: fileType,
+      name: file.originalname,
+      type: file.mimetype,
+      size: file.size,
     };
 
     // Add new attachment to task
@@ -334,7 +345,7 @@ router.post('/:taskId/attachments/upload', async (req: Request, res: Response) =
     res.status(200).json({ 
       status: 'success',
       task: updatedTask,
-      fileUrl,
+      attachment: newAttachment,
       message: 'Attachment added successfully'
     });
   } catch (error) {
