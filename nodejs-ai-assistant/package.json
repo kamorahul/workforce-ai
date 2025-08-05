@@ -17,6 +17,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
     "@stream-io/feeds-client": "^0.1.0",
+    "@stream-io/node-sdk": "^0.5.1",
     "aws-sdk": "^2.1692.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

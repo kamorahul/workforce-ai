@@ -1,0 +1,4 @@
+git pull
+./node_modules/typescript/bin/tsc
+pm2 restart workforce-ai
+pm2 logs workforce-ai
