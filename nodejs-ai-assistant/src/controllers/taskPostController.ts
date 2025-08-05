@@ -5,7 +5,7 @@ import { getStreamFeedsService } from '../utils/getstreamFeedsService'
 
 export const handleTaskPost = async (req: Request, res: Response) => {
   try {
-    const { name, assignee, priority, completionDate, channelId, description, subtasks, createdBy, parentTaskId } = req.body;
+    const { name, assignee, priority, completionDate, channelId, description, subtasks, createdBy, parentTaskId, attachments } = req.body;
     if (!name || !assignee || !Array.isArray(assignee) || assignee.length === 0 || !priority || !completionDate) {
       res.status(400).json({ error: 'Missing required fields or assignee must be a non-empty array' });
       return;
@@ -21,6 +21,7 @@ export const handleTaskPost = async (req: Request, res: Response) => {
       description,
       createdBy: createdBy || assignee[0], // Use first assignee as default creator
       parentTaskId, // Will be undefined for top-level tasks
+      attachments: attachments || [], // Handle attachments
     });
     await task.save();
 
@@ -212,7 +213,7 @@ router.put('/:taskId', async (req: Request, res: Response) => {
     
     const { 
       name, assignee, priority, completionDate, channelId, 
-      description, completed, parentTaskId 
+      description, completed, parentTaskId, attachments 
     } = req.body;
     
     const updateData: any = {};
@@ -230,6 +231,7 @@ router.put('/:taskId', async (req: Request, res: Response) => {
     if (description !== undefined) updateData.description = description;
     if (completed !== undefined) updateData.completed = completed;
     if (parentTaskId !== undefined) updateData.parentTaskId = parentTaskId;
+    if (attachments !== undefined) updateData.attachments = attachments;
     
     const task = await Task.findByIdAndUpdate(
       taskId,
@@ -280,6 +282,95 @@ router.delete('/:taskId', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error deleting task:', error);
     res.status(500).json({ error: 'Failed to delete task' });
+  }
+});
+
+// Add attachment to task
+router.post('/:taskId/attachments', async (req: Request, res: Response) => {
+  try {
+    const { taskId } = req.params;
+    const { attachments } = req.body;
+    
+    if (!taskId) {
+      res.status(400).json({ error: 'Missing required parameter: taskId' });
+      return;
+    }
+
+    if (!attachments || !Array.isArray(attachments)) {
+      res.status(400).json({ error: 'Attachments must be an array' });
+      return;
+    }
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+
+    // Add new attachments to existing ones
+    const updatedAttachments = [...(task.attachments || []), ...attachments];
+    
+    const updatedTask = await Task.findByIdAndUpdate(
+      taskId,
+      { attachments: updatedAttachments },
+      { new: true }
+    );
+
+    res.status(200).json({ 
+      status: 'success', 
+      task: updatedTask,
+      message: 'Attachments added successfully'
+    });
+  } catch (error) {
+    console.error('Error adding attachments:', error);
+    res.status(500).json({ error: 'Failed to add attachments' });
+  }
+});
+
+// Remove attachment from task
+router.delete('/:taskId/attachments/:attachmentIndex', async (req: Request, res: Response) => {
+  try {
+    const { taskId, attachmentIndex } = req.params;
+    
+    if (!taskId) {
+      res.status(400).json({ error: 'Missing required parameter: taskId' });
+      return;
+    }
+
+    const index = parseInt(attachmentIndex);
+    if (isNaN(index) || index < 0) {
+      res.status(400).json({ error: 'Invalid attachment index' });
+      return;
+    }
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+
+    if (!task.attachments || index >= task.attachments.length) {
+      res.status(404).json({ error: 'Attachment not found' });
+      return;
+    }
+
+    // Remove the attachment at the specified index
+    const updatedAttachments = task.attachments.filter((_, i) => i !== index);
+    
+    const updatedTask = await Task.findByIdAndUpdate(
+      taskId,
+      { attachments: updatedAttachments },
+      { new: true }
+    );
+
+    res.status(200).json({ 
+      status: 'success', 
+      task: updatedTask,
+      message: 'Attachment removed successfully'
+    });
+  } catch (error) {
+    console.error('Error removing attachment:', error);
+    res.status(500).json({ error: 'Failed to remove attachment' });
   }
 });
 

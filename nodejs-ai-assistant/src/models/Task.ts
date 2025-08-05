@@ -12,6 +12,12 @@ export interface ITask extends Document {
   description?: string; // Optional long text description
   createdBy: string; // userId of the task creator
   parentTaskId?: string; // Reference to parent task if this is a subtask
+  attachments?: Array<{
+    uri: string;
+    name: string;
+    type: string;
+    size?: number;
+  }>;
 }
 
 const TaskSchema: Schema = new Schema({
@@ -58,6 +64,28 @@ const TaskSchema: Schema = new Schema({
     ref: 'Task',
     required: false,
     index: true,
+  },
+  attachments: {
+    type: [{
+      uri: {
+        type: String,
+        required: true,
+      },
+      name: {
+        type: String,
+        required: true,
+      },
+      type: {
+        type: String,
+        required: true,
+      },
+      size: {
+        type: Number,
+        required: false,
+      },
+    }],
+    required: false,
+    default: [],
   }
 }, {
   timestamps: true,
