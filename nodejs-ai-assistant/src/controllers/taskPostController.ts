@@ -290,19 +290,16 @@ router.delete('/:taskId', async (req: Request, res: Response) => {
   }
 });
 
-// Add attachment to task
-router.post('/:taskId/attachments', async (req: Request, res: Response) => {
+import { uploadToS3 } from '../utils/s3';
+
+// Get pre-signed URL for attachment upload
+router.post('/:taskId/attachments/upload', async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
-    const { attachments } = req.body;
+    const { fileName, fileType } = req.body;
     
-    if (!taskId) {
-      res.status(400).json({ error: 'Missing required parameter: taskId' });
-      return;
-    }
-
-    if (!attachments || !Array.isArray(attachments)) {
-      res.status(400).json({ error: 'Attachments must be an array' });
+    if (!taskId || !fileName || !fileType) {
+      res.status(400).json({ error: 'Missing required parameters' });
       return;
     }
 
@@ -312,8 +309,21 @@ router.post('/:taskId/attachments', async (req: Request, res: Response) => {
       return;
     }
 
-    // Add new attachments to existing ones
-    const updatedAttachments = [...(task.attachments || []), ...attachments];
+    // Generate unique file name
+    const uniqueFileName = `${Date.now()}-${fileName}`;
+    
+    // Upload file to S3 and get URL
+    const fileUrl = await uploadToS3(req.body, uniqueFileName, fileType);
+
+    // Create attachment object
+    const newAttachment = {
+      uri: fileUrl,
+      name: fileName,
+      type: fileType,
+    };
+
+    // Add new attachment to task
+    const updatedAttachments = [...(task.attachments || []), newAttachment];
     
     const updatedTask = await Task.findByIdAndUpdate(
       taskId,
@@ -322,13 +332,14 @@ router.post('/:taskId/attachments', async (req: Request, res: Response) => {
     );
 
     res.status(200).json({ 
-      status: 'success', 
+      status: 'success',
       task: updatedTask,
-      message: 'Attachments added successfully'
+      fileUrl,
+      message: 'Attachment added successfully'
     });
   } catch (error) {
-    console.error('Error adding attachments:', error);
-    res.status(500).json({ error: 'Failed to add attachments' });
+    console.error('Error handling attachment upload:', error);
+    res.status(500).json({ error: 'Failed to handle attachment upload' });
   }
 });
 
