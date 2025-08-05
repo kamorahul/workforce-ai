@@ -300,8 +300,6 @@ router.delete('/:taskId', async (req: Request, res: Response) => {
   }
 });
 
-import { uploadToS3 } from '../utils/s3';
-
 // Handle file upload
 router.post('/:taskId/attachments/upload', upload.single('file'), async (req: Request, res: Response) => {
   try {
