@@ -15,40 +15,51 @@ async function sendCommentNotifications(task: any, comment: any, userId: string)
     
     // 1. Send to project channel
     if (channelId) {
-      const projectChannel = serverClient.channel('messaging', channelId);
-      await projectChannel.sendMessage({
-        user_id: 'system',
-        text: `💬 **New Comment**: New comment on task "${name}" by ${userId}`,
-        type: 'regular',
-        action_type: 'task_commented',
-        taskId: task._id,
-        taskName: name,
-        commentId: comment._id,
-        commentMessage: comment.message,
-        commenter: userId
-      });
-      console.log(`Comment notification sent to channel ${channelId} for task: ${name}`);
+      try {
+        const projectChannel = serverClient.channel('messaging', channelId);
+        await projectChannel.sendMessage({
+          user_id: 'system',
+          text: `💬 **New Comment**: New comment on task "${name}" by ${userId}`,
+          type: 'regular',
+          action_type: 'task_commented',
+          taskId: task._id,
+          taskName: name,
+          commentId: comment._id,
+          commentMessage: comment.message,
+          commenter: userId
+        });
+        console.log(`Comment notification sent to channel ${channelId} for task: ${name}`);
+      } catch (error: any) {
+        console.warn(`Could not send comment notification to project channel ${channelId}:`, error.message);
+      }
     }
     
     // 2. Send to task assignees group channels (excluding the commenter)
     const assigneesToNotify = assignee.filter((id: string) => id !== userId);
     for (const assigneeId of assigneesToNotify) {
-      const groupChannel = serverClient.channel('messaging', `group_${assigneeId}`);
-      await groupChannel.sendMessage({
-        user_id: 'system',
-        text: `💬 **New Comment**: New comment on task "${name}" by ${userId}`,
-        type: 'regular',
-        action_type: 'task_commented',
-        taskId: task._id,
-        taskName: name,
-        commentId: comment._id,
-        commentMessage: comment.message,
-        commenter: userId,
-        channelId: channelId
-      });
-      console.log(`Comment notification sent to group_${assigneeId} for task: ${name}`);
+      try {
+        const groupChannelId = `group_${assigneeId}`;
+        const groupChannel = serverClient.channel('messaging', groupChannelId);
+        
+        await groupChannel.sendMessage({
+          user_id: 'system',
+          text: `💬 **New Comment**: New comment on task "${name}" by ${userId}`,
+          type: 'regular',
+          action_type: 'task_commented',
+          taskId: task._id,
+          taskName: name,
+          commentId: comment._id,
+          commentMessage: comment.message,
+          commenter: userId,
+          channelId: channelId
+        });
+        console.log(`Comment notification sent to ${groupChannelId} for task: ${name}`);
+      } catch (error: any) {
+        console.warn(`Could not send comment notification to group_${assigneeId} (channel may not exist):`, error.message);
+        // Continue with other users even if one fails
+      }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error sending comment notifications:', error);
     // Don't fail the main operation if notifications fail
   }

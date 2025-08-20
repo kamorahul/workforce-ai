@@ -94,6 +94,22 @@ All notifications include structured data for frontend processing:
 - **Project Channel**: `channelId` from task (e.g., `project-123`)
 - **Group Channels**: `group_${userId}` for each assignee (e.g., `group_user1`, `group_user2`)
 
+### Channel Requirements
+
+**Important**: Group channels must exist before notifications can be sent. The system will:
+
+1. **Try to send** notifications to existing channels
+2. **Log warnings** if channels don't exist
+3. **Continue gracefully** without blocking main operations
+4. **Never create** channels automatically
+
+### Error Handling
+
+- **Graceful Degradation**: Notifications never block main operations
+- **Channel Validation**: Only send to existing channels
+- **Fallback Strategy**: Continue with other notifications even if some fail
+- **Comprehensive Logging**: Detailed error and success logging for debugging
+
 ### Action Types
 
 - `task_assigned` - New task assignments

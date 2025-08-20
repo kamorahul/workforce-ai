@@ -31,53 +31,70 @@ async function sendTaskAssignmentNotifications(task: any, previousAssignees?: st
     
     // 1. Send to project channel (using existing serverClient pattern)
     if (channelId) {
-      const projectChannel = serverClient.channel('messaging', channelId);
-      await projectChannel.sendMessage({
-        user_id: 'system',
-        text: `🎯 **Task Assigned**: "${name}" assigned to ${assignee.join(', ')} (${priority} priority)`,
-        type: 'regular',
-        action_type: 'task_assigned',
-        taskId: task._id,
-        taskName: name,
-        priority: priority,
-        assignees: assignee
-      });
-      console.log(`Channel notification sent to ${channelId} for task: ${name}`);
+      try {
+        const projectChannel = serverClient.channel('messaging', channelId);
+        await projectChannel.sendMessage({
+          user_id: 'system',
+          text: `🎯 **Task Assigned**: "${name}" assigned to ${assignee.join(', ')} (${priority} priority)`,
+          type: 'regular',
+          action_type: 'task_assigned',
+          taskId: task._id,
+          taskName: name,
+          priority: priority,
+          assignees: assignee
+        });
+        console.log(`Channel notification sent to ${channelId} for task: ${name}`);
+      } catch (error: any) {
+        console.warn(`Could not send notification to project channel ${channelId}:`, error.message);
+      }
     }
     
-    // 2. Send to group channel for each assignee (using group channel pattern)
+    // 2. Send to group channel for each assignee (only if channel exists)
     for (const assigneeId of assignee) {
-      const groupChannel = serverClient.channel('messaging', `group_${assigneeId}`);
-      await groupChannel.sendMessage({
-        user_id: 'system',
-        text: `🎯 **New Task**: You have been assigned "${name}" (${priority} priority)`,
-        type: 'regular',
-        action_type: 'task_assigned',
-        taskId: task._id,
-        taskName: name,
-        priority: priority,
-        channelId: channelId
-      });
-      console.log(`Group notification sent to group_${assigneeId} for task: ${name}`);
+      try {
+        const groupChannelId = `group_${assigneeId}`;
+        const groupChannel = serverClient.channel('messaging', groupChannelId);
+        
+        await groupChannel.sendMessage({
+          user_id: 'system',
+          text: `🎯 **New Task**: You have been assigned "${name}" (${priority} priority)`,
+          type: 'regular',
+          action_type: 'task_assigned',
+          taskId: task._id,
+          taskName: name,
+          priority: priority,
+          channelId: channelId
+        });
+        console.log(`Group notification sent to ${groupChannelId} for task: ${name}`);
+      } catch (error: any) {
+        console.warn(`Could not send notification to group channel group_${assigneeId} (channel may not exist):`, error.message);
+        // Continue with other users even if one fails
+      }
     }
     
     // 3. Notify removed assignees if updating
     if (previousAssignees) {
       const removedAssignees = previousAssignees.filter(id => !assignee.includes(id));
       for (const removedId of removedAssignees) {
-        const groupChannel = serverClient.channel('messaging', `group_${removedId}`);
-        await groupChannel.sendMessage({
-          user_id: 'system',
-          text: `📤 **Task Unassigned**: You are no longer assigned to "${name}"`,
-          type: 'regular',
-          action_type: 'task_unassigned',
-          taskId: task._id,
-          taskName: name
-        });
-        console.log(`Unassignment notification sent to group_${removedId} for task: ${name}`);
+        try {
+          const groupChannelId = `group_${removedId}`;
+          const groupChannel = serverClient.channel('messaging', groupChannelId);
+          
+          await groupChannel.sendMessage({
+            user_id: 'system',
+            text: `📤 **Task Unassigned**: You are no longer assigned to "${name}"`,
+            type: 'regular',
+            action_type: 'task_unassigned',
+            taskId: task._id,
+            taskName: name
+          });
+          console.log(`Unassignment notification sent to ${groupChannelId} for task: ${name}`);
+        } catch (error: any) {
+          console.warn(`Could not send unassignment notification to group_${removedId} (channel may not exist):`, error.message);
+        }
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error sending task notifications:', error);
     // Don't fail the main operation if notifications fail
   }
@@ -93,53 +110,67 @@ async function sendTaskCompletionNotifications(task: any, isCompleted: boolean) 
     if (isCompleted) {
       // 1. Send to project channel
       if (channelId) {
-        const projectChannel = serverClient.channel('messaging', channelId);
-        await projectChannel.sendMessage({
-          user_id: 'system',
-          text: `✅ **Task Completed**: "${name}" has been completed by ${assignee.join(', ')}`,
-          type: 'regular',
-          action_type: 'task_completed',
-          taskId: task._id,
-          taskName: name,
-          priority: priority,
-          assignees: assignee
-        });
-        console.log(`Completion notification sent to channel ${channelId} for task: ${name}`);
+        try {
+          const projectChannel = serverClient.channel('messaging', channelId);
+          await projectChannel.sendMessage({
+            user_id: 'system',
+            text: `✅ **Task Completed**: "${name}" has been completed by ${assignee.join(', ')}`,
+            type: 'regular',
+            action_type: 'task_completed',
+            taskId: task._id,
+            taskName: name,
+            priority: priority,
+            assignees: assignee
+          });
+          console.log(`Completion notification sent to channel ${channelId} for task: ${name}`);
+        } catch (error: any) {
+          console.warn(`Could not send completion notification to project channel ${channelId}:`, error.message);
+        }
       }
       
       // 2. Send to assignee group channels
       for (const assigneeId of assignee) {
-        const groupChannel = serverClient.channel('messaging', `group_${assigneeId}`);
-        await groupChannel.sendMessage({
-          user_id: 'system',
-          text: `✅ **Task Completed**: You have completed "${name}"`,
-          type: 'regular',
-          action_type: 'task_completed',
-          taskId: task._id,
-          taskName: name,
-          priority: priority,
-          channelId: channelId
-        });
-        console.log(`Completion notification sent to group_${assigneeId} for task: ${name}`);
+        try {
+          const groupChannelId = `group_${assigneeId}`;
+          const groupChannel = serverClient.channel('messaging', groupChannelId);
+          
+          await groupChannel.sendMessage({
+            user_id: 'system',
+            text: `✅ **Task Completed**: You have completed "${name}"`,
+            type: 'regular',
+            action_type: 'task_completed',
+            taskId: task._id,
+            taskName: name,
+            priority: priority,
+            channelId: channelId
+          });
+          console.log(`Completion notification sent to ${groupChannelId} for task: ${name}`);
+        } catch (error: any) {
+          console.warn(`Could not send completion notification to group_${assigneeId} (channel may not exist):`, error.message);
+        }
       }
     } else {
       // Task was uncompleted
       if (channelId) {
-        const projectChannel = serverClient.channel('messaging', channelId);
-        await projectChannel.sendMessage({
-          user_id: 'system',
-          text: `🔄 **Task Reopened**: "${name}" has been reopened`,
-          type: 'regular',
-          action_type: 'task_reopened',
-          taskId: task._id,
-          taskName: name,
-          priority: priority,
-          assignees: assignee
-        });
-        console.log(`Reopening notification sent to channel ${channelId} for task: ${name}`);
+        try {
+          const projectChannel = serverClient.channel('messaging', channelId);
+          await projectChannel.sendMessage({
+            user_id: 'system',
+            text: `🔄 **Task Reopened**: "${name}" has been reopened`,
+            type: 'regular',
+            action_type: 'task_reopened',
+            taskId: task._id,
+            taskName: name,
+            priority: priority,
+            assignees: assignee
+          });
+          console.log(`Reopening notification sent to channel ${channelId} for task: ${name}`);
+        } catch (error: any) {
+          console.warn(`Could not send reopening notification to project channel ${channelId}:`, error.message);
+        }
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error sending task completion notifications:', error);
     // Don't fail the main operation if notifications fail
   }
@@ -197,7 +228,7 @@ export const handleTaskPost = async (req: Request, res: Response) => {
       task,
       subtasks: createdSubtasks 
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error saving task:', error);
     res.status(500).json({ error: 'Failed to save task' });
   }
@@ -265,7 +296,7 @@ router.get('/', async (req: Request, res: Response) => {
     }));
 
     res.status(200).json({ status: 'success', tasks: tasksWithCounts });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching tasks:', error);
     res.status(500).json({ error: 'Failed to fetch tasks' });
   }
@@ -298,7 +329,7 @@ router.get('/:taskId', async (req: Request, res: Response) => {
       subtasks,
       comments 
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching task details:', error);
     res.status(500).json({ error: 'Failed to fetch task details' });
   }
@@ -351,7 +382,7 @@ router.patch('/:taskId/complete', async (req: Request, res: Response) => {
       task,
       subtasks: completeSubtasks === 'true' ? subtasks : undefined
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error toggling task completion:', error);
     res.status(500).json({ error: 'Failed to toggle task completion' });
   }
@@ -416,7 +447,7 @@ router.put('/:taskId', async (req: Request, res: Response) => {
     }
     
     res.status(200).json({ status: 'success', task });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating task:', error);
     res.status(500).json({ error: 'Failed to update task' });
   }
@@ -450,7 +481,7 @@ router.delete('/:taskId', async (req: Request, res: Response) => {
       message: 'Task deleted successfully',
       deletedTaskId: taskId 
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting task:', error);
     res.status(500).json({ error: 'Failed to delete task' });
   }
@@ -502,7 +533,7 @@ router.post('/:taskId/attachments/upload', upload.single('file'), async (req: Re
       attachment: newAttachment,
       message: 'Attachment added successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error handling attachment upload:', error);
     res.status(500).json({ error: 'Failed to handle attachment upload' });
   }
@@ -529,7 +560,7 @@ router.get('/:taskId/attachments', async (req: Request, res: Response) => {
       attachments: task.attachments || [],
       taskId: taskId
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching attachments:', error);
     res.status(500).json({ error: 'Failed to fetch attachments' });
   }
@@ -576,7 +607,7 @@ router.delete('/:taskId/attachments/:attachmentIndex', async (req: Request, res:
       task: updatedTask,
       message: 'Attachment removed successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error removing attachment:', error);
     res.status(500).json({ error: 'Failed to remove attachment' });
   }
