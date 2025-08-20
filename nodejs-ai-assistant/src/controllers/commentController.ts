@@ -2,10 +2,57 @@ import express, { Request, Response, Router } from 'express';
 import { Comment } from '../models/Comment';
 import { Task } from '../models/Task';
 import { getStreamFeedsService } from '../utils/getstreamFeedsService';
+import { serverClient } from '../serverClient';
 
 const router: Router = express.Router();
 
-
+/**
+ * Send comment notifications to channel and task assignees
+ */
+async function sendCommentNotifications(task: any, comment: any, userId: string) {
+  try {
+    const { channelId, assignee, name } = task;
+    
+    // 1. Send to project channel
+    if (channelId) {
+      const projectChannel = serverClient.channel('messaging', channelId);
+      await projectChannel.sendMessage({
+        user_id: 'system',
+        text: `💬 **New Comment**: New comment on task "${name}" by ${userId}`,
+        type: 'regular',
+        action_type: 'task_commented',
+        taskId: task._id,
+        taskName: name,
+        commentId: comment._id,
+        commentMessage: comment.message,
+        commenter: userId
+      });
+      console.log(`Comment notification sent to channel ${channelId} for task: ${name}`);
+    }
+    
+    // 2. Send to task assignees (excluding the commenter)
+    const assigneesToNotify = assignee.filter((id: string) => id !== userId);
+    for (const assigneeId of assigneesToNotify) {
+      const userChannel = serverClient.channel('messaging', `tai_${assigneeId}`);
+      await userChannel.sendMessage({
+        user_id: 'system',
+        text: `💬 **New Comment**: New comment on task "${name}" by ${userId}`,
+        type: 'regular',
+        action_type: 'task_commented',
+        taskId: task._id,
+        taskName: name,
+        commentId: comment._id,
+        commentMessage: comment.message,
+        commenter: userId,
+        channelId: channelId
+      });
+      console.log(`Comment notification sent to assignee ${assigneeId} for task: ${name}`);
+    }
+  } catch (error) {
+    console.error('Error sending comment notifications:', error);
+    // Don't fail the main operation if notifications fail
+  }
+}
 
 // Post comment on task
 router.post('/:taskId/comments', async (req: Request, res: Response) => {
@@ -52,6 +99,9 @@ router.post('/:taskId/comments', async (req: Request, res: Response) => {
       console.error('Error adding comment to GetStream:', error);
       // Continue even if GetStream fails - we have the comment in database
     }
+
+    // Send comment notifications
+    await sendCommentNotifications(task, comment, userId);
 
     res.status(201).json({ 
       status: 'success', 

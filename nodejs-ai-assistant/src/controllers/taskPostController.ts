@@ -2,6 +2,7 @@ import express, { Request, Response, Router } from 'express';
 import { Task } from '../models/Task';
 import { Comment } from '../models/Comment';
 import { getStreamFeedsService } from '../utils/getstreamFeedsService';
+import { serverClient } from '../serverClient';
 import multer from 'multer';
 import { uploadToS3 } from '../utils/s3';
 
@@ -20,6 +21,129 @@ const upload = multer({
     }
   }
 });
+
+/**
+ * Send task assignment notifications to channel and assignees
+ */
+async function sendTaskAssignmentNotifications(task: any, previousAssignees?: string[]) {
+  try {
+    const { channelId, assignee, name, priority, createdBy } = task;
+    
+    // 1. Send to project channel (using existing serverClient pattern)
+    if (channelId) {
+      const projectChannel = serverClient.channel('messaging', channelId);
+      await projectChannel.sendMessage({
+        user_id: 'system',
+        text: `🎯 **Task Assigned**: "${name}" assigned to ${assignee.join(', ')} (${priority} priority)`,
+        type: 'regular',
+        action_type: 'task_assigned',
+        taskId: task._id,
+        taskName: name,
+        priority: priority,
+        assignees: assignee
+      });
+      console.log(`Channel notification sent to ${channelId} for task: ${name}`);
+    }
+    
+    // 2. Send to each assignee individually (using existing pattern)
+    for (const assigneeId of assignee) {
+      const userChannel = serverClient.channel('messaging', `tai_${assigneeId}`);
+      await userChannel.sendMessage({
+        user_id: 'system',
+        text: `🎯 **New Task**: You have been assigned "${name}" (${priority} priority)`,
+        type: 'regular',
+        action_type: 'task_assigned',
+        taskId: task._id,
+        taskName: name,
+        priority: priority,
+        channelId: channelId
+      });
+      console.log(`Assignee notification sent to ${assigneeId} for task: ${name}`);
+    }
+    
+    // 3. Notify removed assignees if updating
+    if (previousAssignees) {
+      const removedAssignees = previousAssignees.filter(id => !assignee.includes(id));
+      for (const removedId of removedAssignees) {
+        const userChannel = serverClient.channel('messaging', `tai_${removedId}`);
+        await userChannel.sendMessage({
+          user_id: 'system',
+          text: `📤 **Task Unassigned**: You are no longer assigned to "${name}"`,
+          type: 'regular',
+          action_type: 'task_unassigned',
+          taskId: task._id,
+          taskName: name
+        });
+        console.log(`Unassignment notification sent to ${removedId} for task: ${name}`);
+      }
+    }
+  } catch (error) {
+    console.error('Error sending task notifications:', error);
+    // Don't fail the main operation if notifications fail
+  }
+}
+
+/**
+ * Send task completion notifications to channel and assignees
+ */
+async function sendTaskCompletionNotifications(task: any, isCompleted: boolean) {
+  try {
+    const { channelId, assignee, name, priority } = task;
+    
+    if (isCompleted) {
+      // 1. Send to project channel
+      if (channelId) {
+        const projectChannel = serverClient.channel('messaging', channelId);
+        await projectChannel.sendMessage({
+          user_id: 'system',
+          text: `✅ **Task Completed**: "${name}" has been completed by ${assignee.join(', ')}`,
+          type: 'regular',
+          action_type: 'task_completed',
+          taskId: task._id,
+          taskName: name,
+          priority: priority,
+          assignees: assignee
+        });
+        console.log(`Completion notification sent to channel ${channelId} for task: ${name}`);
+      }
+      
+      // 2. Send to assignees
+      for (const assigneeId of assignee) {
+        const userChannel = serverClient.channel('messaging', `tai_${assigneeId}`);
+        await userChannel.sendMessage({
+          user_id: 'system',
+          text: `✅ **Task Completed**: You have completed "${name}"`,
+          type: 'regular',
+          action_type: 'task_completed',
+          taskId: task._id,
+          taskName: name,
+          priority: priority,
+          channelId: channelId
+        });
+        console.log(`Completion notification sent to assignee ${assigneeId} for task: ${name}`);
+      }
+    } else {
+      // Task was uncompleted
+      if (channelId) {
+        const projectChannel = serverClient.channel('messaging', channelId);
+        await projectChannel.sendMessage({
+          user_id: 'system',
+          text: `🔄 **Task Reopened**: "${name}" has been reopened`,
+          type: 'regular',
+          action_type: 'task_reopened',
+          taskId: task._id,
+          taskName: name,
+          priority: priority,
+          assignees: assignee
+        });
+        console.log(`Reopening notification sent to channel ${channelId} for task: ${name}`);
+      }
+    }
+  } catch (error) {
+    console.error('Error sending task completion notifications:', error);
+    // Don't fail the main operation if notifications fail
+  }
+}
 
 export const handleTaskPost = async (req: Request, res: Response) => {
   try {
@@ -64,6 +188,10 @@ export const handleTaskPost = async (req: Request, res: Response) => {
     }
 
     await getStreamFeedsService.createTaskActivity(task._id as string, task);
+    
+    // Send notifications for task assignment
+    await sendTaskAssignmentNotifications(task);
+    
     res.status(201).json({ 
       status: 'success', 
       task,
@@ -215,6 +343,9 @@ router.patch('/:taskId/complete', async (req: Request, res: Response) => {
       ? await Task.find({ parentTaskId: taskId })
       : [];
 
+    // Send completion notifications
+    await sendTaskCompletionNotifications(task, newCompletedStatus);
+
     res.status(200).json({ 
       status: 'success', 
       task,
@@ -231,6 +362,13 @@ router.put('/:taskId', async (req: Request, res: Response) => {
     const { taskId } = req.params;
     if (!taskId) {
       res.status(400).json({ error: 'Missing required parameter: taskId' });
+      return;
+    }
+    
+    // Get current task to check for assignee changes
+    const oldTask = await Task.findById(taskId);
+    if (!oldTask) {
+      res.status(404).json({ error: 'Task not found' });
       return;
     }
     
@@ -265,6 +403,16 @@ router.put('/:taskId', async (req: Request, res: Response) => {
     if (!task) {
       res.status(404).json({ error: 'Task not found' });
       return;
+    }
+    
+    // Send notifications if assignees changed
+    if (oldTask && JSON.stringify(oldTask.assignee) !== JSON.stringify(task.assignee)) {
+      await sendTaskAssignmentNotifications(task, oldTask.assignee);
+    }
+    
+    // Send notifications if completion status changed
+    if (oldTask && oldTask.completed !== task.completed) {
+      await sendTaskCompletionNotifications(task, task.completed);
     }
     
     res.status(200).json({ status: 'success', task });
