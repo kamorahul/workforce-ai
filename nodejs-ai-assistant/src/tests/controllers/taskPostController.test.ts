@@ -40,8 +40,8 @@ describe('Task Post Controller - Notifications', () => {
       // Verify that notifications were sent
       const mockChannel = serverClient.channel as jest.Mock;
       expect(mockChannel).toHaveBeenCalledWith('messaging', 'test-channel-123');
-      expect(mockChannel).toHaveBeenCalledWith('messaging', 'tai_user1');
-      expect(mockChannel).toHaveBeenCalledWith('messaging', 'tai_user2');
+      expect(mockChannel).toHaveBeenCalledWith('messaging', 'group_user1');
+      expect(mockChannel).toHaveBeenCalledWith('messaging', 'group_user2');
     });
 
     it('should handle notification failures gracefully', async () => {
@@ -107,8 +107,8 @@ describe('Task Post Controller - Notifications', () => {
       // Verify that notifications were sent for the change
       const mockChannel = serverClient.channel as jest.Mock;
       expect(mockChannel).toHaveBeenCalledWith('messaging', 'test-channel-123');
-      expect(mockChannel).toHaveBeenCalledWith('messaging', 'tai_user2');
-      expect(mockChannel).toHaveBeenCalledWith('messaging', 'tai_user3');
+      expect(mockChannel).toHaveBeenCalledWith('messaging', 'group_user2');
+      expect(mockChannel).toHaveBeenCalledWith('messaging', 'group_user3');
     });
 
     it('should not send notifications when assignees remain the same', async () => {
@@ -180,7 +180,7 @@ describe('Task Post Controller - Notifications', () => {
       // Verify that completion notifications were sent
       const mockChannel = serverClient.channel as jest.Mock;
       expect(mockChannel).toHaveBeenCalledWith('messaging', 'test-channel-123');
-      expect(mockChannel).toHaveBeenCalledWith('messaging', 'tai_user1');
+      expect(mockChannel).toHaveBeenCalledWith('messaging', 'group_user1');
     });
   });
 });

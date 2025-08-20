@@ -30,11 +30,11 @@ async function sendCommentNotifications(task: any, comment: any, userId: string)
       console.log(`Comment notification sent to channel ${channelId} for task: ${name}`);
     }
     
-    // 2. Send to task assignees (excluding the commenter)
+    // 2. Send to task assignees group channels (excluding the commenter)
     const assigneesToNotify = assignee.filter((id: string) => id !== userId);
     for (const assigneeId of assigneesToNotify) {
-      const userChannel = serverClient.channel('messaging', `tai_${assigneeId}`);
-      await userChannel.sendMessage({
+      const groupChannel = serverClient.channel('messaging', `group_${assigneeId}`);
+      await groupChannel.sendMessage({
         user_id: 'system',
         text: `💬 **New Comment**: New comment on task "${name}" by ${userId}`,
         type: 'regular',
@@ -46,7 +46,7 @@ async function sendCommentNotifications(task: any, comment: any, userId: string)
         commenter: userId,
         channelId: channelId
       });
-      console.log(`Comment notification sent to assignee ${assigneeId} for task: ${name}`);
+      console.log(`Comment notification sent to group_${assigneeId} for task: ${name}`);
     }
   } catch (error) {
     console.error('Error sending comment notifications:', error);

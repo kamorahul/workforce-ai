@@ -67,9 +67,9 @@ await sendCommentNotifications(task, comment, userId);
 - **Content**: Task updates, assignments, completions, and comments
 
 #### **Individual User Notifications**
-- **Channel ID**: Uses the pattern `tai_${userId}` (following existing convention)
+- **Channel ID**: Uses the pattern `group_${userId}` (group channels for each user)
 - **Message Type**: `regular` with `action_type` for filtering
-- **Recipients**: Specific task assignees
+- **Recipients**: Specific task assignees via their group channels
 - **Content**: Personalized task information
 
 ### Message Structure
@@ -88,6 +88,11 @@ All notifications include structured data for frontend processing:
   assignees: ['user1', 'user2']
 }
 ```
+
+### Channel Patterns
+
+- **Project Channel**: `channelId` from task (e.g., `project-123`)
+- **Group Channels**: `group_${userId}` for each assignee (e.g., `group_user1`, `group_user2`)
 
 ### Action Types
 

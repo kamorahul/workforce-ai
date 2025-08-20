@@ -45,10 +45,10 @@ async function sendTaskAssignmentNotifications(task: any, previousAssignees?: st
       console.log(`Channel notification sent to ${channelId} for task: ${name}`);
     }
     
-    // 2. Send to each assignee individually (using existing pattern)
+    // 2. Send to group channel for each assignee (using group channel pattern)
     for (const assigneeId of assignee) {
-      const userChannel = serverClient.channel('messaging', `tai_${assigneeId}`);
-      await userChannel.sendMessage({
+      const groupChannel = serverClient.channel('messaging', `group_${assigneeId}`);
+      await groupChannel.sendMessage({
         user_id: 'system',
         text: `🎯 **New Task**: You have been assigned "${name}" (${priority} priority)`,
         type: 'regular',
@@ -58,15 +58,15 @@ async function sendTaskAssignmentNotifications(task: any, previousAssignees?: st
         priority: priority,
         channelId: channelId
       });
-      console.log(`Assignee notification sent to ${assigneeId} for task: ${name}`);
+      console.log(`Group notification sent to group_${assigneeId} for task: ${name}`);
     }
     
     // 3. Notify removed assignees if updating
     if (previousAssignees) {
       const removedAssignees = previousAssignees.filter(id => !assignee.includes(id));
       for (const removedId of removedAssignees) {
-        const userChannel = serverClient.channel('messaging', `tai_${removedId}`);
-        await userChannel.sendMessage({
+        const groupChannel = serverClient.channel('messaging', `group_${removedId}`);
+        await groupChannel.sendMessage({
           user_id: 'system',
           text: `📤 **Task Unassigned**: You are no longer assigned to "${name}"`,
           type: 'regular',
@@ -74,7 +74,7 @@ async function sendTaskAssignmentNotifications(task: any, previousAssignees?: st
           taskId: task._id,
           taskName: name
         });
-        console.log(`Unassignment notification sent to ${removedId} for task: ${name}`);
+        console.log(`Unassignment notification sent to group_${removedId} for task: ${name}`);
       }
     }
   } catch (error) {
@@ -107,10 +107,10 @@ async function sendTaskCompletionNotifications(task: any, isCompleted: boolean) 
         console.log(`Completion notification sent to channel ${channelId} for task: ${name}`);
       }
       
-      // 2. Send to assignees
+      // 2. Send to assignee group channels
       for (const assigneeId of assignee) {
-        const userChannel = serverClient.channel('messaging', `tai_${assigneeId}`);
-        await userChannel.sendMessage({
+        const groupChannel = serverClient.channel('messaging', `group_${assigneeId}`);
+        await groupChannel.sendMessage({
           user_id: 'system',
           text: `✅ **Task Completed**: You have completed "${name}"`,
           type: 'regular',
@@ -120,7 +120,7 @@ async function sendTaskCompletionNotifications(task: any, isCompleted: boolean) 
           priority: priority,
           channelId: channelId
         });
-        console.log(`Completion notification sent to assignee ${assigneeId} for task: ${name}`);
+        console.log(`Completion notification sent to group_${assigneeId} for task: ${name}`);
       }
     } else {
       // Task was uncompleted

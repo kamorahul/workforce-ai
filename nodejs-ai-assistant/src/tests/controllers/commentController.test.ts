@@ -57,9 +57,9 @@ describe('Comment Controller - Notifications', () => {
       // Should send to project channel
       expect(mockChannel).toHaveBeenCalledWith('messaging', 'test-channel-123');
       // Should send to other assignees (excluding the commenter)
-      expect(mockChannel).toHaveBeenCalledWith('messaging', 'tai_user2');
+      expect(mockChannel).toHaveBeenCalledWith('messaging', 'group_user2');
       // Should NOT send to the commenter themselves
-      expect(mockChannel).not.toHaveBeenCalledWith('messaging', 'tai_user1');
+      expect(mockChannel).not.toHaveBeenCalledWith('messaging', 'group_user1');
     });
 
     it('should handle notification failures gracefully', async () => {
