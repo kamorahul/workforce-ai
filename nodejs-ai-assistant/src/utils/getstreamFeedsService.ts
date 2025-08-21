@@ -125,11 +125,81 @@ export class GetStreamFeedsService {
         extra: extra
       });
       
+      // Send push notification
+      await this.sendPushNotification(userId, verb, extra);
+      
       console.log('Notification created successfully:', activity.id);
       return activity.id;
     } catch (error) {
       console.error('Error creating notification:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Send push notification to user
+   */
+  async sendPushNotification(userId: string, verb: string, extra: any = {}): Promise<void> {
+    try {
+      // Get notification title and message based on verb
+      const { title, message } = this.getPushNotificationContent(verb, extra);
+      
+      // Here you would integrate with your push notification service
+      // For now, we'll log the push notification details
+      console.log('Push Notification:', {
+        userId,
+        title,
+        message,
+        verb,
+        extra
+      });
+      
+      // TODO: Integrate with Firebase Cloud Messaging or your preferred push service
+      // Example Firebase integration:
+      // await admin.messaging().send({
+      //   token: userDeviceToken,
+      //   notification: { title, body: message },
+      //   data: { ...extra, verb }
+      // });
+      
+    } catch (error) {
+      console.error('Error sending push notification:', error);
+      // Don't throw error - push notification failure shouldn't break the main flow
+    }
+  }
+
+  /**
+   * Get push notification title and message based on verb
+   */
+  private getPushNotificationContent(verb: string, extra: any = {}): { title: string; message: string } {
+    switch (verb) {
+      case 'task_created':
+        return {
+          title: 'Task Created',
+          message: `You created a new task: "${extra.taskName || 'Untitled Task'}"`
+        };
+      case 'task_assigned':
+        return {
+          title: 'New Task Assigned',
+          message: `${extra.createdBy || 'System'} assigned you: "${extra.taskName || 'Untitled Task'}"`
+        };
+      case 'comment_added':
+        if (extra.action === 'commented') {
+          return {
+            title: 'Comment Added',
+            message: `You commented on task: "${extra.taskName || 'Untitled Task'}"`
+          };
+        } else {
+          return {
+            title: 'New Comment',
+            message: `${extra.commentedBy || 'Someone'} commented on your task: "${extra.taskName || 'Untitled Task'}"`
+          };
+        }
+      default:
+        return {
+          title: 'New Notification',
+          message: 'You have a new notification'
+        };
     }
   }
 
@@ -204,7 +274,19 @@ export class GetStreamFeedsService {
         }
       });
 
-      // Also create notification for each assignee
+      // Create notification for task creator (who is doing the activity)
+      if (task.createdBy) {
+        await this.createNotification(task.createdBy, 'task_created', taskId, {
+          taskId: taskId,
+          taskName: task.title || task.name,
+          priority: task.priority || 'medium',
+          description: task.description,
+          action: 'created',
+          assignee: task.assignee
+        });
+      }
+
+      // Create notification for each assignee
       if (task.assignee && Array.isArray(task.assignee)) {
         for (const assigneeId of task.assignee) {
           await this.createNotification(assigneeId, 'task_assigned', taskId, {
@@ -212,31 +294,9 @@ export class GetStreamFeedsService {
             taskName: task.title || task.name,
             priority: task.priority || 'medium',
             description: task.description,
-            assignee: assigneeId
+            assignee: assigneeId,
+            createdBy: task.createdBy
           });
-        }
-      }
-
-      // Send notifications to all project members if channelId is provided
-      if (task.channelId) {
-        try {
-          await this.sendNotificationToProjectMembers(
-            task.channelId,
-            'task_created',
-            taskId,
-            {
-              taskId: taskId,
-              taskName: task.title || task.name,
-              priority: task.priority || 'medium',
-              description: task.description,
-              createdBy: task.createdBy || 'system',
-              assignee: task.assignee
-            },
-            task.createdBy // Exclude the creator from notifications
-          );
-        } catch (error) {
-          console.error('Failed to send notifications to project members:', error);
-          // Continue even if project member notifications fail
         }
       }
       
@@ -274,41 +334,39 @@ export class GetStreamFeedsService {
         }
       });
 
-      // Create notification for task assignees about the new comment
-      // You might want to get the task details to find assignees
-      // For now, we'll create a general comment notification
+      // Create notification for the commenter (who is doing the activity)
       await this.createNotification(userId, 'comment_added', taskId, {
         taskId: taskId,
         commentId: commentId,
         message: message,
-        commentPreview: message.substring(0, 100) // First 100 characters
+        commentPreview: message.substring(0, 100), // First 100 characters
+        action: 'commented'
       });
 
-      // Send notifications to project members about the new comment
-      // We need to get the task to find the channelId
+      // Get task details to notify assignees about the new comment
       try {
         const { Task } = await import('../models/Task');
         const task = await Task.findById(taskId);
         
-        if (task && task.channelId) {
-          await this.sendNotificationToProjectMembers(
-            task.channelId,
-            'comment_added',
-            taskId,
-            {
-              taskId: taskId,
-              commentId: commentId,
-              message: message,
-              commentPreview: message.substring(0, 100),
-              commentedBy: userId,
-              taskName: task.name || 'Untitled Task'
-            },
-            userId // Exclude the commenter from notifications
-          );
+        if (task && task.assignee && Array.isArray(task.assignee)) {
+          // Notify all assignees about the new comment (excluding the commenter)
+          for (const assigneeId of task.assignee) {
+            if (assigneeId !== userId) {
+              await this.createNotification(assigneeId, 'comment_added', taskId, {
+                taskId: taskId,
+                commentId: commentId,
+                message: message,
+                commentPreview: message.substring(0, 100),
+                commentedBy: userId,
+                taskName: task.name || 'Untitled Task',
+                action: 'received_comment'
+              });
+            }
+          }
         }
       } catch (error) {
-        console.error('Failed to send comment notifications to project members:', error);
-        // Continue even if project member notifications fail
+        console.error('Failed to send comment notifications to assignees:', error);
+        // Continue even if assignee notifications fail
       }
       
       return {
@@ -474,87 +532,7 @@ export class GetStreamFeedsService {
     }
   }
 
-  /**
-   * Send notification to all project members
-   */
-  async sendNotificationToProjectMembers(
-    channelId: string, 
-    verb: string, 
-    object: string, 
-    extra: any = {},
-    excludeUserId?: string
-  ): Promise<string[]> {
-    try {
-      if (!this.isConnected) {
-        await this.connect();
-      }
 
-      console.log('Sending notification to project members for channel:', channelId, 'verb:', verb);
-      
-      // Get project members from the channel
-      const projectMembers = await this.getProjectMembers(channelId);
-      
-      if (!projectMembers || projectMembers.length === 0) {
-        console.log('No project members found for channel:', channelId);
-        return [];
-      }
-
-      const notificationIds: string[] = [];
-      
-      // Send notification to each project member (excluding the user who triggered the action)
-      for (const memberId of projectMembers) {
-        if (excludeUserId && memberId === excludeUserId) {
-          continue; // Skip the user who triggered the action
-        }
-        
-        try {
-          const notificationId = await this.createNotification(memberId, verb, object, {
-            ...extra,
-            channelId: channelId,
-            projectMember: true
-          });
-          
-          if (notificationId) {
-            notificationIds.push(notificationId);
-          }
-        } catch (error) {
-          console.error(`Failed to send notification to member ${memberId}:`, error);
-        }
-      }
-      
-      console.log(`Sent ${notificationIds.length} notifications to project members`);
-      return notificationIds;
-    } catch (error) {
-      console.error('Error sending notifications to project members:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get project members from channel
-   */
-  async getProjectMembers(channelId: string): Promise<string[]> {
-    try {
-      console.log('Getting project members for channel:', channelId);
-      
-      // Import Channel model dynamically to avoid circular dependencies
-      const { Channel } = await import('../models/Channel');
-      
-      // Find the channel and get its members
-      const channel = await Channel.findOne({ channelId: channelId });
-      
-      if (!channel) {
-        console.log('Channel not found:', channelId);
-        return [];
-      }
-      
-      console.log(`Found ${channel.members.length} members for channel ${channelId}:`, channel.members);
-      return channel.members;
-    } catch (error) {
-      console.error('Error getting project members:', error);
-      return [];
-    }
-  }
 
   /**
    * Disconnect from GetStream
