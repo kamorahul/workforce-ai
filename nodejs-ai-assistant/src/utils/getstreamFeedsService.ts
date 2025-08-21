@@ -216,6 +216,29 @@ export class GetStreamFeedsService {
           });
         }
       }
+
+      // Send notifications to all project members if channelId is provided
+      if (task.channelId) {
+        try {
+          await this.sendNotificationToProjectMembers(
+            task.channelId,
+            'task_created',
+            taskId,
+            {
+              taskId: taskId,
+              taskName: task.title || task.name,
+              priority: task.priority || 'medium',
+              description: task.description,
+              createdBy: task.createdBy || 'system',
+              assignee: task.assignee
+            },
+            task.createdBy // Exclude the creator from notifications
+          );
+        } catch (error) {
+          console.error('Failed to send notifications to project members:', error);
+          // Continue even if project member notifications fail
+        }
+      }
       
       return activity.id;
     } catch (error) {
@@ -260,6 +283,33 @@ export class GetStreamFeedsService {
         message: message,
         commentPreview: message.substring(0, 100) // First 100 characters
       });
+
+      // Send notifications to project members about the new comment
+      // We need to get the task to find the channelId
+      try {
+        const { Task } = await import('../models/Task');
+        const task = await Task.findById(taskId);
+        
+        if (task && task.channelId) {
+          await this.sendNotificationToProjectMembers(
+            task.channelId,
+            'comment_added',
+            taskId,
+            {
+              taskId: taskId,
+              commentId: commentId,
+              message: message,
+              commentPreview: message.substring(0, 100),
+              commentedBy: userId,
+              taskName: task.name || 'Untitled Task'
+            },
+            userId // Exclude the commenter from notifications
+          );
+        }
+      } catch (error) {
+        console.error('Failed to send comment notifications to project members:', error);
+        // Continue even if project member notifications fail
+      }
       
       return {
         id: activity.id,
@@ -421,6 +471,88 @@ export class GetStreamFeedsService {
     } catch (error) {
       console.error('Error deleting comment reaction:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Send notification to all project members
+   */
+  async sendNotificationToProjectMembers(
+    channelId: string, 
+    verb: string, 
+    object: string, 
+    extra: any = {},
+    excludeUserId?: string
+  ): Promise<string[]> {
+    try {
+      if (!this.isConnected) {
+        await this.connect();
+      }
+
+      console.log('Sending notification to project members for channel:', channelId, 'verb:', verb);
+      
+      // Get project members from the channel
+      const projectMembers = await this.getProjectMembers(channelId);
+      
+      if (!projectMembers || projectMembers.length === 0) {
+        console.log('No project members found for channel:', channelId);
+        return [];
+      }
+
+      const notificationIds: string[] = [];
+      
+      // Send notification to each project member (excluding the user who triggered the action)
+      for (const memberId of projectMembers) {
+        if (excludeUserId && memberId === excludeUserId) {
+          continue; // Skip the user who triggered the action
+        }
+        
+        try {
+          const notificationId = await this.createNotification(memberId, verb, object, {
+            ...extra,
+            channelId: channelId,
+            projectMember: true
+          });
+          
+          if (notificationId) {
+            notificationIds.push(notificationId);
+          }
+        } catch (error) {
+          console.error(`Failed to send notification to member ${memberId}:`, error);
+        }
+      }
+      
+      console.log(`Sent ${notificationIds.length} notifications to project members`);
+      return notificationIds;
+    } catch (error) {
+      console.error('Error sending notifications to project members:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get project members from channel
+   */
+  async getProjectMembers(channelId: string): Promise<string[]> {
+    try {
+      console.log('Getting project members for channel:', channelId);
+      
+      // Import Channel model dynamically to avoid circular dependencies
+      const { Channel } = await import('../models/Channel');
+      
+      // Find the channel and get its members
+      const channel = await Channel.findOne({ channelId: channelId });
+      
+      if (!channel) {
+        console.log('Channel not found:', channelId);
+        return [];
+      }
+      
+      console.log(`Found ${channel.members.length} members for channel ${channelId}:`, channel.members);
+      return channel.members;
+    } catch (error) {
+      console.error('Error getting project members:', error);
+      return [];
     }
   }
 
