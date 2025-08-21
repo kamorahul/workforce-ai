@@ -13,6 +13,7 @@ import projectsGetControllerRouter from './controllers/projectsGetController';
 import profileUpdatePostControllerRouter from './controllers/profileUpdatePostController';
 import taskPostControllerRouter from './controllers/taskPostController';
 import commentControllerRouter from './controllers/commentController';
+import notificationsControllerRouter from './controllers/notificationsController';
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -40,6 +41,7 @@ app.use('/check-message-status', checkMessageStatusGetControllerRouter);
 app.use('/projects', projectsGetControllerRouter);
 app.use('/profile', profileUpdatePostControllerRouter);
 app.use('/task', taskPostControllerRouter);
-app.use('/task', commentControllerRouter); // Mount comment routes under /task
+app.use('/task', commentControllerRouter);
+app.use('/notifications', notificationsControllerRouter); // Mount comment routes under /task
 
 export { app }; // Export the app instance
