@@ -144,8 +144,16 @@ export class GetStreamFeedsService {
       // Get notification title and message based on verb
       const { title, message } = this.getPushNotificationContent(verb, extra);
       
-      // Send message to user's personal notification channel for push notifications
-      await this.sendMessageToUserChannel(userId, message);
+      // Send custom notification to user's notification channel for push notifications
+      if (extra.channelId) {
+        await this.sendCustomNotification(extra.channelId, {
+          title,
+          message,
+          userId,
+          verb,
+          ...extra
+        });
+      }
       
       // Here you would integrate with your push notification service
       // For now, we'll log the push notification details
@@ -171,68 +179,32 @@ export class GetStreamFeedsService {
     }
   }
 
-  /**
-   * Send message to a user's personal notification channel for push notifications
-   */
-  async sendMessageToUserChannel(userId: string, text: string): Promise<void> {
-    try {
-      console.log('Sending message to user notification channel:', userId, 'text:', text);
-      
-      // Import serverClient to send message to channel
-      const { serverClient } = await import('../serverClient');
-      
-      // Create or get user's personal notification channel
-      const channelId = `notifications_${userId}`;
-      let channel = serverClient.channel('messaging', channelId);
-      
-      try {
-        // Try to get existing channel
-        await channel.watch();
-      } catch (error) {
-        // Channel doesn't exist, create it
-        console.log('Creating new notification channel for user:', userId);
-        channel = serverClient.channel('messaging', channelId, {
-          name: `Notifications for ${userId}`,
-          created_by_id: userId,
-          members: [userId],
-          push_notifications: true
-        });
-        await channel.create();
-      }
-      
-      // Send the notification message
-      await channel.sendMessage({
-        text,
-        user: { id: userId },
-      });
-      
-      console.log('Message sent successfully to user notification channel:', userId);
-    } catch (error) {
-      console.error('Error sending message to user notification channel:', error);
-      // Don't throw error - message failure shouldn't break the main flow
-    }
-  }
+
 
   /**
-   * Send message to a channel for push notifications
+   * Send custom notification event to a channel (no chat message)
    */
-  async sendMessage(channelId: string, userId: string, text: string): Promise<void> {
+  async sendCustomNotification(channelId: string, data: object): Promise<void> {
     try {
-      console.log('Sending message to channel:', channelId, 'from user:', userId, 'text:', text);
+      console.log('Sending custom notification to channel:', channelId, 'data:', data);
       
-      // Import serverClient to send message to channel
+      // Import serverClient to send custom event
       const { serverClient } = await import('../serverClient');
       const channel = serverClient.channel('messaging', channelId);
       
+      // Send a system message that won't appear in regular chat
       await channel.sendMessage({
-        text,
-        user: { id: userId },
+        text: 'Notification',
+        user: { id: 'system' },
+        type: 'system',
+        extra: data,
+        silent: true // This prevents it from showing as a regular message
       });
       
-      console.log('Message sent successfully to channel:', channelId);
+      console.log('Custom notification sent successfully to channel:', channelId);
     } catch (error) {
-      console.error('Error sending message to channel:', error);
-      // Don't throw error - message failure shouldn't break the main flow
+      console.error('Error sending custom notification to channel:', error);
+      // Don't throw error - custom notification failure shouldn't break the main flow
     }
   }
 
