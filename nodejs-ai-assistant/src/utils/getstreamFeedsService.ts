@@ -230,6 +230,7 @@ export class GetStreamFeedsService {
       await channel.sendEvent({
         type: 'message.new',
         text: data.message || '🔔 New notification',
+        user: { id: 'system' }, // Required field for server-side auth
         data: {
           ...data,
           isNotification: true,
