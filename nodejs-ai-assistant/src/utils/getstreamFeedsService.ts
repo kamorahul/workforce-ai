@@ -192,23 +192,20 @@ export class GetStreamFeedsService {
       const { serverClient } = await import('../serverClient');
       const channel = serverClient.channel('messaging', channelId);
       
-      // Send a hidden message that GetStream can push but won't show in chat
+      // Send a minimal message that GetStream can push but is easy to filter
       await channel.sendMessage({
         text: '🔔', // Minimal text - just an emoji
         user: { id: 'system' },
-        type: 'ephemeral', // Makes message temporary/less visible
+        type: 'system', // Valid type that's less prominent
         extra: {
           ...data,
           isNotification: true,
           isHidden: true,
           originalMessage: data.message
         },
-        // Add metadata to hide from chat UI
+        // Add metadata to help mobile apps filter out notification messages
         silent: false, // Allow push notifications
-        skip_push: false, // Ensure push notifications are sent
-        // These flags help mobile apps filter out notification messages
-        skip_enrich_urls: true,
-        skip_auto_translation: true
+        skip_push: false // Ensure push notifications are sent
       });
       
       console.log('Hidden notification message sent successfully to channel:', channelId);
