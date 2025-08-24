@@ -182,40 +182,47 @@ export class GetStreamFeedsService {
 
 
   /**
-   * Send notification message to channel (triggers push notifications)
+   * Send hidden notification message (triggers push notifications, hidden from chat)
    */
   async sendCustomNotification(channelId: string, data: any): Promise<void> {
     try {
-      console.log('Sending notification message to channel:', channelId, 'data:', data);
+      console.log('Sending hidden notification message to channel:', channelId, 'data:', data);
       
       // Import serverClient to send message
       const { serverClient } = await import('../serverClient');
       const channel = serverClient.channel('messaging', channelId);
       
-      // Send a regular message that GetStream can push
-      // Use the actual notification message as the text
+      // Send a hidden message that GetStream can push but won't show in chat
       await channel.sendMessage({
-        text: data.message || 'You have a new notification',
+        text: '🔔', // Minimal text - just an emoji
         user: { id: 'system' },
-        // Remove type: 'system' so GetStream treats it as a regular message
+        type: 'ephemeral', // Makes message temporary/less visible
         extra: {
           ...data,
-          isNotification: true, // Flag to identify notification messages
-          originalMessage: data.message // Preserve original message
-        }
+          isNotification: true,
+          isHidden: true,
+          originalMessage: data.message
+        },
+        // Add metadata to hide from chat UI
+        silent: false, // Allow push notifications
+        skip_push: false, // Ensure push notifications are sent
+        // These flags help mobile apps filter out notification messages
+        skip_enrich_urls: true,
+        skip_auto_translation: true
       });
       
-      console.log('Notification message sent successfully to channel:', channelId);
+      console.log('Hidden notification message sent successfully to channel:', channelId);
       
       // Log channel information for debugging
       console.log('Channel details for push notifications:', {
         channelId,
-        messageType: 'regular_message',
-        shouldTriggerPush: true
+        messageType: 'hidden_notification',
+        shouldTriggerPush: true,
+        isHidden: true
       });
       
     } catch (error) {
-      console.error('Error sending notification message to channel:', error);
+      console.error('Error sending hidden notification message to channel:', error);
       // Don't throw error - notification failure shouldn't break the main flow
     }
   }
