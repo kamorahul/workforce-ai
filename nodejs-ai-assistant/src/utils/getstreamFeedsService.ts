@@ -182,9 +182,9 @@ export class GetStreamFeedsService {
 
 
   /**
-   * Send custom notification event to a channel (no chat message)
+   * Send custom notification event to a channel (triggers push notifications)
    */
-  async sendCustomNotification(channelId: string, data: object): Promise<void> {
+  async sendCustomNotification(channelId: string, data: any): Promise<void> {
     try {
       console.log('Sending custom notification to channel:', channelId, 'data:', data);
       
@@ -192,13 +192,13 @@ export class GetStreamFeedsService {
       const { serverClient } = await import('../serverClient');
       const channel = serverClient.channel('messaging', channelId);
       
-      // Send a system message that won't appear in regular chat
+      // Send a message that GetStream can push, but with system styling
       await channel.sendMessage({
-        text: 'Notification',
+        text: data.message || 'Notification',
         user: { id: 'system' },
         type: 'system',
         extra: data,
-        silent: true // This prevents it from showing as a regular message
+        // Remove silent: true so GetStream can push this notification
       });
       
       console.log('Custom notification sent successfully to channel:', channelId);
