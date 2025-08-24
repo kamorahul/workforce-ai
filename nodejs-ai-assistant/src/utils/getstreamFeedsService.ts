@@ -144,10 +144,8 @@ export class GetStreamFeedsService {
       // Get notification title and message based on verb
       const { title, message } = this.getPushNotificationContent(verb, extra);
       
-      // Send message to user's notification channel for push notifications
-      if (extra.channelId) {
-        await this.sendMessage(extra.channelId, userId, message);
-      }
+      // Send message to user's personal notification channel for push notifications
+      await this.sendMessageToUserChannel(userId, message);
       
       // Here you would integrate with your push notification service
       // For now, we'll log the push notification details
@@ -170,6 +168,48 @@ export class GetStreamFeedsService {
     } catch (error) {
       console.error('Error sending push notification:', error);
       // Don't throw error - push notification failure shouldn't break the main flow
+    }
+  }
+
+  /**
+   * Send message to a user's personal notification channel for push notifications
+   */
+  async sendMessageToUserChannel(userId: string, text: string): Promise<void> {
+    try {
+      console.log('Sending message to user notification channel:', userId, 'text:', text);
+      
+      // Import serverClient to send message to channel
+      const { serverClient } = await import('../serverClient');
+      
+      // Create or get user's personal notification channel
+      const channelId = `notifications_${userId}`;
+      let channel = serverClient.channel('messaging', channelId);
+      
+      try {
+        // Try to get existing channel
+        await channel.watch();
+      } catch (error) {
+        // Channel doesn't exist, create it
+        console.log('Creating new notification channel for user:', userId);
+        channel = serverClient.channel('messaging', channelId, {
+          name: `Notifications for ${userId}`,
+          created_by_id: userId,
+          members: [userId],
+          push_notifications: true
+        });
+        await channel.create();
+      }
+      
+      // Send the notification message
+      await channel.sendMessage({
+        text,
+        user: { id: userId },
+      });
+      
+      console.log('Message sent successfully to user notification channel:', userId);
+    } catch (error) {
+      console.error('Error sending message to user notification channel:', error);
+      // Don't throw error - message failure shouldn't break the main flow
     }
   }
 
