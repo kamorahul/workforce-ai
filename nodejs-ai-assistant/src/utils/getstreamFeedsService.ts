@@ -59,7 +59,6 @@ export class GetStreamFeedsService {
       // For server-side operations, we don't need to connect as a specific user
       // The API secret provides the necessary authentication
       this.isConnected = true;
-      console.log('Connected to GetStream Activity Feeds with server authentication');
     } catch (error) {
       console.error('Error connecting to GetStream:', error);
       throw error;
@@ -69,7 +68,7 @@ export class GetStreamFeedsService {
   /**
    * Get user notifications from GetStream Activity Feeds
    */
-  async getUserNotifications(userId: string, limit: number = 50): Promise<GetStreamNotification[]> {
+  async getUserNotifications(userId: string, limit: number = 100): Promise<GetStreamNotification[]> {
     try {
       if (!this.isConnected) {
         await this.connect();
@@ -77,23 +76,73 @@ export class GetStreamFeedsService {
 
       console.log('Fetching notifications for user:', userId, 'limit:', limit);
       
-      // Use notification feed group (you have this configured)
-      const notificationFeed = this.getstreamClient.feed('notification', userId);
-      const response = await notificationFeed.get({ limit });
+      // Try different feed groups to see which one has the notifications
+      let notificationFeed = this.getstreamClient.feed('notification', userId);
+      let response = await notificationFeed.get({ 
+        limit,
+        offset: 0,
+        withReactionCounts: false,
+        withRecentReactions: false,
+        withOwnReactions: false
+      });
       
-      if (response.results && response.results.length > 0) {
-        // Transform GetStream activities to our notification format
-        const notifications = response.results.map((activity: any) => ({
-          id: activity.id,
-          verb: activity.verb,
-          actor: activity.actor,
-          object: activity.object,
-          time: activity.time,
-          extra: activity.extra || {},
-          isRead: activity.isRead || false
-        }));
+      let feedGroup = 'notification';
+      
+      // If notification feed is empty, try user feed
+      if (!response.results || response.results.length === 0) {
+        feedGroup = 'user';
+        const userFeed = this.getstreamClient.feed('user', userId);
+        response = await userFeed.get({ 
+          limit,
+          offset: 0,
+          withReactionCounts: false,
+          withRecentReactions: false,
+          withOwnReactions: false
+        });
+        console.log(`📭 ${feedGroup} feed results:`, response.results?.length || 0);
+      }
+      
+      // If still empty, try timeline feed
+      if (!response.results || response.results.length === 0) {
+        feedGroup = 'timeline';
+        const timelineFeed = this.getstreamClient.feed('timeline', userId);
+        response = await timelineFeed.get({ 
+          limit,
+          offset: 0,
+          withReactionCounts: false,
+          withRecentReactions: false,
+          withOwnReactions: false
+        });
+        console.log(`📭 ${feedGroup} feed results:`, response.results?.length || 0);
+      }
+      
+      if (response.results && response.results.length > 0) {  
+        // Extract individual activities from grouped results
+        let allActivities: any[] = [];
         
-        console.log(`Found ${notifications.length} notifications for user ${userId}`);
+        for (const group of response.results) {
+          if (group.activities && Array.isArray(group.activities)) {
+            // This is a grouped activity - extract individual activities
+            allActivities.push(...group.activities);
+          } else {
+            // This is an individual activity
+            allActivities.push(group);
+          }
+        } 
+        // Transform GetStream activities to our notification format
+        const notifications = allActivities.map((activity: any) => {
+          const notification = {
+            id: activity.id,
+            verb: activity.verb,
+            actor: activity.actor,
+            object: activity.object,
+            time: activity.time || activity.created_at,
+            extra: activity.extra || {},
+            isRead: activity.isRead || false
+          };
+          return notification;
+        });
+         
         return notifications;
       } else {
         console.log(`No notifications found for user ${userId}`);
@@ -113,13 +162,10 @@ export class GetStreamFeedsService {
       if (!this.isConnected) {
         await this.connect();
       }
-
-      console.log('Creating notification for user:', userId, 'verb:', verb, 'object:', object);
-      
       // Add activity to user's notification feed (you have this configured)
       const notificationFeed = this.getstreamClient.feed('notification', userId);
       const activity = await notificationFeed.addActivity({
-        actor: userId,
+        actor: extra.actor || extra.commentedBy || extra.createdBy || extra.assignee || 'system',
         verb: verb,
         object: object,
         extra: extra
@@ -128,7 +174,7 @@ export class GetStreamFeedsService {
       // Send push notification
       await this.sendPushNotification(userId, verb, extra);
       
-      console.log('Notification created successfully:', activity.id);
+      console.log('✅ Notification created successfully:', activity.id);
       return activity.id;
     } catch (error) {
       console.error('Error creating notification:', error);
@@ -155,16 +201,6 @@ export class GetStreamFeedsService {
         });
       }
       
-      // Here you would integrate with your push notification service
-      // For now, we'll log the push notification details
-      console.log('Push Notification:', {
-        userId,
-        title,
-        message,
-        verb,
-        extra
-      });
-      
       // TODO: Integrate with Firebase Cloud Messaging or your preferred push service
       // Example Firebase integration:
       // await admin.messaging().send({
@@ -186,15 +222,13 @@ export class GetStreamFeedsService {
    */
   async sendCustomNotification(channelId: string, data: any): Promise<void> {
     try {
-      console.log('Sending hidden notification message to channel:', channelId, 'data:', data);
-      
       // Import serverClient to send message
       const { serverClient } = await import('../serverClient');
       const channel = serverClient.channel('messaging', channelId);
       
       // Send a minimal message that GetStream can push but is easy to filter
       await channel.sendMessage({
-        text: '🔔', // Minimal text - just an emoji
+        text: '', // Minimal text - just an emoji
         user: { id: 'system' },
         type: 'system', // Valid type that's less prominent
         extra: {
@@ -206,16 +240,6 @@ export class GetStreamFeedsService {
         // Add metadata to help mobile apps filter out notification messages
         silent: false, // Allow push notifications
         skip_push: false // Ensure push notifications are sent
-      });
-      
-      console.log('Hidden notification message sent successfully to channel:', channelId);
-      
-      // Log channel information for debugging
-      console.log('Channel details for push notifications:', {
-        channelId,
-        messageType: 'hidden_notification',
-        shouldTriggerPush: true,
-        isHidden: true
       });
       
     } catch (error) {
@@ -427,6 +451,14 @@ export class GetStreamFeedsService {
         const { Task } = await import('../models/Task');
         const task = await Task.findById(taskId);
         
+        console.log('Task found for comment notification:', {
+          taskId,
+          taskName: task?.name,
+          createdBy: task?.createdBy,
+          assignee: task?.assignee,
+          channelId: task?.channelId
+        });
+        
         if (task) {
           // Create a set of all users to notify (assignees + creator)
           const usersToNotify = new Set([
@@ -434,53 +466,47 @@ export class GetStreamFeedsService {
             task.createdBy
           ].filter(Boolean)); // Remove any undefined values
           
+          console.log('Users to notify about comment:', Array.from(usersToNotify));
+          
           // Notify all relevant users about the new comment
           for (const userIdToNotify of usersToNotify) {
             // Skip if this is the commenter themselves
             if (userIdToNotify === userId) {
+              console.log(`Skipping notification for commenter themselves: ${userIdToNotify}`);
               continue;
             }
             
-            // Add activity to user's notification feed
-            const userFeed = this.getstreamClient.feed('notification', userIdToNotify);
-            await userFeed.addActivity({
-              actor: userId,
-              verb: 'comment_added',
-              object: taskId,
-              extra: {
-                taskId: taskId,
-                commentId: commentId,
-                message: message,
-                commentPreview: message.substring(0, 100),
-                commentedBy: userId,
-                taskName: task.name || 'Untitled Task',
-                action: 'received_comment',
-                channelId: task.channelId,
-                feedGroup: 'notification',
-                isTaskCreator: userIdToNotify === task.createdBy
-              }
-            });
+            console.log(`Creating notification for user ${userIdToNotify} about comment from ${userId}`);
             
-            // Also create notification for push notifications
+            // Create notification for the user (this will add to their notification feed)
             await this.createNotification(userIdToNotify, 'comment_added', taskId, {
               taskId: taskId,
               commentId: commentId,
               message: message,
               commentPreview: message.substring(0, 100),
-              commentedBy: userId,
+              commentedBy: userId, // This is the user who commented
               taskName: task.name || 'Untitled Task',
               action: 'received_comment',
               channelId: task.channelId,
-              isTaskCreator: userIdToNotify === task.createdBy
+              isTaskCreator: userIdToNotify === task.createdBy,
+              // Ensure the actor is properly set
+              actor: userId
             });
             
             const userType = userIdToNotify === task.createdBy ? 'task creator' : 'assignee';
-            console.log(`Added comment_added activity to ${userType} ${userIdToNotify}'s notification feed`);
+            console.log(`✅ Created comment notification for ${userType} ${userIdToNotify}`);
           }
+        } else {
+          console.log('❌ Task not found for comment notification:', taskId);
         }
       } catch (error) {
-        console.error('Failed to send comment notifications to assignees:', error);
-        // Continue even if assignee notifications fail
+        console.error('Failed to send comment notifications to users:', error);
+        if (error instanceof Error) {
+          console.error('Error details:', error.message);
+        } else {
+          console.error('Error details:', error);
+        }
+        // Continue even if notifications fail
       }
       
       return {

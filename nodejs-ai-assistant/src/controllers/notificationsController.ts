@@ -15,7 +15,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     // Get notifications from GetStream Activity Feeds
     try {
-      const notifications = await getStreamFeedsService.getUserNotifications(userId as string, 50);
+      const notifications = await getStreamFeedsService.getUserNotifications(userId as string, 100);
       
       if (notifications && notifications.length > 0) {
         const formattedNotifications = notifications.map((notification: any) => ({
