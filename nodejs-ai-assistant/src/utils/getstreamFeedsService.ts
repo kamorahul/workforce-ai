@@ -144,6 +144,11 @@ export class GetStreamFeedsService {
       // Get notification title and message based on verb
       const { title, message } = this.getPushNotificationContent(verb, extra);
       
+      // Send message to user's notification channel for push notifications
+      if (extra.channelId) {
+        await this.sendMessage(extra.channelId, userId, message);
+      }
+      
       // Here you would integrate with your push notification service
       // For now, we'll log the push notification details
       console.log('Push Notification:', {
@@ -165,6 +170,29 @@ export class GetStreamFeedsService {
     } catch (error) {
       console.error('Error sending push notification:', error);
       // Don't throw error - push notification failure shouldn't break the main flow
+    }
+  }
+
+  /**
+   * Send message to a channel for push notifications
+   */
+  async sendMessage(channelId: string, userId: string, text: string): Promise<void> {
+    try {
+      console.log('Sending message to channel:', channelId, 'from user:', userId, 'text:', text);
+      
+      // Import serverClient to send message to channel
+      const { serverClient } = await import('../serverClient');
+      const channel = serverClient.channel('messaging', channelId);
+      
+      await channel.sendMessage({
+        text,
+        user: { id: userId },
+      });
+      
+      console.log('Message sent successfully to channel:', channelId);
+    } catch (error) {
+      console.error('Error sending message to channel:', error);
+      // Don't throw error - message failure shouldn't break the main flow
     }
   }
 
@@ -282,7 +310,8 @@ export class GetStreamFeedsService {
           priority: task.priority || 'medium',
           description: task.description,
           action: 'created',
-          assignee: task.assignee
+          assignee: task.assignee,
+          channelId: task.channelId
         });
       }
 
@@ -295,7 +324,8 @@ export class GetStreamFeedsService {
             priority: task.priority || 'medium',
             description: task.description,
             assignee: assigneeId,
-            createdBy: task.createdBy
+            createdBy: task.createdBy,
+            channelId: task.channelId
           });
         }
       }
@@ -359,7 +389,8 @@ export class GetStreamFeedsService {
                 commentPreview: message.substring(0, 100),
                 commentedBy: userId,
                 taskName: task.name || 'Untitled Task',
-                action: 'received_comment'
+                action: 'received_comment',
+                channelId: task.channelId
               });
             }
           }
