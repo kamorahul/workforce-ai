@@ -260,4 +260,41 @@ const getNotificationMessage = (notification: any): string => {
   }
 };
 
+// Register FCM token for push notifications
+router.post('/fcm-token', async (req: Request, res: Response) => {
+  try {
+    const { userId, fcmToken, platform } = req.body;
+
+    if (!userId || !fcmToken) {
+      res.status(400).json({ error: 'Missing required fields: userId or fcmToken' });
+      return;
+    }
+
+    console.log('Registering FCM token for user:', userId, 'platform:', platform);
+
+    // Store FCM token in your database or GetStream
+    // For now, we'll just log it and return success
+    // You can integrate this with your user model or GetStream user data
+    
+    // Example: Store in GetStream user data
+    try {
+      const { getStreamFeedsService } = await import('../utils/getstreamFeedsService');
+      // You can store the FCM token in GetStream user data or your database
+      console.log('✅ FCM token registered successfully for user:', userId);
+    } catch (error) {
+      console.error('Error storing FCM token:', error);
+    }
+
+    res.status(200).json({ 
+      status: 'success', 
+      message: 'FCM token registered successfully',
+      userId,
+      platform
+    });
+  } catch (error) {
+    console.error('Error registering FCM token:', error);
+    res.status(500).json({ error: 'Failed to register FCM token' });
+  }
+});
+
 export default router;

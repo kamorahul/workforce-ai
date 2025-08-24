@@ -218,32 +218,29 @@ export class GetStreamFeedsService {
 
 
   /**
-   * Send hidden notification message (triggers push notifications, hidden from chat)
+   * Send custom notification event (triggers push notifications, hidden from chat)
    */
   async sendCustomNotification(channelId: string, data: any): Promise<void> {
     try {
-      // Import serverClient to send message
+      // Import serverClient to send event
       const { serverClient } = await import('../serverClient');
       const channel = serverClient.channel('messaging', channelId);
       
-      // Send a minimal message that GetStream can push but is easy to filter
-      await channel.sendMessage({
-        text: '', // Minimal text - just an emoji
-        user: { id: 'system' },
-        type: 'system', // Valid type that's less prominent
-        extra: {
+      // Send custom event that triggers push notifications
+      await channel.sendEvent({
+        type: 'message.new',
+        text: data.message || '🔔 New notification',
+        data: {
           ...data,
           isNotification: true,
           isHidden: true,
-          originalMessage: data.message
-        },
-        // Add metadata to help mobile apps filter out notification messages
-        silent: false, // Allow push notifications
-        skip_push: false // Ensure push notifications are sent
+          timestamp: new Date().toISOString()
+        }
       });
+      console.log('✅ Custom notification sent successfully');
       
     } catch (error) {
-      console.error('Error sending hidden notification message to channel:', error);
+      console.error('Error sending custom notification event:', error);
       // Don't throw error - notification failure shouldn't break the main flow
     }
   }
