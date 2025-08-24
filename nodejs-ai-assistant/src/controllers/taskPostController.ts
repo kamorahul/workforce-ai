@@ -234,6 +234,13 @@ router.put('/:taskId', async (req: Request, res: Response) => {
       return;
     }
     
+    // Get the original task before updating
+    const originalTask = await Task.findById(taskId);
+    if (!originalTask) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+    
     const { 
       name, assignee, priority, completionDate, channelId, 
       description, completed, parentTaskId, attachments 
@@ -256,18 +263,26 @@ router.put('/:taskId', async (req: Request, res: Response) => {
     if (parentTaskId !== undefined) updateData.parentTaskId = parentTaskId;
     if (attachments !== undefined) updateData.attachments = attachments;
     
-    const task = await Task.findByIdAndUpdate(
+    const updatedTask = await Task.findByIdAndUpdate(
       taskId,
       updateData,
       { new: true, runValidators: true }
     );
     
-    if (!task) {
+    if (!updatedTask) {
       res.status(404).json({ error: 'Task not found' });
       return;
     }
     
-    res.status(200).json({ status: 'success', task });
+    // Create notifications for task updates
+    try {
+      await getStreamFeedsService.createTaskUpdateNotifications(originalTask, updatedTask, req.body);
+    } catch (error) {
+      console.error('Error creating task update notifications:', error);
+      // Continue even if notifications fail
+    }
+    
+    res.status(200).json({ status: 'success', task: updatedTask });
   } catch (error) {
     console.error('Error updating task:', error);
     res.status(500).json({ error: 'Failed to update task' });

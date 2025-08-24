@@ -115,7 +115,9 @@ const getNotificationCategory = (notification: any): string => {
   const verb = notification.verb;
   const extra = notification.extra || {};
 
-  if (verb === 'task_assigned' || verb === 'task_completed' || verb === 'task_updated') {
+  if (verb === 'task_assigned' || verb === 'task_completed' || verb === 'task_updated' ||
+      verb === 'task_priority_changed' || verb === 'task_date_changed' || verb === 'task_description_changed' ||
+      verb === 'task_status_changed' || verb === 'task_name_changed' || verb === 'task_unassigned') {
     return 'tasks_projects';
   } else if (verb === 'comment_added' || verb === 'mention' || verb === 'message') {
     return 'chat_messaging';
@@ -141,6 +143,18 @@ const getNotificationIcon = (notification: any): string => {
       return 'chatbubble-outline';
     case 'mention':
       return 'at-outline';
+    case 'task_priority_changed':
+      return 'flag-outline';
+    case 'task_date_changed':
+      return 'calendar-outline';
+    case 'task_description_changed':
+      return 'document-text-outline';
+    case 'task_status_changed':
+      return 'checkmark-done-outline';
+    case 'task_name_changed':
+      return 'create-outline';
+    case 'task_unassigned':
+      return 'person-remove-outline';
     case 'event_created':
     case 'event_reminder':
       return 'calendar-outline';
@@ -167,6 +181,18 @@ const getNotificationTitle = (notification: any): string => {
       return 'New Comment on Task';
     case 'mention':
       return 'You were mentioned';
+    case 'task_priority_changed':
+      return 'Task Priority Changed';
+    case 'task_date_changed':
+      return 'Task Due Date Changed';
+    case 'task_description_changed':
+      return 'Task Description Updated';
+    case 'task_status_changed':
+      return 'Task Status Changed';
+    case 'task_name_changed':
+      return 'Task Name Changed';
+    case 'task_unassigned':
+      return 'Task Unassigned';
     case 'task_updated':
       return 'Task Updated';
     case 'event_created':
@@ -204,7 +230,19 @@ const getNotificationMessage = (notification: any): string => {
         return `${actor} commented on your assigned task: "${extra.commentPreview || 'New comment'}"`;
       }
     case 'mention':
-      return `${actor} mentioned you in a comment: "${extra.mentionText || '@mention'}"`;
+      return `${actor} mentioned you in a comment: "${extra.message || '@mention'}"`;
+    case 'task_priority_changed':
+      return `${actor} changed priority from "${extra.oldPriority || 'unknown'}" to "${extra.newPriority || 'unknown'}" for task: "${extra.taskName || 'Untitled Task'}"`;
+    case 'task_date_changed':
+      return `${actor} changed due date from "${new Date(extra.oldDate).toLocaleDateString()}" to "${new Date(extra.newDate).toLocaleDateString()}" for task: "${extra.taskName || 'Untitled Task'}"`;
+    case 'task_description_changed':
+      return `${actor} updated description for task: "${extra.taskName || 'Untitled Task'}"`;
+    case 'task_status_changed':
+      return `${actor} changed status from "${extra.oldStatus || 'unknown'}" to "${extra.newStatus || 'unknown'}" for task: "${extra.taskName || 'Untitled Task'}"`;
+    case 'task_name_changed':
+      return `${actor} renamed task from "${extra.oldName || 'Untitled Task'}" to "${extra.newName || 'Untitled Task'}"`;
+    case 'task_unassigned':
+      return `${actor} unassigned you from task: "${extra.taskName || 'Untitled Task'}"`;
     case 'task_updated':
       return `Task "${extra.taskName || 'Untitled Task'}" has been updated`;
     case 'event_created':

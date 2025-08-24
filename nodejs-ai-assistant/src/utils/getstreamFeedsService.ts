@@ -411,6 +411,153 @@ export class GetStreamFeedsService {
   }
 
   /**
+   * Create notifications for task updates
+   */
+  async createTaskUpdateNotifications(originalTask: any, updatedTask: any, updateData: any): Promise<void> {
+    try {
+      if (!this.isConnected) {
+        await this.connect();
+      }
+
+      console.log('Creating notifications for task updates:', {
+        taskId: String(updatedTask._id || ''),
+        taskName: updatedTask.name,
+        changes: Object.keys(updateData)
+      });
+
+      // Get all users to notify (assignees + creator)
+      const usersToNotify = new Set([
+        ...(updatedTask.assignee || []),
+        updatedTask.createdBy
+      ].filter(Boolean));
+
+      // Check for specific changes and create notifications
+      if (updateData.assignee !== undefined) {
+        // Assignee changed
+        const originalAssignees = new Set(originalTask.assignee || []);
+        const newAssignees = new Set(updatedTask.assignee || []);
+        
+        // Notify newly assigned users
+        for (const assigneeId of newAssignees) {
+          if (!originalAssignees.has(assigneeId)) {
+            const taskId = String((updatedTask._id as any) || '');
+            await this.createNotification(assigneeId as string, 'task_assigned', taskId, {
+              taskId: taskId,
+              taskName: updatedTask.name || 'Untitled Task',
+              priority: updatedTask.priority || 'medium',
+              description: updatedTask.description,
+              assignee: assigneeId,
+              createdBy: updatedTask.createdBy,
+              channelId: updatedTask.channelId,
+              action: 'newly_assigned',
+              actor: updatedTask.createdBy
+            });
+            console.log(`✅ Created assignment notification for user ${assigneeId}`);
+          }
+        }
+        
+        // Notify unassigned users
+        for (const assigneeId of originalAssignees) {
+          if (!newAssignees.has(assigneeId)) {
+            const taskId = String((updatedTask._id as any) || '');
+            await this.createNotification(assigneeId as string, 'task_unassigned', taskId, {
+              taskId: taskId,
+              taskName: updatedTask.name || 'Untitled Task',
+              action: 'unassigned',
+              actor: updatedTask.createdBy
+            });
+            console.log(`✅ Created unassignment notification for user ${assigneeId}`);
+          }
+        }
+      }
+
+      if (updateData.priority !== undefined && updateData.priority !== originalTask.priority) {
+        // Priority changed
+        for (const userId of usersToNotify) {
+          const taskId = updatedTask._id?.toString() || '';
+          await this.createNotification(userId, 'task_priority_changed', taskId, {
+            taskId: taskId,
+            taskName: updatedTask.name || 'Untitled Task',
+            oldPriority: originalTask.priority,
+            newPriority: updateData.priority,
+            action: 'priority_changed',
+            actor: updatedTask.createdBy
+          });
+          console.log(`✅ Created priority change notification for user ${userId}`);
+        }
+      }
+
+      if (updateData.completionDate !== undefined && 
+          new Date(updateData.completionDate).getTime() !== new Date(originalTask.completionDate).getTime()) {
+        // Completion date changed
+        for (const userId of usersToNotify) {
+          const taskId = updatedTask._id?.toString() || '';
+          await this.createNotification(userId, 'task_date_changed', taskId, {
+            taskId: taskId,
+            taskName: updatedTask.name || 'Untitled Task',
+            oldDate: originalTask.completionDate,
+            newDate: updateData.completionDate,
+            action: 'date_changed',
+            actor: updatedTask.createdBy
+          });
+          console.log(`✅ Created date change notification for user ${userId}`);
+        }
+      }
+
+      if (updateData.description !== undefined && updateData.description !== originalTask.description) {
+        // Description changed
+        for (const userId of usersToNotify) {
+          const taskId = updatedTask._id?.toString() || '';
+          await this.createNotification(userId, 'task_description_changed', taskId, {
+            taskId: taskId,
+            taskName: updatedTask.name || 'Untitled Task',
+            oldDescription: originalTask.description,
+            newDescription: updateData.description,
+            action: 'description_changed',
+            actor: updatedTask.createdBy
+          });
+          console.log(`✅ Created description change notification for user ${userId}`);
+        }
+      }
+
+      if (updateData.completed !== undefined && updateData.completed !== originalTask.completed) {
+        // Completion status changed
+        for (const userId of usersToNotify) {
+          const taskId = updatedTask._id?.toString() || '';
+          await this.createNotification(userId, 'task_status_changed', taskId, {
+            taskId: taskId,
+            taskName: updatedTask.name || 'Untitled Task',
+            oldStatus: originalTask.completed ? 'completed' : 'in_progress',
+            newStatus: updateData.completed ? 'completed' : 'in_progress',
+            action: 'status_changed',
+            actor: updatedTask.createdBy
+          });
+          console.log(`✅ Created status change notification for user ${userId}`);
+        }
+      }
+
+      if (updateData.name !== undefined && updateData.name !== originalTask.name) {
+        // Task name changed
+        for (const userId of usersToNotify) {
+          const taskId = updatedTask._id?.toString() || '';
+          await this.createNotification(userId, 'task_name_changed', taskId, {
+            taskId: taskId,
+            oldName: originalTask.name,
+            newName: updateData.name,
+            action: 'name_changed',
+            actor: updatedTask.createdBy
+          });
+          console.log(`✅ Created name change notification for user ${userId}`);
+        }
+      }
+
+    } catch (error) {
+      console.error('Error creating task update notifications:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Add a comment to a task activity
    */
   async addComment(taskId: string, userId: string, message: string, commentId?: string): Promise<GetStreamComment | null> {
