@@ -182,29 +182,41 @@ export class GetStreamFeedsService {
 
 
   /**
-   * Send custom notification event to a channel (triggers push notifications)
+   * Send notification message to channel (triggers push notifications)
    */
   async sendCustomNotification(channelId: string, data: any): Promise<void> {
     try {
-      console.log('Sending custom notification to channel:', channelId, 'data:', data);
+      console.log('Sending notification message to channel:', channelId, 'data:', data);
       
-      // Import serverClient to send custom event
+      // Import serverClient to send message
       const { serverClient } = await import('../serverClient');
       const channel = serverClient.channel('messaging', channelId);
       
-      // Send a message that GetStream can push, but with system styling
+      // Send a regular message that GetStream can push
+      // Use the actual notification message as the text
       await channel.sendMessage({
-        text: data.message || 'Notification',
+        text: data.message || 'You have a new notification',
         user: { id: 'system' },
-        type: 'system',
-        extra: data,
-        // Remove silent: true so GetStream can push this notification
+        // Remove type: 'system' so GetStream treats it as a regular message
+        extra: {
+          ...data,
+          isNotification: true, // Flag to identify notification messages
+          originalMessage: data.message // Preserve original message
+        }
       });
       
-      console.log('Custom notification sent successfully to channel:', channelId);
+      console.log('Notification message sent successfully to channel:', channelId);
+      
+      // Log channel information for debugging
+      console.log('Channel details for push notifications:', {
+        channelId,
+        messageType: 'regular_message',
+        shouldTriggerPush: true
+      });
+      
     } catch (error) {
-      console.error('Error sending custom notification to channel:', error);
-      // Don't throw error - custom notification failure shouldn't break the main flow
+      console.error('Error sending notification message to channel:', error);
+      // Don't throw error - notification failure shouldn't break the main flow
     }
   }
 
