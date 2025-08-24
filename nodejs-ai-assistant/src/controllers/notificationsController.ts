@@ -196,7 +196,11 @@ const getNotificationMessage = (notification: any): string => {
     case 'task_completed':
       return `Task "${extra.taskName || 'Untitled Task'}" has been marked as completed`;
     case 'comment_added':
-      return `${actor} commented on your task: "${extra.commentPreview || 'New comment'}"`;
+      if (extra.action === 'commented') {
+        return `You commented on task: "${extra.taskName || 'Untitled Task'}"`;
+      } else {
+        return `${actor} commented on your task: "${extra.commentPreview || 'New comment'}"`;
+      }
     case 'mention':
       return `${actor} mentioned you in a comment: "${extra.mentionText || '@mention'}"`;
     case 'task_updated':

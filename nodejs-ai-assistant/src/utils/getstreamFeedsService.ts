@@ -343,9 +343,28 @@ export class GetStreamFeedsService {
         });
       }
 
-      // Create notification for each assignee
+      // Create notification for each assignee using their feed groups
       if (task.assignee && Array.isArray(task.assignee)) {
         for (const assigneeId of task.assignee) {
+          // Add activity to assignee's feed group
+          const assigneeFeed = this.getstreamClient.feed('notification', assigneeId);
+          await assigneeFeed.addActivity({
+            actor: task.createdBy || 'system',
+            verb: 'task_assigned',
+            object: taskId,
+            extra: {
+              taskId: taskId,
+              taskName: task.title || task.name,
+              priority: task.priority || 'medium',
+              description: task.description,
+              assignee: assigneeId,
+              createdBy: task.createdBy,
+              channelId: task.channelId,
+              feedGroup: 'notification'
+            }
+          });
+          
+          // Also create notification for push notifications
           await this.createNotification(assigneeId, 'task_assigned', taskId, {
             taskId: taskId,
             taskName: task.title || task.name,
@@ -355,6 +374,8 @@ export class GetStreamFeedsService {
             createdBy: task.createdBy,
             channelId: task.channelId
           });
+          
+          console.log(`Added task_assigned activity to assignee ${assigneeId}'s notification feed`);
         }
       }
       
@@ -407,20 +428,40 @@ export class GetStreamFeedsService {
         const task = await Task.findById(taskId);
         
         if (task && task.assignee && Array.isArray(task.assignee)) {
-          // Notify all assignees about the new comment (excluding the commenter)
+          // Notify all assignees about the new comment (including the commenter for their own feed)
           for (const assigneeId of task.assignee) {
-            if (assigneeId !== userId) {
-              await this.createNotification(assigneeId, 'comment_added', taskId, {
+            // Add activity to assignee's feed group (including commenter)
+            const assigneeFeed = this.getstreamClient.feed('notification', assigneeId);
+            await assigneeFeed.addActivity({
+              actor: userId,
+              verb: 'comment_added',
+              object: taskId,
+              extra: {
                 taskId: taskId,
                 commentId: commentId,
                 message: message,
                 commentPreview: message.substring(0, 100),
                 commentedBy: userId,
                 taskName: task.name || 'Untitled Task',
-                action: 'received_comment',
-                channelId: task.channelId
-              });
-            }
+                action: assigneeId === userId ? 'commented' : 'received_comment',
+                channelId: task.channelId,
+                feedGroup: 'notification'
+              }
+            });
+            
+            // Also create notification for push notifications
+            await this.createNotification(assigneeId, 'comment_added', taskId, {
+              taskId: taskId,
+              commentId: commentId,
+              message: message,
+              commentPreview: message.substring(0, 100),
+              commentedBy: userId,
+              taskName: task.name || 'Untitled Task',
+              action: assigneeId === userId ? 'commented' : 'received_comment',
+              channelId: task.channelId
+            });
+            
+            console.log(`Added comment_added activity to assignee ${assigneeId}'s notification feed`);
           }
         }
       } catch (error) {
