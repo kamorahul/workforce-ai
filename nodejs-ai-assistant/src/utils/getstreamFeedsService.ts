@@ -427,12 +427,23 @@ export class GetStreamFeedsService {
         const { Task } = await import('../models/Task');
         const task = await Task.findById(taskId);
         
-        if (task && task.assignee && Array.isArray(task.assignee)) {
-          // Notify all assignees about the new comment (including the commenter for their own feed)
-          for (const assigneeId of task.assignee) {
-            // Add activity to assignee's feed group (including commenter)
-            const assigneeFeed = this.getstreamClient.feed('notification', assigneeId);
-            await assigneeFeed.addActivity({
+        if (task) {
+          // Create a set of all users to notify (assignees + creator)
+          const usersToNotify = new Set([
+            ...(task.assignee || []),
+            task.createdBy
+          ].filter(Boolean)); // Remove any undefined values
+          
+          // Notify all relevant users about the new comment
+          for (const userIdToNotify of usersToNotify) {
+            // Skip if this is the commenter themselves
+            if (userIdToNotify === userId) {
+              continue;
+            }
+            
+            // Add activity to user's notification feed
+            const userFeed = this.getstreamClient.feed('notification', userIdToNotify);
+            await userFeed.addActivity({
               actor: userId,
               verb: 'comment_added',
               object: taskId,
@@ -443,25 +454,28 @@ export class GetStreamFeedsService {
                 commentPreview: message.substring(0, 100),
                 commentedBy: userId,
                 taskName: task.name || 'Untitled Task',
-                action: assigneeId === userId ? 'commented' : 'received_comment',
+                action: 'received_comment',
                 channelId: task.channelId,
-                feedGroup: 'notification'
+                feedGroup: 'notification',
+                isTaskCreator: userIdToNotify === task.createdBy
               }
             });
             
             // Also create notification for push notifications
-            await this.createNotification(assigneeId, 'comment_added', taskId, {
+            await this.createNotification(userIdToNotify, 'comment_added', taskId, {
               taskId: taskId,
               commentId: commentId,
               message: message,
               commentPreview: message.substring(0, 100),
               commentedBy: userId,
               taskName: task.name || 'Untitled Task',
-              action: assigneeId === userId ? 'commented' : 'received_comment',
-              channelId: task.channelId
+              action: 'received_comment',
+              channelId: task.channelId,
+              isTaskCreator: userIdToNotify === task.createdBy
             });
             
-            console.log(`Added comment_added activity to assignee ${assigneeId}'s notification feed`);
+            const userType = userIdToNotify === task.createdBy ? 'task creator' : 'assignee';
+            console.log(`Added comment_added activity to ${userType} ${userIdToNotify}'s notification feed`);
           }
         }
       } catch (error) {
