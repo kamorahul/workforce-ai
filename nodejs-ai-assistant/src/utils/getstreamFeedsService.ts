@@ -190,24 +190,8 @@ export class GetStreamFeedsService {
       // Get notification title and message based on verb
       const { title, message } = this.getPushNotificationContent(verb, extra);
       
-      // Send custom notification to user's notification channel for push notifications
-      if (extra.channelId) {
-        await this.sendCustomNotification(extra.channelId, {
-          title,
-          message,
-          userId,
-          verb,
-          ...extra
-        });
-      }
-      
-      // TODO: Integrate with Firebase Cloud Messaging or your preferred push service
-      // Example Firebase integration:
-      // await admin.messaging().send({
-      //   token: userDeviceToken,
-      //   notification: { title, body: message },
-      //   data: { ...extra, verb }
-      // });
+      // Send push notification directly (no channels)
+      await this.sendDirectPushNotification(userId, title, message, extra);
       
     } catch (error) {
       console.error('Error sending push notification:', error);
@@ -215,34 +199,29 @@ export class GetStreamFeedsService {
     }
   }
 
-
-
   /**
-   * Send custom notification event (triggers push notifications, hidden from chat)
+   * Send push notification directly (no channels)
    */
-  async sendCustomNotification(channelId: string, data: any): Promise<void> {
+  private async sendDirectPushNotification(
+    userId: string, 
+    title: string, 
+    message: string, 
+    extra: any = {}
+  ): Promise<void> {
     try {
-      // Import serverClient to send event
-      const { serverClient } = await import('../serverClient');
-      const channel = serverClient.channel('messaging', channelId);
+      // Import the direct push notification service
+      const { directPushNotificationService } = await import('./directPushNotificationService');
       
-      // Send custom event that triggers push notifications
-      await channel.sendEvent({
-        type: 'message.new',
-        text: data.message || '🔔 New notification',
-        user: { id: 'system' }, // Required field for server-side auth
-        data: {
-          ...data,
-          isNotification: true,
-          isHidden: true,
-          timestamp: new Date().toISOString()
-        }
+      // Send push notification directly without creating channels
+      await directPushNotificationService.sendDirectPushNotification(userId, {
+        title,
+        message,
+        data: extra
       });
-      console.log('✅ Custom notification sent successfully');
       
     } catch (error) {
-      console.error('Error sending custom notification event:', error);
-      // Don't throw error - notification failure shouldn't break the main flow
+      console.error(`❌ Error sending direct push notification to user ${userId}:`, error);
+      // Don't throw error - push notification failure shouldn't break the main flow
     }
   }
 
@@ -267,10 +246,15 @@ export class GetStreamFeedsService {
             title: 'Comment Added',
             message: `You commented on task: "${extra.taskName || 'Untitled Task'}"`
           };
+        } else if (extra.isTaskCreator) {
+          return {
+            title: 'New Comment on Your Task',
+            message: `${extra.commentedBy || 'Someone'} commented on your created task: "${extra.taskName || 'Untitled Task'}"`
+          };
         } else {
           return {
-            title: 'New Comment',
-            message: `${extra.commentedBy || 'Someone'} commented on your task: "${extra.taskName || 'Untitled Task'}"`
+            title: 'New Comment on Assigned Task',
+            message: `${extra.commentedBy || 'Someone'} commented on your assigned task: "${extra.taskName || 'Untitled Task'}"`
           };
         }
       default:
@@ -582,14 +566,8 @@ export class GetStreamFeedsService {
         }
       });
 
-      // Create notification for the commenter (who is doing the activity)
-      await this.createNotification(userId, 'comment_added', taskId, {
-        taskId: taskId,
-        commentId: commentId,
-        message: message,
-        commentPreview: message.substring(0, 100), // First 100 characters
-        action: 'commented'
-      });
+      // Don't create notification for the commenter themselves
+      // They will see their comment in the task, no need for notification
 
       // Get task details to notify assignees about the new comment
       try {

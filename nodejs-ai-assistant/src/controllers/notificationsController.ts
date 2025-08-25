@@ -260,40 +260,226 @@ const getNotificationMessage = (notification: any): string => {
   }
 };
 
-// Register FCM token for push notifications
+// Register device token for push notifications
+router.post('/device-token', async (req: Request, res: Response) => {
+  try {
+    const { userId, deviceToken, platform, providerName } = req.body;
+
+    if (!userId || !deviceToken || !platform) {
+      res.status(400).json({ 
+        error: 'Missing required fields: userId, deviceToken, or platform' 
+      });
+      return;
+    }
+
+    // Validate platform
+    if (!['apn', 'firebase', 'webpush'].includes(platform)) {
+      res.status(400).json({ 
+        error: 'Invalid platform. Must be one of: apn, firebase, webpush' 
+      });
+      return;
+    }
+
+    console.log(`🔔 Registering ${platform} device token for user:`, userId);
+
+    try {
+      // Import and use device token service
+      const { deviceTokenService } = await import('../utils/deviceTokenService');
+      
+      // Register device with Stream
+      await deviceTokenService.registerDevice(
+        userId, 
+        deviceToken, 
+        platform as 'apn' | 'firebase' | 'webpush',
+        providerName
+      );
+      
+      console.log(`✅ ${platform} device token registered successfully for user:`, userId);
+      
+      res.status(200).json({ 
+        status: 'success', 
+        message: `${platform} device token registered successfully`,
+        userId,
+        platform,
+        providerName
+      });
+    } catch (error) {
+      console.error(`❌ Error registering ${platform} device token:`, error);
+      res.status(500).json({ 
+        error: `Failed to register ${platform} device token`,
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error in device token registration endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Remove device token
+router.delete('/device-token', async (req: Request, res: Response) => {
+  try {
+    const { deviceToken } = req.body;
+
+    if (!deviceToken) {
+      res.status(400).json({ error: 'Missing required field: deviceToken' });
+      return;
+    }
+
+    console.log('🗑️ Removing device token');
+
+    try {
+      const { deviceTokenService } = await import('../utils/deviceTokenService');
+      
+      await deviceTokenService.removeDevice(deviceToken);
+      
+      console.log('✅ Device token removed successfully');
+      
+      res.status(200).json({ 
+        status: 'success', 
+        message: 'Device token removed successfully'
+      });
+    } catch (error) {
+      console.error('❌ Error removing device token:', error);
+      res.status(500).json({ 
+        error: 'Failed to remove device token',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error in device token removal endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get user devices
+router.get('/device-token/:userId', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      res.status(400).json({ error: 'Missing required parameter: userId' });
+      return;
+    }
+
+    console.log(`📱 Getting devices for user:`, userId);
+
+    try {
+      const { deviceTokenService } = await import('../utils/deviceTokenService');
+      
+      const devices = await deviceTokenService.getUserDevices(userId);
+      
+      console.log(`✅ Retrieved ${devices.length} devices for user:`, userId);
+      
+      res.status(200).json({ 
+        status: 'success', 
+        devices,
+        count: devices.length
+      });
+    } catch (error) {
+      console.error(`❌ Error getting devices for user ${userId}:`, error);
+      res.status(500).json({ 
+        error: 'Failed to get user devices',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error in get user devices endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Legacy FCM token endpoint for backward compatibility
 router.post('/fcm-token', async (req: Request, res: Response) => {
   try {
-    const { userId, fcmToken, platform } = req.body;
+    const { userId, fcmToken, platform = 'firebase' } = req.body;
 
     if (!userId || !fcmToken) {
       res.status(400).json({ error: 'Missing required fields: userId or fcmToken' });
       return;
     }
 
-    console.log('Registering FCM token for user:', userId, 'platform:', platform);
+    console.log('🔔 Registering FCM token for user:', userId);
 
-    // Store FCM token in your database or GetStream
-    // For now, we'll just log it and return success
-    // You can integrate this with your user model or GetStream user data
-    
-    // Example: Store in GetStream user data
     try {
-      const { getStreamFeedsService } = await import('../utils/getstreamFeedsService');
-      // You can store the FCM token in GetStream user data or your database
+      const { deviceTokenService } = await import('../utils/deviceTokenService');
+      
+      // Register device with Stream using firebase platform
+      await deviceTokenService.registerDevice(
+        userId, 
+        fcmToken, 
+        'firebase',
+        'FCM_Provider'
+      );
+      
       console.log('✅ FCM token registered successfully for user:', userId);
+      
+      res.status(200).json({ 
+        status: 'success', 
+        message: 'FCM token registered successfully',
+        userId,
+        platform: 'firebase'
+      });
     } catch (error) {
-      console.error('Error storing FCM token:', error);
+      console.error('❌ Error registering FCM token:', error);
+      res.status(500).json({ 
+        error: 'Failed to register FCM token',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error in FCM token registration endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Test direct push notification (no channels)
+router.post('/test-direct-push', async (req: Request, res: Response) => {
+  try {
+    const { userId, title, message, data } = req.body;
+
+    if (!userId || !title || !message) {
+      res.status(400).json({ 
+        error: 'Missing required fields: userId, title, or message' 
+      });
+      return;
     }
 
-    res.status(200).json({ 
-      status: 'success', 
-      message: 'FCM token registered successfully',
-      userId,
-      platform
-    });
+    console.log(`🧪 Testing direct push notification for user:`, userId);
+
+    try {
+      // Import and use direct push notification service
+      const { directPushNotificationService } = await import('../utils/directPushNotificationService');
+      
+      // Send direct push notification
+      await directPushNotificationService.sendDirectPushNotification(userId, {
+        title,
+        message,
+        data: data || {},
+        badge: 1,
+        sound: 'default',
+        category: 'test'
+      });
+      
+      console.log(`✅ Direct push notification test sent to user:`, userId);
+      
+      res.status(200).json({ 
+        status: 'success', 
+        message: 'Direct push notification test sent successfully',
+        userId,
+        notificationTitle: title,
+        notificationMessage: message
+      });
+    } catch (error) {
+      console.error(`❌ Error sending direct push notification test:`, error);
+      res.status(500).json({ 
+        error: 'Failed to send direct push notification test',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   } catch (error) {
-    console.error('Error registering FCM token:', error);
-    res.status(500).json({ error: 'Failed to register FCM token' });
+    console.error('❌ Error in direct push notification test endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
