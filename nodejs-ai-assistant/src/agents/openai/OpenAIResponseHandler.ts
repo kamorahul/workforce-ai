@@ -255,9 +255,24 @@ export class OpenAIResponseHandler {
     }
 
   private determineIfTask = (text: string): boolean => {
-    // Parse the assistant's response for ISTASK indicator
-    const istaskMatch = text.match(/ISTASK:\s*(\d+)/i);
-    return istaskMatch ? istaskMatch[1] === '1' : false;
+    // Check if this is a kai user/channel response (structured format)
+    const isKaiUser = this.user.id === 'kai' || this.channel.id?.indexOf('kai') === 0;
+    
+    if (isKaiUser) {
+      // For kai users, look for task indicators in the structured response
+      const taskKeywords = [
+        'task', 'todo', 'deadline', 'due', 'complete', 'finish', 'assign',
+        'schedule', 'meeting', 'appointment', 'reminder', 'urgent', 'priority',
+        'project', 'work', 'action item', 'follow up', 'checklist'
+      ];
+      
+      const lowerText = text.toLowerCase();
+      return taskKeywords.some(keyword => lowerText.includes(keyword));
+    } else {
+      // For regular users, parse simple 1 or 0 response
+      const trimmedText = text.trim();
+      return trimmedText === '1';
+    }
   };
 
   private determineTaskStatus = (text: string): boolean => {
