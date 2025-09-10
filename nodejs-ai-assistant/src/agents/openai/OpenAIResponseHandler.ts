@@ -73,6 +73,7 @@ export class OpenAIResponseHandler {
           if(this.messageId) {
             await this.chatClient.updateMessage({
               id: this.messageId,
+              user_id: this.user.id,
               text,
             });
           } else {
@@ -98,6 +99,7 @@ export class OpenAIResponseHandler {
               // Update the message with istask field
               await this.chatClient.updateMessage({
                 id: messageResponse.message.id,
+                user_id: this.user.id,
                 extraData: {
                   istask: istask ? 1 : 0
                 }
