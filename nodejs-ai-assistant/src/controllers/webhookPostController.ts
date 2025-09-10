@@ -36,7 +36,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       messageText += `: ${message.attachments[0].toString()}`;
     }
     
-    await agent.handleMessage(messageText);
+    await agent.handleMessage(messageText, message.id);
 
     res.status(200).json({ message: "Webhook processed successfully" });
   } catch (error) {
@@ -48,7 +48,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
 async function doAnalyzeMessage(agent: AIAgent, user: User, message: any) {
   await agent.init("asst_ercPXUnj2oTtMpqjk4cfJWCD");
-  await agent.handleMessage(`${user.name}: ${message.text}`);
+  await agent.handleMessage(`${user.name}: ${message.text}`, message.id);
 }
 
 export default router;
