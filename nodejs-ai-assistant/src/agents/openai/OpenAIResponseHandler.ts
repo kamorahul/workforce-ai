@@ -70,6 +70,7 @@ export class OpenAIResponseHandler {
           break;
         case 'thread.message.completed':
           const text = this.message_text;
+          console.log(`🤖 AI Response: "${text}"`);
           if(this.messageId) {
             await this.chatClient.updateMessage({
               id: this.messageId,
@@ -95,6 +96,7 @@ export class OpenAIResponseHandler {
             // Determine if it's a task and update Stream message
             if (messageResponse?.message?.id) {
               const istask = this.determineTaskStatus(text);
+              console.log(`🔍 Task Detection - Response: "${text}" | IsTask: ${istask}`);
               
               // Update the message with istask field
               await this.chatClient.updateMessage({
@@ -104,6 +106,7 @@ export class OpenAIResponseHandler {
                   istask: istask ? 1 : 0
                 }
               });
+              console.log(`✅ Updated Stream message with istask: ${istask ? 1 : 0}`);
             }
           }
 
