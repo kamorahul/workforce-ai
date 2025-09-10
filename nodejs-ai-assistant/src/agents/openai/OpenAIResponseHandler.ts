@@ -72,18 +72,23 @@ export class OpenAIResponseHandler {
           const text = this.message_text;
           console.log(`🤖 AI Response: "${text}"`);
           if(this.messageId) {
-            // Only update extraData with istask, don't change the message text
+            // Only update extraData with istask, preserve original message text
             const istask = this.determineTaskStatus(text);
             console.log(`🔍 Task Detection - Response: "${text}" | IsTask: ${istask}`);
+            
+            // Get the original message to preserve its text
+            const originalMessage = await this.chatClient.getMessage(this.messageId);
+            const originalText = originalMessage?.message?.text || '';
             
             await this.chatClient.updateMessage({
               id: this.messageId,
               user_id: this.user.id,
+              text: originalText, // Preserve original text
               extraData: {
                 istask: istask ? 1 : 0
               }
             });
-            console.log(`✅ Updated Stream message with istask: ${istask ? 1 : 0}`);
+            console.log(`✅ Updated Stream message with istask: ${istask ? 1 : 0}, preserved text: "${originalText}"`);
           } else {
             let messageResponse;
             if(this.channel.id?.indexOf('kai') === 0) {
