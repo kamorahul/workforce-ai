@@ -3,6 +3,7 @@ import { OpenAIResponseHandler } from './OpenAIResponseHandler';
 import type { AIAgent } from '../types';
 import type { Channel, StreamChat } from 'stream-chat';
 import {User} from "../createAgent";
+import { Thread } from '../../models/Thread';
 
 export class OpenAIAgent implements AIAgent {
   private openai?: OpenAI;
@@ -37,66 +38,92 @@ export class OpenAIAgent implements AIAgent {
       throw new Error('OpenAI API key is required');
     }
 
-    console.log("Creating OpenAI client...");
     this.openai = new OpenAI({ apiKey });
-    
-    console.log("Retrieving assistant...");
+  
     this.assistant = await this.openai.beta.assistants.retrieve(agentId);
-    console.log("Assistant retrieved:", this.assistant.id);
     
-    console.log("Creating thread...");
-    this.openAiThread = await this.openai.beta.threads.create();
-    console.log("Thread created:", this.openAiThread.id);
+    // Check if thread already exists for this channel and user
+    const existingThread = await Thread.findOne({ 
+      channelId: this.channel.id, 
+      userId: this.user.id 
+    });
     
-    console.log("Assistant initialization complete");
+    if (existingThread) {
+      this.openAiThread = await this.openai.beta.threads.retrieve(existingThread.openAiThreadId);
+      console.log("Using existing thread:", existingThread.openAiThreadId);
+    } else {
+      // Create new thread
+      this.openAiThread = await this.openai.beta.threads.create();
+      
+      // Save thread mapping to MongoDB
+      const threadRecord = new Thread({
+        channelId: this.channel.id,
+        openAiThreadId: this.openAiThread.id,
+        userId: this.user.id
+      });
+      await threadRecord.save();
+      console.log("Created new thread and saved to MongoDB:", this.openAiThread.id);
+    }
   };
 
-  public handleMessage = async (e: string) => {
-    console.log("=== Assistant Debug ===");
-    console.log("Message received:", e);
-    
+  public handleMessage = async (e: string, messageId?: string) => {
     if (!this.openai || !this.openAiThread || !this.assistant) {
       console.error('OpenAI not initialized');
       return;
     }
 
     if (!e) {
-      console.log('Skip handling empty message');
       return;
     }
 
     this.lastInteractionTs = Date.now();
-    console.log("Creating assistant message...");
 
-    await this.openai.beta.threads.messages.create(this.openAiThread.id, {
-      role: "assistant",
-      content: `You are a helpful assistant that extracts structured information from user messages.
+    // Check if this is a kai user/channel to use different system prompt
+    const isKaiUser = this.user.id === 'kai' || this.channel.id?.indexOf('kai') === 0;
+    
+    if (isKaiUser) {
+      // Original system prompt for kai users
+      await this.openai.beta.threads.messages.create(this.openAiThread.id, {
+        role: "assistant",
+        content: `You are a helpful assistant that extracts structured information from user messages.
 
-                ## Extraction Rules:
+                  ## Extraction Rules:
 
-                - try to understand the conversation and find the expected tasks or calender events
+                  - try to understand the conversation and find the expected tasks or calender events
 
-                ## Output Format (always follow this):
+                  ## Output Format (always follow this):
 
-                **Upcoming Events**
-                - [List events here with time/date and subject]
+                  *Upcoming Events*
+                  - [List events here with time/date and subject]
 
-                **Tasks to Complete**
-                - [List tasks here with what needs to be done and any deadlines]
+                  *Tasks to Complete*
+                  - [List tasks here with what needs to be done and any deadlines]
 
-                ## Requirements:
-                - Never return "null" or leave sections empty. If nothing is found, say: "You are all good for the day" .
-                - Keep all tasks and events user-focused unless clearly about someone else.
-      `,
-    });
+                  ## Requirements:
+                  - Never return "null" or leave sections empty. If nothing is found, say: "You are all good for the day" .
+                  - Keep all tasks and events user-focused unless clearly about someone else.
+        `,
+      });
+    } else {
+      // Simple 1 or 0 response for regular users
+      await this.openai.beta.threads.messages.create(this.openAiThread.id, {
+        role: "assistant",
+        content: `You are a task detection assistant. Analyze the given message and determine if it contains any task, todo, deadline, or actionable item. 
 
-    console.log("Creating user message...");
+                  ## Requirements:
+                  - Respond with only '1' if the message contains a task, todo, deadline, or actionable item
+                  - Respond with only '0' if the message does not contain any tasks
+                  - Be precise and only respond with 1 or 0
+                  - Do not include any other text or explanation
+        `,
+      });
+    }
+
     await this.openai.beta.threads.messages.create(this.openAiThread.id, {
       role: 'user',
       content: e,
     });
 
-    console.log("Starting assistant run...");
     try {
       const run = this.openai.beta.threads.runs.stream(this.openAiThread.id, {
         assistant_id: this.assistant.id,
@@ -109,12 +136,11 @@ export class OpenAIAgent implements AIAgent {
         this.chatClient,
         this.channel,
         this.user,
+        messageId,
       );
       
-      console.log("Starting response handler...");
       void handler.run();
       this.handlers.push(handler);
-      console.log("Response handler started successfully");
     } catch (error) {
       console.error("Error in handleMessage:", error);
     }

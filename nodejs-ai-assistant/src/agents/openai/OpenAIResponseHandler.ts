@@ -23,6 +23,7 @@ export class OpenAIResponseHandler {
     private readonly chatClient: StreamChat,
     private readonly channel: Channel,
     private readonly user: User,
+    private readonly messageId?: string,
   ) {
     this.chatClient.on('ai_indicator.stop', this.handleStopGenerating);
   }
@@ -69,18 +70,39 @@ export class OpenAIResponseHandler {
           break;
         case 'thread.message.completed':
           const text = this.message_text;
-          if(this.channel.id?.indexOf('kai') === 0) {
-            await this.channel.sendMessage({
+          if(this.messageId) {
+            await this.chatClient.updateMessage({
+              id: this.messageId,
               text,
-              user: { id: "kai" },
             });
           } else {
-            await this.channel.sendMessage({
-              text,
-              user_id: this.user.id,
-              type: 'system',
-              restricted_visibility: [this.user.id],
-            });
+            let messageResponse;
+            if(this.channel.id?.indexOf('kai') === 0) {
+              messageResponse = await this.channel.sendMessage({
+                text,
+                user: { id: "kai" },
+              });
+            } else {
+              messageResponse = await this.channel.sendMessage({
+                text,
+                user_id: this.user.id,
+                type: 'system',
+                restricted_visibility: [this.user.id],
+              });
+            }
+            
+            // Determine if it's a task and update Stream message
+            if (messageResponse?.message?.id) {
+              const istask = this.determineTaskStatus(text);
+              
+              // Update the message with istask field
+              await this.chatClient.updateMessage({
+                id: messageResponse.message.id,
+                extraData: {
+                  istask: istask ? 1 : 0
+                }
+              });
+            }
           }
 
           break;
@@ -226,6 +248,16 @@ export class OpenAIResponseHandler {
       return `${message.user?.name}: ${message.text}`;
     });
     }
+
+  private determineIfTask = (text: string): boolean => {
+    // Parse the assistant's response for ISTASK indicator
+    const istaskMatch = text.match(/ISTASK:\s*(\d+)/i);
+    return istaskMatch ? istaskMatch[1] === '1' : false;
+  };
+
+  private determineTaskStatus = (text: string): boolean => {
+    return this.determineIfTask(text);
+  };
 
   private handleError = async (error: Error) => {
     throw new Error(`An error occurred while handling: ${error.message}`);
