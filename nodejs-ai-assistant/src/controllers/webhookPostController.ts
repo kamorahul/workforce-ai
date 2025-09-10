@@ -19,6 +19,20 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Skip processing if message already has istask field (prevents loop)
+    if (message.extraData && message.extraData.istask !== undefined) {
+      console.log("Message already processed (has istask field), skipping...");
+      res.status(200).json({ message: "Message already processed" });
+      return;
+    }
+
+    // Skip processing if message text is empty (usually means it's an update)
+    if (!message.text || message.text.trim() === '') {
+      console.log("Message has no text, skipping...");
+      res.status(200).json({ message: "No text to process" });
+      return;
+    }
+
     const agent = await createAgent(user as User, channel.type, channel.id);
 
     if(user.id === 'kai' || channel.id.indexOf('kai') !== 0) {
