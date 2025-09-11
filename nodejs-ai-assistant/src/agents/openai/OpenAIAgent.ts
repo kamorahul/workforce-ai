@@ -105,15 +105,15 @@ export class OpenAIAgent implements AIAgent {
         `,
       });
     } else {
-      // Simple 1 or 0 response for regular users
+      // JSON task data response for regular users
       await this.openai.beta.threads.messages.create(this.openAiThread.id, {
         role: "assistant",
-        content: `You are a task detection assistant. Analyze the given message and determine if it contains any task, todo, deadline, or actionable item. 
+        content: `You are a task detection and extraction assistant. Analyze the given message and determine if it contains any task, todo, deadline, or actionable item.
 
                   ## Requirements:
                   - Respond with only '1' if the message contains a task, todo, deadline, or actionable item
                   - Respond with only '0' if the message does not contain any tasks
-                  - Be precise and only respond with 1 or 0
+                  - Be precise and only respond with json or 0
                   - Do not include any other text or explanation
         `,
       });

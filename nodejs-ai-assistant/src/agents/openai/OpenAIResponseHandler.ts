@@ -72,23 +72,28 @@ export class OpenAIResponseHandler {
           const text = this.message_text;
           console.log(`🤖 AI Response: "${text}"`);
           if(this.messageId) {
-            // Only update extraData with istask, preserve original message text
-            const istask = this.determineTaskStatus(text);
-            console.log(`🔍 Task Detection - Response: "${text}" | IsTask: ${istask}`);
+            const { isTask, taskData } = this.parseTaskData(text);
+            console.log(`🔍 Task Detection - Response: "${text}" | IsTask: ${isTask}`, taskData ? `| TaskData: ${JSON.stringify(taskData)}` : '');
             
-            // Get the original message to preserve its text
             const originalMessage = await this.chatClient.getMessage(this.messageId);
             const originalText = originalMessage?.message?.text || '';
+            
+            const extraData: any = {
+              istask: isTask ? 1 : 0
+            };
+            
+            if (isTask && taskData) {
+              extraData.taskData = taskData;
+              console.log(`📝 Saving task data: ${JSON.stringify(taskData)}`);
+            }
             
             await this.chatClient.updateMessage({
               id: this.messageId,
               user_id: this.user.id,
               text: originalText, // Preserve original text
-              extraData: {
-                istask: istask ? 1 : 0
-              }
+              extraData
             });
-            console.log(`✅ Updated Stream message with istask: ${istask ? 1 : 0}, preserved text: "${originalText}"`);
+            console.log(`✅ Updated Stream message with istask: ${isTask ? 1 : 0}, preserved text: "${originalText}"`);
           } else {
             let messageResponse;
             if(this.channel.id?.indexOf('kai') === 0) {
@@ -107,18 +112,27 @@ export class OpenAIResponseHandler {
             
             // Determine if it's a task and update Stream message
             if (messageResponse?.message?.id) {
-              const istask = this.determineTaskStatus(text);
-              console.log(`🔍 Task Detection - Response: "${text}" | IsTask: ${istask}`);
+              const { isTask, taskData } = this.parseTaskData(text);
+              console.log(`🔍 Task Detection - Response: "${text}" | IsTask: ${isTask}`, taskData ? `| TaskData: ${JSON.stringify(taskData)}` : '');
               
-              // Update the message with istask field
+              // Prepare extraData with task information
+              const extraData: any = {
+                istask: isTask ? 1 : 0
+              };
+              
+              // If it's a task with JSON data, save the task properties
+              if (isTask && taskData) {
+                extraData.taskData = taskData;
+                console.log(`📝 Saving task data: ${JSON.stringify(taskData)}`);
+              }
+              
+              // Update the message with istask field and task data
               await this.chatClient.updateMessage({
                 id: messageResponse.message.id,
                 user_id: this.user.id,
-                extraData: {
-                  istask: istask ? 1 : 0
-                }
+                extraData
               });
-              console.log(`✅ Updated Stream message with istask: ${istask ? 1 : 0}`);
+              console.log(`✅ Updated Stream message with istask: ${isTask ? 1 : 0}`);
             }
           }
 
@@ -289,6 +303,30 @@ export class OpenAIResponseHandler {
 
   private determineTaskStatus = (text: string): boolean => {
     return this.determineIfTask(text);
+  };
+
+  private parseTaskData = (text: string): { isTask: boolean; taskData?: any } => {
+    const trimmedText = text.trim();
+    
+    // If response is "0", it's not a task
+    if (trimmedText === '0') {
+      return { isTask: false };
+    }
+    
+    // Try to parse as JSON - if successful, it's a task with data
+    try {
+      const taskData = JSON.parse(trimmedText);
+      // Validate that it has expected task structure
+      if (taskData && (taskData.title || taskData.description || taskData.priority || taskData.subtasks)) {
+        return { isTask: true, taskData };
+      }
+    } catch (error) {
+      // Not valid JSON, fall back to original logic
+      console.log('Response is not valid JSON, using original task detection logic');
+    }
+    
+    // Fall back to original task detection logic
+    return { isTask: this.determineIfTask(text) };
   };
 
   private handleError = async (error: Error) => {
