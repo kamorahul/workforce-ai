@@ -3,7 +3,7 @@ import { getStreamFeedsService } from '../utils/getstreamFeedsService';
 
 const router: Router = express.Router();
 
-// Get notifications for a user
+// Get notifications for a user - DISABLED
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { userId } = req.query;
@@ -13,6 +13,16 @@ router.get('/', async (req: Request, res: Response) => {
       return;
     }
 
+    // NOTIFICATIONS DISABLED - Return empty array
+    res.status(200).json({ 
+      status: 'success', 
+      notifications: [],
+      source: 'disabled',
+      message: 'Notifications are currently disabled'
+    });
+
+    // COMMENTED OUT - GetStream notifications functionality
+    /*
     // Get notifications from GetStream Activity Feeds
     try {
       const notifications = await getStreamFeedsService.getUserNotifications(userId as string, 100);
@@ -56,13 +66,14 @@ router.get('/', async (req: Request, res: Response) => {
         details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
+    */
   } catch (error) {
     console.error('Error fetching notifications:', error);
     res.status(500).json({ error: 'Failed to fetch notifications' });
   }
 });
 
-// Mark a notification as read
+// Mark a notification as read - DISABLED
 router.patch('/:notificationId/read', async (req: Request, res: Response) => {
   try {
     const { notificationId } = req.params;
@@ -72,6 +83,14 @@ router.patch('/:notificationId/read', async (req: Request, res: Response) => {
       return;
     }
 
+    // NOTIFICATIONS DISABLED - Return success without processing
+    res.status(200).json({ 
+      status: 'success', 
+      message: 'Notifications are disabled - no action taken' 
+    });
+
+    // COMMENTED OUT - Mark notification as read functionality
+    /*
     try {
       // Mark notification as read in GetStream
       await getStreamFeedsService.markNotificationAsRead(notificationId);
@@ -80,13 +99,14 @@ router.patch('/:notificationId/read', async (req: Request, res: Response) => {
       console.error('Error marking notification as read in GetStream:', error);
       res.status(500).json({ error: 'Failed to mark notification as read' });
     }
+    */
   } catch (error) {
     console.error('Error marking notification as read:', error);
     res.status(500).json({ error: 'Failed to mark notification as read' });
   }
 });
 
-// Mark all notifications as read for a user
+// Mark all notifications as read for a user - DISABLED
 router.patch('/mark-all-read', async (req: Request, res: Response) => {
   try {
     const { userId } = req.body;
@@ -96,6 +116,14 @@ router.patch('/mark-all-read', async (req: Request, res: Response) => {
       return;
     }
 
+    // NOTIFICATIONS DISABLED - Return success without processing
+    res.status(200).json({ 
+      status: 'success', 
+      message: 'Notifications are disabled - no action taken' 
+    });
+
+    // COMMENTED OUT - Mark all notifications as read functionality
+    /*
     try {
       // Mark all notifications as read in GetStream
       await getStreamFeedsService.markAllNotificationsAsRead(userId);
@@ -104,6 +132,7 @@ router.patch('/mark-all-read', async (req: Request, res: Response) => {
       console.error('Error marking all notifications as read in GetStream:', error);
       res.status(500).json({ error: 'Failed to mark all notifications as read' });
     }
+    */
   } catch (error) {
     console.error('Error marking all notifications as read:', error);
     res.status(500).json({ error: 'Failed to mark all notifications as read' });
@@ -260,7 +289,7 @@ const getNotificationMessage = (notification: any): string => {
   }
 };
 
-// Register device token for push notifications
+// Register device token for push notifications - DISABLED
 router.post('/device-token', async (req: Request, res: Response) => {
   try {
     const { userId, deviceToken, platform, providerName } = req.body;
@@ -280,6 +309,17 @@ router.post('/device-token', async (req: Request, res: Response) => {
       return;
     }
 
+    // NOTIFICATIONS DISABLED - Return success without processing
+    res.status(200).json({ 
+      status: 'success', 
+      message: 'Notifications are disabled - device token not registered',
+      userId,
+      platform,
+      providerName
+    });
+
+    // COMMENTED OUT - Device token registration functionality
+    /*
     console.log(`🔔 Registering ${platform} device token for user:`, userId);
 
     try {
@@ -310,13 +350,14 @@ router.post('/device-token', async (req: Request, res: Response) => {
         details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
+    */
   } catch (error) {
     console.error('❌ Error in device token registration endpoint:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Remove device token
+// Remove device token - DISABLED
 router.delete('/device-token', async (req: Request, res: Response) => {
   try {
     const { deviceToken } = req.body;
@@ -326,6 +367,14 @@ router.delete('/device-token', async (req: Request, res: Response) => {
       return;
     }
 
+    // NOTIFICATIONS DISABLED - Return success without processing
+    res.status(200).json({ 
+      status: 'success', 
+      message: 'Notifications are disabled - no action taken'
+    });
+
+    // COMMENTED OUT - Remove device token functionality
+    /*
     console.log('🗑️ Removing device token');
 
     try {
@@ -346,13 +395,14 @@ router.delete('/device-token', async (req: Request, res: Response) => {
         details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
+    */
   } catch (error) {
     console.error('❌ Error in device token removal endpoint:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Get user devices
+// Get user devices - DISABLED
 router.get('/device-token/:userId', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
@@ -362,6 +412,16 @@ router.get('/device-token/:userId', async (req: Request, res: Response) => {
       return;
     }
 
+    // NOTIFICATIONS DISABLED - Return empty devices array
+    res.status(200).json({ 
+      status: 'success', 
+      devices: [],
+      count: 0,
+      message: 'Notifications are disabled - no devices returned'
+    });
+
+    // COMMENTED OUT - Get user devices functionality
+    /*
     console.log(`📱 Getting devices for user:`, userId);
 
     try {
@@ -383,13 +443,14 @@ router.get('/device-token/:userId', async (req: Request, res: Response) => {
         details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
+    */
   } catch (error) {
     console.error('❌ Error in get user devices endpoint:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Legacy FCM token endpoint for backward compatibility
+// Legacy FCM token endpoint for backward compatibility - DISABLED
 router.post('/fcm-token', async (req: Request, res: Response) => {
   try {
     const { userId, fcmToken, platform = 'firebase' } = req.body;
@@ -399,6 +460,16 @@ router.post('/fcm-token', async (req: Request, res: Response) => {
       return;
     }
 
+    // NOTIFICATIONS DISABLED - Return success without processing
+    res.status(200).json({ 
+      status: 'success', 
+      message: 'Notifications are disabled - FCM token not registered',
+      userId,
+      platform: 'firebase'
+    });
+
+    // COMMENTED OUT - FCM token registration functionality
+    /*
     console.log('🔔 Registering FCM token for user:', userId);
 
     try {
@@ -427,13 +498,14 @@ router.post('/fcm-token', async (req: Request, res: Response) => {
         details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
+    */
   } catch (error) {
     console.error('❌ Error in FCM token registration endpoint:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Test direct push notification (no channels)
+// Test direct push notification (no channels) - DISABLED
 router.post('/test-direct-push', async (req: Request, res: Response) => {
   try {
     const { userId, title, message, data } = req.body;
@@ -445,6 +517,17 @@ router.post('/test-direct-push', async (req: Request, res: Response) => {
       return;
     }
 
+    // NOTIFICATIONS DISABLED - Return success without processing
+    res.status(200).json({ 
+      status: 'success', 
+      message: 'Notifications are disabled - test notification not sent',
+      userId,
+      notificationTitle: title,
+      notificationMessage: message
+    });
+
+    // COMMENTED OUT - Direct push notification test functionality
+    /*
     console.log(`🧪 Testing direct push notification for user:`, userId);
 
     try {
@@ -477,6 +560,7 @@ router.post('/test-direct-push', async (req: Request, res: Response) => {
         details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
+    */
   } catch (error) {
     console.error('❌ Error in direct push notification test endpoint:', error);
     res.status(500).json({ error: 'Internal server error' });
