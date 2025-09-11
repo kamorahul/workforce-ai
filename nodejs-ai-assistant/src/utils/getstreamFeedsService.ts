@@ -155,10 +155,16 @@ export class GetStreamFeedsService {
   }
 
   /**
-   * Create a notification activity for a user
+   * Create a notification activity for a user - DISABLED
    */
   async createNotification(userId: string, verb: string, object: string, extra: any = {}): Promise<string | null> {
     try {
+      // NOTIFICATIONS DISABLED - Return null without creating notifications
+      console.log('🔕 Notifications disabled - skipping notification creation for user:', userId, 'verb:', verb);
+      return null;
+
+      // COMMENTED OUT - Original notification creation logic
+      /*
       if (!this.isConnected) {
         await this.connect();
       }
@@ -176,6 +182,7 @@ export class GetStreamFeedsService {
       
       console.log('✅ Notification created successfully:', activity.id);
       return activity.id;
+      */
     } catch (error) {
       console.error('Error creating notification:', error);
       throw error;
@@ -183,16 +190,22 @@ export class GetStreamFeedsService {
   }
 
   /**
-   * Send push notification to user
+   * Send push notification to user - DISABLED
    */
   async sendPushNotification(userId: string, verb: string, extra: any = {}): Promise<void> {
     try {
+      // NOTIFICATIONS DISABLED - Skip push notification sending
+      console.log('🔕 Notifications disabled - skipping push notification for user:', userId, 'verb:', verb);
+      return;
+
+      // COMMENTED OUT - Original push notification logic
+      /*
       // Get notification title and message based on verb
       const { title, message } = this.getPushNotificationContent(verb, extra);
       
       // Send push notification directly (no channels)
       await this.sendDirectPushNotification(userId, title, message, extra);
-      
+      */
     } catch (error) {
       console.error('Error sending push notification:', error);
       // Don't throw error - push notification failure shouldn't break the main flow
@@ -200,7 +213,7 @@ export class GetStreamFeedsService {
   }
 
   /**
-   * Send push notification directly (no channels)
+   * Send push notification directly (no channels) - DISABLED
    */
   private async sendDirectPushNotification(
     userId: string, 
@@ -209,6 +222,12 @@ export class GetStreamFeedsService {
     extra: any = {}
   ): Promise<void> {
     try {
+      // NOTIFICATIONS DISABLED - Skip direct push notification
+      console.log('🔕 Notifications disabled - skipping direct push notification for user:', userId, 'title:', title);
+      return;
+
+      // COMMENTED OUT - Original direct push notification logic
+      /*
       // Import the direct push notification service
       const { directPushNotificationService } = await import('./directPushNotificationService');
       
@@ -218,7 +237,7 @@ export class GetStreamFeedsService {
         message,
         data: extra
       });
-      
+      */
     } catch (error) {
       console.error(`❌ Error sending direct push notification to user ${userId}:`, error);
       // Don't throw error - push notification failure shouldn't break the main flow
