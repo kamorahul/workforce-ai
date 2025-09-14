@@ -130,6 +130,7 @@ export class OpenAIResponseHandler {
               await this.chatClient.updateMessage({
                 id: messageResponse.message.id,
                 user_id: this.user.id,
+                text: text, // Preserve the AI response text
                 extraData
               });
               console.log(`✅ Updated Stream message with istask: ${isTask ? 1 : 0}`);
