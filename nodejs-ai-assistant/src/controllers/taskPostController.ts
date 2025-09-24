@@ -83,10 +83,6 @@ router.post('/', handleTaskPost);
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { assignee, channelId, createdBy, isCompleted, includeSubtasks, parentTaskId } = req.query;
-    if (!assignee && !createdBy) {
-      res.status(400).json({ error: 'Missing required query parameter: assignee or createdBy' });
-      return;
-    }
     const now = new Date();
     const query: any = {};
     
