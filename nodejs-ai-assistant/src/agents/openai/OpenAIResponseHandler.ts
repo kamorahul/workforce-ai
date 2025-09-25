@@ -87,12 +87,7 @@ export class OpenAIResponseHandler {
               console.log(`📝 Saving task data: ${JSON.stringify(taskData)}`);
             }
             
-            await this.chatClient.updateMessage({
-              id: this.messageId,
-              user_id: this.user.id,
-              text: originalText, // Preserve original text
-              extraData
-            });
+            await this.chatClient.updateMessage({...originalMessage, ...extraData});
             console.log(`✅ Updated Stream message with istask: ${isTask ? 1 : 0}, preserved text: "${originalText}"`);
           } else {
             let messageResponse;
@@ -127,12 +122,7 @@ export class OpenAIResponseHandler {
               }
               
               // Update the message with istask field and task data
-              await this.chatClient.updateMessage({
-                id: messageResponse.message.id,
-                user_id: this.user.id,
-                text: text, // Preserve the AI response text
-                extraData
-              });
+                await this.chatClient.updateMessage({...messageResponse.message, ...extraData});
               console.log(`✅ Updated Stream message with istask: ${isTask ? 1 : 0}`);
             }
           }
