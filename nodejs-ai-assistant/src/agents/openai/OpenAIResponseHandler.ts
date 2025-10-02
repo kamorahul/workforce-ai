@@ -87,7 +87,7 @@ export class OpenAIResponseHandler {
               console.log(`📝 Saving task data: ${JSON.stringify(taskData)}`);
             }
             
-            await this.chatClient.updateMessage({...originalMessage, ...extraData});
+            await this.chatClient.updateMessage({...originalMessage.message, ...extraData});
             console.log(`✅ Updated Stream message with istask: ${isTask ? 1 : 0}, preserved text: "${originalText}"`);
           } else {
             let messageResponse;
