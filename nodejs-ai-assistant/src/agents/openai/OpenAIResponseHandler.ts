@@ -91,9 +91,9 @@ export class OpenAIResponseHandler {
               id: originalMessage.message.id,
               text: originalMessage.message.text,
               attachments: originalMessage.message.attachments,
-              mentioned_users: originalMessage.message.mentioned_users,
+              mentioned_users: originalMessage.message.mentioned_users?.map(u => u.id),
               user_id: originalMessage.message.user?.id,
-              ...extraData
+              extraData: extraData
             });
             console.log(`✅ Updated Stream message with istask: ${isTask ? 1 : 0}, preserved text: "${originalText}"`);
           } else {
@@ -133,9 +133,9 @@ export class OpenAIResponseHandler {
                 id: messageResponse.message.id,
                 text: messageResponse.message.text,
                 attachments: messageResponse.message.attachments,
-                mentioned_users: messageResponse.message.mentioned_users,
+                mentioned_users: messageResponse.message.mentioned_users?.map(u => u.id),
                 user_id: messageResponse.message.user?.id,
-                ...extraData
+                extraData: extraData
               });
               console.log(`✅ Updated Stream message with istask: ${isTask ? 1 : 0}`);
             }
