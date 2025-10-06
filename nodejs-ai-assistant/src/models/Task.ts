@@ -9,6 +9,7 @@ export interface ITask extends Document {
   createdAt: Date;
   updatedAt: Date;
   completed: boolean;
+  status: 'todo' | 'in_progress' | 'completed'; // Task status for workflow
   description?: string; // Optional long text description
   createdBy: string; // userId of the task creator
   parentTaskId?: string; // Reference to parent task if this is a subtask
@@ -48,6 +49,12 @@ const TaskSchema: Schema = new Schema({
   completed: {
     type: Boolean,
     default: false,
+    required: true,
+  },
+  status: {
+    type: String,
+    enum: ['todo', 'in_progress', 'completed'],
+    default: 'todo',
     required: true,
   },
   description: {

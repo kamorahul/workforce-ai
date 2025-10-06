@@ -123,8 +123,15 @@ router.get('/', async (req: Request, res: Response) => {
       const totalSubtasks = subtasks.length;
       const completedSubtasks = subtasks.filter(subtask => subtask.completed).length;
       
+      const taskObj = task.toObject();
+      
+      // Ensure status field is set based on completed flag if not already set
+      if (!taskObj.status) {
+        taskObj.status = taskObj.completed ? 'completed' : 'todo';
+      }
+      
       return {
-        ...task.toObject(),
+        ...taskObj,
         subtaskCounts: {
           total: totalSubtasks,
           completed: completedSubtasks
@@ -162,9 +169,15 @@ router.get('/:taskId', async (req: Request, res: Response) => {
     // Fetch subtasks if this is a parent task
     const subtasks = await Task.find({ parentTaskId: taskId });
 
+    // Ensure status field is set based on completed flag if not already set
+    const taskObj = task.toObject();
+    if (!taskObj.status) {
+      taskObj.status = taskObj.completed ? 'completed' : 'todo';
+    }
+
     res.status(200).json({ 
       status: 'success', 
-      task,
+      task: taskObj,
       subtasks,
       comments 
     });
@@ -241,7 +254,7 @@ router.put('/:taskId', async (req: Request, res: Response) => {
     
     const { 
       name, assignee, priority, completionDate, channelId, 
-      description, completed, parentTaskId, attachments 
+      description, completed, status, parentTaskId, attachments 
     } = req.body;
     
     const updateData: any = {};
@@ -258,6 +271,7 @@ router.put('/:taskId', async (req: Request, res: Response) => {
     if (channelId !== undefined) updateData.channelId = channelId;
     if (description !== undefined) updateData.description = description;
     if (completed !== undefined) updateData.completed = completed;
+    if (status !== undefined) updateData.status = status;
     if (parentTaskId !== undefined) updateData.parentTaskId = parentTaskId;
     if (attachments !== undefined) updateData.attachments = attachments;
     
