@@ -81,52 +81,28 @@ export class OpenAIAgent implements AIAgent {
     // Check if this is a kai user/channel to use different system prompt
     const isKaiUser = this.user.id === 'kai' || this.channel.id?.indexOf('kai') === 0;
     
-    if (isKaiUser) {
-      // Original system prompt for kai users
-      await this.openai.beta.threads.messages.create(this.openAiThread.id, {
-        role: "assistant",
-        content: `You are a helpful assistant that extracts structured information from user messages.
-
-                  ## Extraction Rules:
-
-                  - try to understand the conversation and find the expected tasks or calender events
-
-                  ## Output Format (always follow this):
-
-                  *Upcoming Events*
-                  - [List events here with time/date and subject]
-
-                  *Tasks to Complete*
-                  - [List tasks here with what needs to be done and any deadlines]
-
-                  ## Requirements:
-                  - Never return "null" or leave sections empty. If nothing is found, say: "You are all good for the day" .
-                  - Keep all tasks and events user-focused unless clearly about someone else.
-        `,
-      });
-    } else {
-      // JSON task data response for regular users
-      await this.openai.beta.threads.messages.create(this.openAiThread.id, {
-        role: "assistant",
-        content: `You are a task detection and extraction assistant. Analyze the given message and determine if it contains any task, todo, deadline, or actionable item.
-
-                  ## Requirements:
-                  - Respond with only '1' if the message contains a task, todo, deadline, or actionable item
-                  - Respond with only '0' if the message does not contain any tasks
-                  - Be precise and only respond with json or 0
-                  - Do not include any other text or explanation
-        `,
-      });
-    }
-
+    // Add the user's message to the thread
     await this.openai.beta.threads.messages.create(this.openAiThread.id, {
       role: 'user',
       content: e,
     });
 
+    // Prepare additional instructions based on user type (passed to the run, not as a message)
+    let additionalInstructions = '';
+    
+    if (isKaiUser) {
+      // Get current date for the daily summary
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      additionalInstructions = `Today's date is: ${today}. Please analyze only the last 7 days of conversation and focus on upcoming events and recent tasks. Separate completed tasks from pending ones.`;
+    } else {
+      // JSON task data response for regular users
+      additionalInstructions = `Analyze this message and respond with only '1' if it contains a task/todo/deadline, or '0' if it does not. Be precise.`;
+    }
+
     try {
       const run = this.openai.beta.threads.runs.stream(this.openAiThread.id, {
         assistant_id: this.assistant.id,
+        additional_instructions: additionalInstructions,
       });
 
       const handler = new OpenAIResponseHandler(
