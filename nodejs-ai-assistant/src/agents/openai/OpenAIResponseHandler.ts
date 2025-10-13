@@ -98,46 +98,51 @@ export class OpenAIResponseHandler {
             console.log(`✅ Updated Stream message with istask: ${isTask ? 1 : 0}, preserved text: "${originalText}"`);
           } else {
             let messageResponse;
-            if(this.channel.id?.indexOf('kai') === 0) {
+            const isKaiChannel = this.channel.id?.indexOf('kai') === 0;
+            
+            if(isKaiChannel) {
+              // Kai channel - send as Kai user, no task detection
               messageResponse = await this.channel.sendMessage({
                 text,
                 user: { id: "kai" },
               });
+              console.log(`✅ Sent Kai daily summary (no task detection)`);
             } else {
+              // Regular channel - send and detect tasks
               messageResponse = await this.channel.sendMessage({
                 text,
                 user_id: this.user.id,
                 type: 'system',
                 restricted_visibility: [this.user.id],
               });
-            }
-            
-            // Determine if it's a task and update Stream message
-            if (messageResponse?.message?.id) {
-              const { isTask, taskData } = this.parseTaskData(text);
-              console.log(`🔍 Task Detection - Response: "${text}" | IsTask: ${isTask}`, taskData ? `| TaskData: ${JSON.stringify(taskData)}` : '');
               
-              // Prepare extraData with task information
-              const extraData: any = {
-                istask: isTask ? 1 : 0
-              };
-              
-              // If it's a task with JSON data, save the task properties
-              if (isTask && taskData) {
-                extraData.taskData = taskData;
-                console.log(`📝 Saving task data: ${JSON.stringify(taskData)}`);
+              // Determine if it's a task and update Stream message (only for regular channels)
+              if (messageResponse?.message?.id) {
+                const { isTask, taskData } = this.parseTaskData(text);
+                console.log(`🔍 Task Detection - Response: "${text}" | IsTask: ${isTask}`, taskData ? `| TaskData: ${JSON.stringify(taskData)}` : '');
+                
+                // Prepare extraData with task information
+                const extraData: any = {
+                  istask: isTask ? 1 : 0
+                };
+                
+                // If it's a task with JSON data, save the task properties
+                if (isTask && taskData) {
+                  extraData.taskData = taskData;
+                  console.log(`📝 Saving task data: ${JSON.stringify(taskData)}`);
+                }
+                
+                // Update the message with istask field and task data
+                await this.chatClient.updateMessage({
+                  id: messageResponse.message.id,
+                  text: messageResponse.message.text,
+                  attachments: messageResponse.message.attachments,
+                  mentioned_users: messageResponse.message.mentioned_users?.map(u => u.id),
+                  user_id: messageResponse.message.user?.id,
+                  extraData: extraData
+                });
+                console.log(`✅ Updated Stream message with istask: ${isTask ? 1 : 0}`);
               }
-              
-              // Update the message with istask field and task data
-              await this.chatClient.updateMessage({
-                id: messageResponse.message.id,
-                text: messageResponse.message.text,
-                attachments: messageResponse.message.attachments,
-                mentioned_users: messageResponse.message.mentioned_users?.map(u => u.id),
-                user_id: messageResponse.message.user?.id,
-                extraData: extraData
-              });
-              console.log(`✅ Updated Stream message with istask: ${isTask ? 1 : 0}`);
             }
           }
 
