@@ -33,9 +33,17 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Skip processing messages FROM Kai or Tai to prevent infinite loops
+    if (user.id === 'kai' || user.id === 'Kai' || user.id === 'tai') {
+      console.log(`Skipping message from AI user: ${user.id}`);
+      res.status(200).json({ message: "Skipped AI user message" });
+      return;
+    }
+
     const agent = await createAgent(user as User, channel.type, channel.id);
 
-    if(user.id === 'kai' || channel.id.indexOf('kai') !== 0) {
+    // For regular channels (not kai channels), use task detection
+    if(channel.id.indexOf('kai') !== 0) {
       doAnalyzeMessage(agent, user, message);
       res.json(req.body);
       return;
