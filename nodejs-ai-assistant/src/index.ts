@@ -14,6 +14,7 @@ import profileUpdatePostControllerRouter from './controllers/profileUpdatePostCo
 import taskPostControllerRouter from './controllers/taskPostController';
 import commentControllerRouter from './controllers/commentController';
 import notificationsControllerRouter from './controllers/notificationsController';
+import audioUploadPostControllerRouter from './controllers/audioUploadPostController';
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -43,5 +44,6 @@ app.use('/profile', profileUpdatePostControllerRouter);
 app.use('/task', taskPostControllerRouter);
 app.use('/task', commentControllerRouter);
 app.use('/notifications', notificationsControllerRouter); // Mount comment routes under /task
+app.use('/upload', audioUploadPostControllerRouter); // Mount audio upload routes
 
 export { app }; // Export the app instance
