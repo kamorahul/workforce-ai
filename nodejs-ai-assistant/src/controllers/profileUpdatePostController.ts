@@ -9,7 +9,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 const router: Router = express.Router();
 
 router.post('/profile', upload.single('profilePicture'), async (req: Request, res: Response): Promise<void> => {
-  const { userId, name, email } = req.body;
+  const { userId, name, email, displayName, title } = req.body;
   const profilePictureFile = req?.file;
 
   if (!userId) {
@@ -25,6 +25,14 @@ router.post('/profile', upload.single('profilePicture'), async (req: Request, re
 
   if (email) {
     userDataToUpdate.email = email;
+  }
+
+  if (displayName) {
+    userDataToUpdate.displayName = displayName;
+  }
+
+  if (title) {
+    userDataToUpdate.title = title;
   }
 
   try {
