@@ -17,8 +17,8 @@ import notificationsControllerRouter from './controllers/notificationsController
 import audioUploadPostControllerRouter from './controllers/audioUploadPostController';
 
 const app = express();
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '200mb' }));
+app.use(express.urlencoded({ limit: '200mb', extended: true }));
 app.use(cors({ origin: '*' }));
 
 app.get('/', (req, res) => {

@@ -9,14 +9,16 @@ import { uploadToS3 } from '../utils/s3';
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
+    fileSize: 200 * 1024 * 1024, // 200MB limit for videos
   },
   fileFilter: (req, file, cb) => {
-    // Accept images and PDFs
-    if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
+    // Accept images, PDFs, and videos
+    if (file.mimetype.startsWith('image/') || 
+        file.mimetype === 'application/pdf' ||
+        file.mimetype.startsWith('video/')) {
       cb(null, true);
     } else {
-      cb(new Error('Unsupported file type'));
+      cb(new Error('Unsupported file type. Only images, PDFs, and videos are allowed.'));
     }
   }
 });
