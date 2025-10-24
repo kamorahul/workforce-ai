@@ -1,5 +1,6 @@
 import { StreamClient } from "@stream-io/node-sdk";
 import { StreamClient as GetStreamClient } from "getstream";
+import { serverClient } from "../serverClient";
 
 export interface GetStreamComment {
   id: string;
@@ -191,12 +192,40 @@ export class GetStreamFeedsService {
   }
 
   /**
+   * Get user name by ID from GetStream
+   */
+  private async getUserName(userId: string): Promise<string> {
+    try {
+      const response = await serverClient.queryUsers({ id: userId });
+      const user = response.users[0];
+      
+      if (user?.name) {
+        return user.name;
+      }
+      
+      // Fallback: Format phone number nicely if it looks like a phone number
+      if (userId && /^\d{10,15}$/.test(userId)) {
+        return userId.replace(/(\d{2})(\d{5})(\d+)/, '+$1 $2 $3');
+      }
+      
+      return userId;
+    } catch (error) {
+      console.error('Error fetching user name:', error);
+      // Fallback: Format phone number nicely if it looks like a phone number
+      if (userId && /^\d{10,15}$/.test(userId)) {
+        return userId.replace(/(\d{2})(\d{5})(\d+)/, '+$1 $2 $3');
+      }
+      return userId;
+    }
+  }
+
+  /**
    * Send push notification to user
    */
   async sendPushNotification(userId: string, verb: string, extra: any = {}): Promise<void> {
     try {
       // Get notification title and message based on verb
-      const { title, message } = this.getPushNotificationContent(verb, extra);
+      const { title, message } = await this.getPushNotificationContent(verb, extra);
       
       // Send push notification directly (no channels)
       await this.sendDirectPushNotification(userId, title, message, extra);
@@ -235,8 +264,11 @@ export class GetStreamFeedsService {
   /**
    * Get push notification title and message based on verb
    */
-  private getPushNotificationContent(verb: string, extra: any = {}): { title: string; message: string } {
-    const actor = extra.actor || extra.commentedBy || extra.createdBy || 'System';
+  private async getPushNotificationContent(verb: string, extra: any = {}): Promise<{ title: string; message: string }> {
+    const actorId = extra.actor || extra.commentedBy || extra.createdBy || 'System';
+    
+    // Get user name for the actor
+    const actor = actorId === 'System' ? 'System' : await this.getUserName(actorId);
     
     switch (verb) {
       case 'task_created':
