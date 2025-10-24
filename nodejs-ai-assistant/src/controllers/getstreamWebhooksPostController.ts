@@ -92,7 +92,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   
   if (message.command === 'summary' || message.command === 'calender') {
     // Send response to user's kai channel instead of current channel
-    agentChannel = `kai_${user.id}`;
+    agentChannel = `kai${user.id}`; // No underscore - matches channel creation pattern
     agentChannelType = 'messaging';
   }
   
