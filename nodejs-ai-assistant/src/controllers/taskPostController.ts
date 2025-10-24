@@ -60,14 +60,14 @@ export const handleTaskPost = async (req: Request, res: Response) => {
           parentTaskId: task._id, // Link to parent task
         });
         await newSubtask.save();
-        // NOTIFICATIONS DISABLED - Comment out task activity creation
-        // await getStreamFeedsService.createTaskActivity(newSubtask._id as string, newSubtask);
+        // Create notification for subtask (with self-exclusion)
+        await getStreamFeedsService.createTaskActivity(newSubtask._id as string, newSubtask);
         createdSubtasks.push(newSubtask);
       }
     }
 
-    // NOTIFICATIONS DISABLED - Comment out task activity creation
-    // await getStreamFeedsService.createTaskActivity(task._id as string, task);
+    // Create notification for main task (with self-exclusion)
+    await getStreamFeedsService.createTaskActivity(task._id as string, task);
     res.status(201).json({ 
       status: 'success', 
       task,
@@ -288,16 +288,13 @@ router.put('/:taskId', async (req: Request, res: Response) => {
       return;
     }
     
-    // NOTIFICATIONS DISABLED - Comment out task update notifications
-    /*
-    // Create notifications for task updates
+    // Create notifications for task updates (with self-exclusion)
     try {
       await getStreamFeedsService.createTaskUpdateNotifications(originalTask, updatedTask, req.body);
     } catch (error) {
       console.error('Error creating task update notifications:', error);
       // Continue even if notifications fail
     }
-    */
     
     res.status(200).json({ status: 'success', task: updatedTask });
   } catch (error) {

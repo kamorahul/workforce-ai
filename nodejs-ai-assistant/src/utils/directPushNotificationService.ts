@@ -1,4 +1,5 @@
 import { serverClient } from '../serverClient';
+import { deviceTokenService } from './deviceTokenService';
 
 export interface PushNotificationPayload {
   title: string;
@@ -9,127 +10,178 @@ export interface PushNotificationPayload {
   category?: string;
 }
 
+export interface SimpleNotificationPayload {
+  userId: string;
+  title: string;
+  message: string;
+  type: 'task' | 'comment' | 'event' | 'system';
+  data?: Record<string, any>;
+}
+
+export interface GroupNotificationPayload {
+  userIds: string[];
+  title: string;
+  message: string;
+  type: 'task' | 'comment' | 'event' | 'system';
+  data?: Record<string, any>;
+}
+
 export class DirectPushNotificationService {
   /**
-   * Send push notification directly to user's devices
-   * This bypasses channel creation and sends notifications directly
+   * Send simple notification to a single user
+   */
+  async sendSimpleNotification(payload: SimpleNotificationPayload): Promise<void> {
+    try {
+      console.log(`🔔 Sending simple notification to user ${payload.userId}: ${payload.title}`);
+      
+      // Create push notification payload
+      const pushPayload: PushNotificationPayload = {
+        title: payload.title,
+        message: payload.message,
+        data: {
+          type: payload.type,
+          userId: payload.userId,
+          ...payload.data
+        },
+        badge: 1,
+        sound: 'default',
+        category: payload.type
+      };
+      
+      // Send push notification
+      await this.sendDirectPushNotification(payload.userId, pushPayload);
+      
+      console.log(`✅ Simple notification sent to user ${payload.userId}`);
+    } catch (error) {
+      console.error(`❌ Failed to send simple notification to user ${payload.userId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send group notification to multiple users
+   */
+  async sendGroupNotification(payload: GroupNotificationPayload): Promise<void> {
+    try {
+      console.log(`🔔 Sending group notification to ${payload.userIds.length} users: ${payload.title}`);
+      
+      const promises = payload.userIds.map(userId => 
+        this.sendSimpleNotification({
+          userId,
+          title: payload.title,
+          message: payload.message,
+          type: payload.type,
+          data: payload.data
+        })
+      );
+      
+      await Promise.allSettled(promises);
+      console.log(`✅ Group notification sent to ${payload.userIds.length} users`);
+    } catch (error) {
+      console.error(`❌ Failed to send group notification:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send push notification directly to user's devices via Stream
    */
   async sendDirectPushNotification(
     userId: string,
     payload: PushNotificationPayload
   ): Promise<void> {
     try {
-      console.log(`🔔 Sending direct push notification to user ${userId}: ${payload.title}`);
+      console.log(`🔔 Sending push notification to user ${userId}: ${payload.title}`);
       
-      // Method 1: Try to use Stream's direct push API (if available)
-      try {
-        await this.sendViaStreamDirectAPI(userId, payload);
+      // Get user's devices
+      const devices = await deviceTokenService.getUserDevices(userId);
+      
+      if (!devices || devices.length === 0) {
+        console.log(`📱 No devices found for user ${userId}, skipping push notification`);
         return;
-      } catch (error) {
-        console.log('Direct API not available, trying alternative method...');
       }
       
-      // Method 2: Use a system notification approach
-      await this.sendViaSystemNotification(userId, payload);
+      console.log(`📱 Found ${devices.length} devices for user ${userId}`);
       
+      // Send push notification via Stream's push API
+      await this.sendPushViaStream(userId, payload, devices);
+      
+      console.log(`✅ Push notification sent to user ${userId}`);
     } catch (error) {
-      console.error(`❌ Failed to send direct push notification to user ${userId}:`, error);
+      console.error(`❌ Failed to send push notification to user ${userId}:`, error);
       throw error;
     }
   }
 
   /**
-   * Method 1: Try to send via Stream's direct push API
+   * Send push notification via Firebase Cloud Messaging (direct, no channel creation)
    */
-  private async sendViaStreamDirectAPI(
+  private async sendPushViaStream(
     userId: string,
-    payload: PushNotificationPayload
-  ): Promise<void> {
-    // This is a placeholder for Stream's direct push API
-    // Currently, Stream doesn't have a direct push API without channels
-    throw new Error('Direct push API not available');
-  }
-
-  /**
-   * Method 2: Send via system notification channel (minimal approach)
-   */
-  private async sendViaSystemNotification(
-    userId: string,
-    payload: PushNotificationPayload
+    payload: PushNotificationPayload,
+    devices: any[]
   ): Promise<void> {
     try {
-      console.log(`🔍 DEBUG: Starting system notification for user ${userId}`);
-      console.log(`🔍 DEBUG: Payload:`, JSON.stringify(payload, null, 2));
+      // Import Firebase Admin SDK
+      const { messaging } = await import('../config/firebase');
       
-      // Create a system-level notification that's immediately deleted
-      const systemChannelId = `system_push_${Date.now()}`;
-      console.log(`🔍 DEBUG: Creating system channel: ${systemChannelId}`);
+      console.log(`📱 Sending FCM push notification to user ${userId}:`, {
+        title: payload.title,
+        body: payload.message,
+        devices: devices.length
+      });
       
-      const channel = serverClient.channel('messaging', systemChannelId, {
-        members: [userId],
-        created_by_id: 'system',
-        // Make it a system channel that won't appear in user's channel list
-        extra: {
-          isSystemChannel: true,
-          isPushOnly: true,
-          hidden: true
+      // Send push notification to each device token
+      const pushPromises = devices.map(async (device) => {
+        try {
+          const deviceToken = device.id; // Device token from Stream
+          
+          // Create FCM message
+          const message = {
+            token: deviceToken,
+            notification: {
+              title: payload.title,
+              body: payload.message,
+            },
+            data: {
+              ...payload.data,
+              type: payload.category || 'task',
+              timestamp: new Date().toISOString(),
+            },
+            android: {
+              priority: 'high' as const,
+              notification: {
+                sound: payload.sound || 'default',
+                channelId: 'task_notifications',
+              }
+            },
+            apns: {
+              payload: {
+                aps: {
+                  alert: {
+                    title: payload.title,
+                    body: payload.message,
+                  },
+                  badge: payload.badge || 1,
+                  sound: payload.sound || 'default',
+                }
+              }
+            }
+          };
+          
+          // Send via Firebase Cloud Messaging
+          const response = await messaging.send(message);
+          console.log(`✅ FCM push sent to device ${deviceToken.substring(0, 10)}...: ${response}`);
+        } catch (deviceError: any) {
+          console.error(`❌ Failed to send FCM push to device ${device.id?.substring(0, 10)}:`, deviceError.message);
         }
       });
-
-      // Create the channel
-      console.log(`🔍 DEBUG: Creating channel...`);
-      await channel.create();
-      console.log(`🔍 DEBUG: Channel created successfully`);
       
-      // Prepare message with enhanced push data
-      const messageData = {
-        text: payload.message,
-        user: { id: 'system' },
-        // Make the message hidden from chat UI
-        extra: {
-          ...payload.data,
-          isSystemNotification: true,
-          notificationTitle: payload.title,
-          timestamp: new Date().toISOString(),
-          pushOnly: true,
-          // Enhanced push-specific data
-          push: {
-            title: payload.title,
-            body: payload.message,
-            badge: payload.badge || 1,
-            sound: payload.sound || 'default',
-            category: payload.category || 'general',
-            data: payload.data || {},
-            // Additional push properties
-            priority: 'high',
-            visibility: 'public',
-            icon: 'ic_notification',
-            color: '#FF0000',
-            click_action: 'OPEN_NOTIFICATION_SCREEN'
-          }
-        }
-      };
+      await Promise.allSettled(pushPromises);
       
-      console.log(`🔍 DEBUG: Sending message with data:`, JSON.stringify(messageData, null, 2));
-      
-      // Send the notification message
-      const result = await channel.sendMessage(messageData);
-      console.log(`🔍 DEBUG: Message sent successfully:`, result);
-      console.log(`✅ System notification sent for push: ${payload.title}`);
-      
-      // Delete the channel immediately to keep it clean
-      console.log(`🔍 DEBUG: Deleting channel...`);
-      await channel.delete();
-      console.log(`🗑️ System notification channel cleaned up`);
-      
+      console.log(`✅ FCM push notifications sent to user ${userId}`);
     } catch (error) {
-      console.error(`❌ System notification failed:`, error);
-      console.error(`🔍 DEBUG: Full error details:`, {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : 'No stack trace',
-        code: (error as any)?.code || 'No code',
-        response: (error as any)?.response?.data || 'No response data'
-      });
+      console.error(`❌ Failed to send FCM push for user ${userId}:`, error);
       throw error;
     }
   }
@@ -141,14 +193,19 @@ export class DirectPushNotificationService {
     userIds: string[],
     payload: PushNotificationPayload
   ): Promise<void> {
-    console.log(`🔔 Sending bulk push notifications to ${userIds.length} users`);
-    
-    const promises = userIds.map(userId => 
-      this.sendDirectPushNotification(userId, payload)
-    );
-    
-    await Promise.allSettled(promises);
-    console.log(`✅ Bulk push notifications completed`);
+    try {
+      console.log(`🔔 Sending bulk push notifications to ${userIds.length} users: ${payload.title}`);
+      
+      const promises = userIds.map(userId => 
+        this.sendDirectPushNotification(userId, payload)
+      );
+      
+      await Promise.allSettled(promises);
+      console.log(`✅ Bulk push notifications completed for ${userIds.length} users`);
+    } catch (error) {
+      console.error(`❌ Failed to send bulk push notifications:`, error);
+      throw error;
+    }
   }
 
   /**

@@ -3,7 +3,7 @@ import { getStreamFeedsService } from '../utils/getstreamFeedsService';
 
 const router: Router = express.Router();
 
-// Get notifications for a user - DISABLED
+// Get notifications for a user
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { userId } = req.query;
@@ -13,16 +13,6 @@ router.get('/', async (req: Request, res: Response) => {
       return;
     }
 
-    // NOTIFICATIONS DISABLED - Return empty array
-    res.status(200).json({ 
-      status: 'success', 
-      notifications: [],
-      source: 'disabled',
-      message: 'Notifications are currently disabled'
-    });
-
-    // COMMENTED OUT - GetStream notifications functionality
-    /*
     // Get notifications from GetStream Activity Feeds
     try {
       const notifications = await getStreamFeedsService.getUserNotifications(userId as string, 100);
@@ -66,14 +56,13 @@ router.get('/', async (req: Request, res: Response) => {
         details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
-    */
   } catch (error) {
     console.error('Error fetching notifications:', error);
     res.status(500).json({ error: 'Failed to fetch notifications' });
   }
 });
 
-// Mark a notification as read - DISABLED
+// Mark a notification as read
 router.patch('/:notificationId/read', async (req: Request, res: Response) => {
   try {
     const { notificationId } = req.params;
@@ -83,14 +72,6 @@ router.patch('/:notificationId/read', async (req: Request, res: Response) => {
       return;
     }
 
-    // NOTIFICATIONS DISABLED - Return success without processing
-    res.status(200).json({ 
-      status: 'success', 
-      message: 'Notifications are disabled - no action taken' 
-    });
-
-    // COMMENTED OUT - Mark notification as read functionality
-    /*
     try {
       // Mark notification as read in GetStream
       await getStreamFeedsService.markNotificationAsRead(notificationId);
@@ -99,14 +80,13 @@ router.patch('/:notificationId/read', async (req: Request, res: Response) => {
       console.error('Error marking notification as read in GetStream:', error);
       res.status(500).json({ error: 'Failed to mark notification as read' });
     }
-    */
   } catch (error) {
     console.error('Error marking notification as read:', error);
     res.status(500).json({ error: 'Failed to mark notification as read' });
   }
 });
 
-// Mark all notifications as read for a user - DISABLED
+// Mark all notifications as read for a user
 router.patch('/mark-all-read', async (req: Request, res: Response) => {
   try {
     const { userId } = req.body;
@@ -116,14 +96,6 @@ router.patch('/mark-all-read', async (req: Request, res: Response) => {
       return;
     }
 
-    // NOTIFICATIONS DISABLED - Return success without processing
-    res.status(200).json({ 
-      status: 'success', 
-      message: 'Notifications are disabled - no action taken' 
-    });
-
-    // COMMENTED OUT - Mark all notifications as read functionality
-    /*
     try {
       // Mark all notifications as read in GetStream
       await getStreamFeedsService.markAllNotificationsAsRead(userId);
@@ -132,7 +104,6 @@ router.patch('/mark-all-read', async (req: Request, res: Response) => {
       console.error('Error marking all notifications as read in GetStream:', error);
       res.status(500).json({ error: 'Failed to mark all notifications as read' });
     }
-    */
   } catch (error) {
     console.error('Error marking all notifications as read:', error);
     res.status(500).json({ error: 'Failed to mark all notifications as read' });
@@ -309,17 +280,6 @@ router.post('/device-token', async (req: Request, res: Response) => {
       return;
     }
 
-    // NOTIFICATIONS DISABLED - Return success without processing
-    res.status(200).json({ 
-      status: 'success', 
-      message: 'Notifications are disabled - device token not registered',
-      userId,
-      platform,
-      providerName
-    });
-
-    // COMMENTED OUT - Device token registration functionality
-    /*
     console.log(`🔔 Registering ${platform} device token for user:`, userId);
 
     try {
@@ -350,14 +310,13 @@ router.post('/device-token', async (req: Request, res: Response) => {
         details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
-    */
   } catch (error) {
     console.error('❌ Error in device token registration endpoint:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Remove device token - DISABLED
+// Remove device token
 router.delete('/device-token', async (req: Request, res: Response) => {
   try {
     const { deviceToken } = req.body;
@@ -367,14 +326,6 @@ router.delete('/device-token', async (req: Request, res: Response) => {
       return;
     }
 
-    // NOTIFICATIONS DISABLED - Return success without processing
-    res.status(200).json({ 
-      status: 'success', 
-      message: 'Notifications are disabled - no action taken'
-    });
-
-    // COMMENTED OUT - Remove device token functionality
-    /*
     console.log('🗑️ Removing device token');
 
     try {
@@ -395,14 +346,13 @@ router.delete('/device-token', async (req: Request, res: Response) => {
         details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
-    */
   } catch (error) {
     console.error('❌ Error in device token removal endpoint:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Get user devices - DISABLED
+// Get user devices
 router.get('/device-token/:userId', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
@@ -412,16 +362,6 @@ router.get('/device-token/:userId', async (req: Request, res: Response) => {
       return;
     }
 
-    // NOTIFICATIONS DISABLED - Return empty devices array
-    res.status(200).json({ 
-      status: 'success', 
-      devices: [],
-      count: 0,
-      message: 'Notifications are disabled - no devices returned'
-    });
-
-    // COMMENTED OUT - Get user devices functionality
-    /*
     console.log(`📱 Getting devices for user:`, userId);
 
     try {
@@ -443,7 +383,6 @@ router.get('/device-token/:userId', async (req: Request, res: Response) => {
         details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
-    */
   } catch (error) {
     console.error('❌ Error in get user devices endpoint:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -460,16 +399,6 @@ router.post('/fcm-token', async (req: Request, res: Response) => {
       return;
     }
 
-    // NOTIFICATIONS DISABLED - Return success without processing
-    res.status(200).json({ 
-      status: 'success', 
-      message: 'Notifications are disabled - FCM token not registered',
-      userId,
-      platform: 'firebase'
-    });
-
-    // COMMENTED OUT - FCM token registration functionality
-    /*
     console.log('🔔 Registering FCM token for user:', userId);
 
     try {
@@ -498,7 +427,6 @@ router.post('/fcm-token', async (req: Request, res: Response) => {
         details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
-    */
   } catch (error) {
     console.error('❌ Error in FCM token registration endpoint:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -563,6 +491,107 @@ router.post('/test-direct-push', async (req: Request, res: Response) => {
     */
   } catch (error) {
     console.error('❌ Error in direct push notification test endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Send simple notification to a single user
+router.post('/send-simple', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId, title, message, type = 'system', data } = req.body;
+
+    if (!userId || !title || !message) {
+      res.status(400).json({ 
+        error: 'Missing required fields: userId, title, or message' 
+      });
+      return;
+    }
+
+    console.log(`🔔 Sending simple notification to user ${userId}: ${title}`);
+
+    try {
+      // Import and use direct push notification service
+      const { directPushNotificationService } = await import('../utils/directPushNotificationService');
+      
+      // Send simple notification
+      await directPushNotificationService.sendSimpleNotification({
+        userId,
+        title,
+        message,
+        type,
+        data
+      });
+      
+      console.log(`✅ Simple notification sent successfully to user: ${userId}`);
+      
+      res.status(200).json({ 
+        status: 'success', 
+        message: 'Simple notification sent successfully',
+        userId,
+        notificationTitle: title,
+        notificationMessage: message,
+        type
+      });
+    } catch (error) {
+      console.error(`❌ Error sending simple notification:`, error);
+      res.status(500).json({ 
+        error: 'Failed to send simple notification',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error in simple notification endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Send group notification to multiple users
+router.post('/send-group', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userIds, title, message, type = 'system', data } = req.body;
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0 || !title || !message) {
+      res.status(400).json({ 
+        error: 'Missing required fields: userIds (array), title, or message' 
+      });
+      return;
+    }
+
+    console.log(`🔔 Sending group notification to ${userIds.length} users: ${title}`);
+
+    try {
+      // Import and use direct push notification service
+      const { directPushNotificationService } = await import('../utils/directPushNotificationService');
+      
+      // Send group notification
+      await directPushNotificationService.sendGroupNotification({
+        userIds,
+        title,
+        message,
+        type,
+        data
+      });
+      
+      console.log(`✅ Group notification sent successfully to ${userIds.length} users`);
+      
+      res.status(200).json({ 
+        status: 'success', 
+        message: 'Group notification sent successfully',
+        userIds,
+        notificationTitle: title,
+        notificationMessage: message,
+        type,
+        count: userIds.length
+      });
+    } catch (error) {
+      console.error(`❌ Error sending group notification:`, error);
+      res.status(500).json({ 
+        error: 'Failed to send group notification',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error in group notification endpoint:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

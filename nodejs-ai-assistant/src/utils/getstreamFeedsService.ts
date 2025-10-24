@@ -155,23 +155,27 @@ export class GetStreamFeedsService {
   }
 
   /**
-   * Create a notification activity for a user - DISABLED
+   * Create a notification activity for a user (with self-exclusion)
    */
   async createNotification(userId: string, verb: string, object: string, extra: any = {}): Promise<string | null> {
     try {
-      // NOTIFICATIONS DISABLED - Return null without creating notifications
-      console.log('🔕 Notifications disabled - skipping notification creation for user:', userId, 'verb:', verb);
-      return null;
+      // Determine who performed the action
+      const actor = extra.actor || extra.commentedBy || extra.createdBy || extra.assignee || 'system';
+      
+      // DON'T send notification to self - skip if user is notifying themselves
+      if (userId === actor || userId === extra.createdBy || userId === extra.commentedBy) {
+        console.log(`🚫 Skipping self-notification for user ${userId} (verb: ${verb})`);
+        return null;
+      }
 
-      // COMMENTED OUT - Original notification creation logic
-      /*
       if (!this.isConnected) {
         await this.connect();
       }
+      
       // Add activity to user's notification feed (you have this configured)
       const notificationFeed = this.getstreamClient.feed('notification', userId);
       const activity = await notificationFeed.addActivity({
-        actor: extra.actor || extra.commentedBy || extra.createdBy || extra.assignee || 'system',
+        actor: actor,
         verb: verb,
         object: object,
         extra: extra
@@ -180,9 +184,8 @@ export class GetStreamFeedsService {
       // Send push notification
       await this.sendPushNotification(userId, verb, extra);
       
-      console.log('✅ Notification created successfully:', activity.id);
+      console.log('✅ Notification created successfully for user:', userId, 'activity:', activity.id);
       return activity.id;
-      */
     } catch (error) {
       console.error('Error creating notification:', error);
       throw error;
@@ -190,22 +193,15 @@ export class GetStreamFeedsService {
   }
 
   /**
-   * Send push notification to user - DISABLED
+   * Send push notification to user
    */
   async sendPushNotification(userId: string, verb: string, extra: any = {}): Promise<void> {
     try {
-      // NOTIFICATIONS DISABLED - Skip push notification sending
-      console.log('🔕 Notifications disabled - skipping push notification for user:', userId, 'verb:', verb);
-      return;
-
-      // COMMENTED OUT - Original push notification logic
-      /*
       // Get notification title and message based on verb
       const { title, message } = this.getPushNotificationContent(verb, extra);
       
       // Send push notification directly (no channels)
       await this.sendDirectPushNotification(userId, title, message, extra);
-      */
     } catch (error) {
       console.error('Error sending push notification:', error);
       // Don't throw error - push notification failure shouldn't break the main flow
@@ -213,7 +209,7 @@ export class GetStreamFeedsService {
   }
 
   /**
-   * Send push notification directly (no channels) - DISABLED
+   * Send push notification directly (no channels)
    */
   private async sendDirectPushNotification(
     userId: string, 
@@ -222,12 +218,6 @@ export class GetStreamFeedsService {
     extra: any = {}
   ): Promise<void> {
     try {
-      // NOTIFICATIONS DISABLED - Skip direct push notification
-      console.log('🔕 Notifications disabled - skipping direct push notification for user:', userId, 'title:', title);
-      return;
-
-      // COMMENTED OUT - Original direct push notification logic
-      /*
       // Import the direct push notification service
       const { directPushNotificationService } = await import('./directPushNotificationService');
       
@@ -235,9 +225,13 @@ export class GetStreamFeedsService {
       await directPushNotificationService.sendDirectPushNotification(userId, {
         title,
         message,
-        data: extra
+        data: extra,
+        badge: 1,
+        sound: 'default',
+        category: extra.category || 'task'
       });
-      */
+      
+      console.log(`✅ Push notification sent to user ${userId}: ${title}`);
     } catch (error) {
       console.error(`❌ Error sending direct push notification to user ${userId}:`, error);
       // Don't throw error - push notification failure shouldn't break the main flow
