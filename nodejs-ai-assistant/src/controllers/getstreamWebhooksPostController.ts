@@ -85,7 +85,18 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     }
   }
 
-  const agent = await createAgent(user as User, channelType, channelIdUpdated);
+  // For summary and calendar commands, create agent for user's kai channel
+  // For other commands, use the current channel
+  let agentChannel = channelIdUpdated;
+  let agentChannelType = channelType;
+  
+  if (message.command === 'summary' || message.command === 'calender') {
+    // Send response to user's kai channel instead of current channel
+    agentChannel = `kai_${user.id}`;
+    agentChannelType = 'messaging';
+  }
+  
+  const agent = await createAgent(user as User, agentChannelType, agentChannel);
 
   switch (message.command) {
     case 'summary':

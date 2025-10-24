@@ -377,6 +377,50 @@ router.post('/:taskId/attachments/upload', upload.single('file'), async (req: Re
       { new: true }
     );
 
+    // Create activity and notification for attachment addition
+    try {
+      // Add activity to tasks feed
+      const tasksFeed = await getStreamFeedsService['getstreamClient'].feed('tasks', taskId);
+      await tasksFeed.addActivity({
+        actor: req.body.userId || 'system',
+        verb: 'task_attachment_added',
+        object: taskId,
+        extra: {
+          taskId: taskId,
+          taskName: task.name,
+          fileName: file.originalname,
+          fileType: file.mimetype,
+          actor: req.body.userId || 'system',
+          channelId: task.channelId
+        }
+      });
+      
+      // Send notifications to users
+      const usersToNotify = new Set([
+        ...(task.assignee || []),
+        task.createdBy
+      ].filter(Boolean));
+
+      for (const userId of usersToNotify) {
+        await getStreamFeedsService.createNotification(
+          userId,
+          'task_attachment_added',
+          taskId,
+          {
+            taskId: taskId,
+            taskName: task.name,
+            fileName: file.originalname,
+            fileType: file.mimetype,
+            actor: req.body.userId || 'system',
+            channelId: task.channelId
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error creating attachment notification:', error);
+      // Continue even if notification fails
+    }
+
     res.status(200).json({ 
       status: 'success',
       task: updatedTask,
@@ -444,6 +488,7 @@ router.delete('/:taskId/attachments/:attachmentIndex', async (req: Request, res:
     }
 
     // Remove the attachment at the specified index
+    const removedAttachment = task.attachments[index];
     const updatedAttachments = task.attachments.filter((_, i) => i !== index);
     
     const updatedTask = await Task.findByIdAndUpdate(
@@ -451,6 +496,48 @@ router.delete('/:taskId/attachments/:attachmentIndex', async (req: Request, res:
       { attachments: updatedAttachments },
       { new: true }
     );
+
+    // Create activity and notification for attachment removal
+    try {
+      // Add activity to tasks feed
+      const tasksFeed = await getStreamFeedsService['getstreamClient'].feed('tasks', taskId);
+      await tasksFeed.addActivity({
+        actor: req.body.userId || 'system',
+        verb: 'task_attachment_removed',
+        object: taskId,
+        extra: {
+          taskId: taskId,
+          taskName: task.name,
+          fileName: removedAttachment.name,
+          actor: req.body.userId || 'system',
+          channelId: task.channelId
+        }
+      });
+      
+      // Send notifications to users
+      const usersToNotify = new Set([
+        ...(task.assignee || []),
+        task.createdBy
+      ].filter(Boolean));
+
+      for (const userId of usersToNotify) {
+        await getStreamFeedsService.createNotification(
+          userId,
+          'task_attachment_removed',
+          taskId,
+          {
+            taskId: taskId,
+            taskName: task.name,
+            fileName: removedAttachment.name,
+            actor: req.body.userId || 'system',
+            channelId: task.channelId
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error creating attachment removal notification:', error);
+      // Continue even if notification fails
+    }
 
     res.status(200).json({ 
       status: 'success', 

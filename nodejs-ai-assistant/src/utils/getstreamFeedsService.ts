@@ -164,7 +164,6 @@ export class GetStreamFeedsService {
       
       // DON'T send notification to self - skip if user is notifying themselves
       if (userId === actor || userId === extra.createdBy || userId === extra.commentedBy) {
-        console.log(`🚫 Skipping self-notification for user ${userId} (verb: ${verb})`);
         return null;
       }
 
@@ -184,7 +183,6 @@ export class GetStreamFeedsService {
       // Send push notification
       await this.sendPushNotification(userId, verb, extra);
       
-      console.log('✅ Notification created successfully for user:', userId, 'activity:', activity.id);
       return activity.id;
     } catch (error) {
       console.error('Error creating notification:', error);
@@ -203,7 +201,6 @@ export class GetStreamFeedsService {
       // Send push notification directly (no channels)
       await this.sendDirectPushNotification(userId, title, message, extra);
     } catch (error) {
-      console.error('Error sending push notification:', error);
       // Don't throw error - push notification failure shouldn't break the main flow
     }
   }
@@ -230,10 +227,7 @@ export class GetStreamFeedsService {
         sound: 'default',
         category: extra.category || 'task'
       });
-      
-      console.log(`✅ Push notification sent to user ${userId}: ${title}`);
     } catch (error) {
-      console.error(`❌ Error sending direct push notification to user ${userId}:`, error);
       // Don't throw error - push notification failure shouldn't break the main flow
     }
   }
@@ -242,6 +236,8 @@ export class GetStreamFeedsService {
    * Get push notification title and message based on verb
    */
   private getPushNotificationContent(verb: string, extra: any = {}): { title: string; message: string } {
+    const actor = extra.actor || extra.commentedBy || extra.createdBy || 'System';
+    
     switch (verb) {
       case 'task_created':
         return {
@@ -251,7 +247,32 @@ export class GetStreamFeedsService {
       case 'task_assigned':
         return {
           title: 'New Task Assigned',
-          message: `${extra.createdBy || 'System'} assigned you: "${extra.taskName || 'Untitled Task'}"`
+          message: `${actor} assigned you: "${extra.taskName || 'Untitled Task'}"`
+        };
+      case 'task_attachment_added':
+        return {
+          title: 'File Attached to Task',
+          message: `${actor} added "${extra.fileName}" to "${extra.taskName || 'Untitled Task'}"`
+        };
+      case 'task_attachment_removed':
+        return {
+          title: 'File Removed from Task',
+          message: `${actor} removed "${extra.fileName}" from "${extra.taskName || 'Untitled Task'}"`
+        };
+      case 'task_priority_changed':
+        return {
+          title: 'Task Priority Changed',
+          message: `${actor} changed priority to "${extra.newPriority}" for "${extra.taskName || 'Untitled Task'}"`
+        };
+      case 'task_date_changed':
+        return {
+          title: 'Task Due Date Changed',
+          message: `${actor} changed due date for "${extra.taskName || 'Untitled Task'}"`
+        };
+      case 'task_status_changed':
+        return {
+          title: 'Task Status Changed',
+          message: `${actor} changed status to "${extra.newStatus}" for "${extra.taskName || 'Untitled Task'}"`
         };
       case 'comment_added':
         if (extra.action === 'commented') {
@@ -262,12 +283,12 @@ export class GetStreamFeedsService {
         } else if (extra.isTaskCreator) {
           return {
             title: 'New Comment on Your Task',
-            message: `${extra.commentedBy || 'Someone'} commented on your created task: "${extra.taskName || 'Untitled Task'}"`
+            message: `${actor} commented on your created task: "${extra.taskName || 'Untitled Task'}"`
           };
         } else {
           return {
             title: 'New Comment on Assigned Task',
-            message: `${extra.commentedBy || 'Someone'} commented on your assigned task: "${extra.taskName || 'Untitled Task'}"`
+            message: `${actor} commented on your assigned task: "${extra.taskName || 'Untitled Task'}"`
           };
         }
       default:
@@ -331,8 +352,6 @@ export class GetStreamFeedsService {
         await this.connect();
       }
 
-      console.log('Creating task activity for:', taskId);
-      
       // Create task activity in tasks feed group (you have this configured)
       const tasksFeed = this.getstreamClient.feed('tasks', taskId);
       const activity = await tasksFeed.addActivity({
@@ -414,28 +433,37 @@ export class GetStreamFeedsService {
         await this.connect();
       }
 
-      console.log('Creating notifications for task updates:', {
-        taskId: String(updatedTask._id || ''),
-        taskName: updatedTask.name,
-        changes: Object.keys(updateData)
-      });
-
       // Get all users to notify (assignees + creator)
       const usersToNotify = new Set([
         ...(updatedTask.assignee || []),
         updatedTask.createdBy
       ].filter(Boolean));
 
-      // Check for specific changes and create notifications
+      // Check for specific changes and create notifications + activities
       if (updateData.assignee !== undefined) {
         // Assignee changed
         const originalAssignees = new Set(originalTask.assignee || []);
         const newAssignees = new Set(updatedTask.assignee || []);
+        const taskId = String((updatedTask._id as any) || '');
+        
+        // Add activity to tasks feed for assignee change
+        const tasksFeed = this.getstreamClient.feed('tasks', taskId);
+        await tasksFeed.addActivity({
+          actor: updatedTask.createdBy || 'system',
+          verb: 'task_assignee_changed',
+          object: taskId,
+          extra: {
+            taskId: taskId,
+            taskName: updatedTask.name || 'Untitled Task',
+            oldAssignees: Array.from(originalAssignees),
+            newAssignees: Array.from(newAssignees),
+            actor: updatedTask.createdBy
+          }
+        });
         
         // Notify newly assigned users
         for (const assigneeId of newAssignees) {
           if (!originalAssignees.has(assigneeId)) {
-            const taskId = String((updatedTask._id as any) || '');
             await this.createNotification(assigneeId as string, 'task_assigned', taskId, {
               taskId: taskId,
               taskName: updatedTask.name || 'Untitled Task',
@@ -447,29 +475,43 @@ export class GetStreamFeedsService {
               action: 'newly_assigned',
               actor: updatedTask.createdBy
             });
-            console.log(`✅ Created assignment notification for user ${assigneeId}`);
           }
         }
         
         // Notify unassigned users
         for (const assigneeId of originalAssignees) {
           if (!newAssignees.has(assigneeId)) {
-            const taskId = String((updatedTask._id as any) || '');
             await this.createNotification(assigneeId as string, 'task_unassigned', taskId, {
               taskId: taskId,
               taskName: updatedTask.name || 'Untitled Task',
               action: 'unassigned',
               actor: updatedTask.createdBy
             });
-            console.log(`✅ Created unassignment notification for user ${assigneeId}`);
           }
         }
       }
 
       if (updateData.priority !== undefined && updateData.priority !== originalTask.priority) {
         // Priority changed
+        const taskId = updatedTask._id?.toString() || '';
+        
+        // Add activity to tasks feed
+        const tasksFeed = this.getstreamClient.feed('tasks', taskId);
+        await tasksFeed.addActivity({
+          actor: updatedTask.createdBy || 'system',
+          verb: 'task_priority_changed',
+          object: taskId,
+          extra: {
+            taskId: taskId,
+            taskName: updatedTask.name || 'Untitled Task',
+            oldPriority: originalTask.priority,
+            newPriority: updateData.priority,
+            actor: updatedTask.createdBy
+          }
+        });
+        
+        // Send notifications to users
         for (const userId of usersToNotify) {
-          const taskId = updatedTask._id?.toString() || '';
           await this.createNotification(userId, 'task_priority_changed', taskId, {
             taskId: taskId,
             taskName: updatedTask.name || 'Untitled Task',
@@ -478,15 +520,31 @@ export class GetStreamFeedsService {
             action: 'priority_changed',
             actor: updatedTask.createdBy
           });
-          console.log(`✅ Created priority change notification for user ${userId}`);
         }
       }
 
       if (updateData.completionDate !== undefined && 
           new Date(updateData.completionDate).getTime() !== new Date(originalTask.completionDate).getTime()) {
         // Completion date changed
+        const taskId = updatedTask._id?.toString() || '';
+        
+        // Add activity to tasks feed
+        const tasksFeed = this.getstreamClient.feed('tasks', taskId);
+        await tasksFeed.addActivity({
+          actor: updatedTask.createdBy || 'system',
+          verb: 'task_date_changed',
+          object: taskId,
+          extra: {
+            taskId: taskId,
+            taskName: updatedTask.name || 'Untitled Task',
+            oldDate: originalTask.completionDate,
+            newDate: updateData.completionDate,
+            actor: updatedTask.createdBy
+          }
+        });
+        
+        // Send notifications to users
         for (const userId of usersToNotify) {
-          const taskId = updatedTask._id?.toString() || '';
           await this.createNotification(userId, 'task_date_changed', taskId, {
             taskId: taskId,
             taskName: updatedTask.name || 'Untitled Task',
@@ -495,14 +553,30 @@ export class GetStreamFeedsService {
             action: 'date_changed',
             actor: updatedTask.createdBy
           });
-          console.log(`✅ Created date change notification for user ${userId}`);
         }
       }
 
       if (updateData.description !== undefined && updateData.description !== originalTask.description) {
         // Description changed
+        const taskId = updatedTask._id?.toString() || '';
+        
+        // Add activity to tasks feed
+        const tasksFeed = this.getstreamClient.feed('tasks', taskId);
+        await tasksFeed.addActivity({
+          actor: updatedTask.createdBy || 'system',
+          verb: 'task_description_changed',
+          object: taskId,
+          extra: {
+            taskId: taskId,
+            taskName: updatedTask.name || 'Untitled Task',
+            oldDescription: originalTask.description,
+            newDescription: updateData.description,
+            actor: updatedTask.createdBy
+          }
+        });
+        
+        // Send notifications to users
         for (const userId of usersToNotify) {
-          const taskId = updatedTask._id?.toString() || '';
           await this.createNotification(userId, 'task_description_changed', taskId, {
             taskId: taskId,
             taskName: updatedTask.name || 'Untitled Task',
@@ -511,14 +585,30 @@ export class GetStreamFeedsService {
             action: 'description_changed',
             actor: updatedTask.createdBy
           });
-          console.log(`✅ Created description change notification for user ${userId}`);
         }
       }
 
       if (updateData.completed !== undefined && updateData.completed !== originalTask.completed) {
         // Completion status changed
+        const taskId = updatedTask._id?.toString() || '';
+        
+        // Add activity to tasks feed
+        const tasksFeed = this.getstreamClient.feed('tasks', taskId);
+        await tasksFeed.addActivity({
+          actor: updatedTask.createdBy || 'system',
+          verb: 'task_status_changed',
+          object: taskId,
+          extra: {
+            taskId: taskId,
+            taskName: updatedTask.name || 'Untitled Task',
+            oldStatus: originalTask.completed ? 'completed' : 'in_progress',
+            newStatus: updateData.completed ? 'completed' : 'in_progress',
+            actor: updatedTask.createdBy
+          }
+        });
+        
+        // Send notifications to users
         for (const userId of usersToNotify) {
-          const taskId = updatedTask._id?.toString() || '';
           await this.createNotification(userId, 'task_status_changed', taskId, {
             taskId: taskId,
             taskName: updatedTask.name || 'Untitled Task',
@@ -527,14 +617,29 @@ export class GetStreamFeedsService {
             action: 'status_changed',
             actor: updatedTask.createdBy
           });
-          console.log(`✅ Created status change notification for user ${userId}`);
         }
       }
 
       if (updateData.name !== undefined && updateData.name !== originalTask.name) {
         // Task name changed
+        const taskId = updatedTask._id?.toString() || '';
+        
+        // Add activity to tasks feed
+        const tasksFeed = this.getstreamClient.feed('tasks', taskId);
+        await tasksFeed.addActivity({
+          actor: updatedTask.createdBy || 'system',
+          verb: 'task_name_changed',
+          object: taskId,
+          extra: {
+            taskId: taskId,
+            oldName: originalTask.name,
+            newName: updateData.name,
+            actor: updatedTask.createdBy
+          }
+        });
+        
+        // Send notifications to users
         for (const userId of usersToNotify) {
-          const taskId = updatedTask._id?.toString() || '';
           await this.createNotification(userId, 'task_name_changed', taskId, {
             taskId: taskId,
             oldName: originalTask.name,
@@ -542,7 +647,6 @@ export class GetStreamFeedsService {
             action: 'name_changed',
             actor: updatedTask.createdBy
           });
-          console.log(`✅ Created name change notification for user ${userId}`);
         }
       }
 
@@ -561,8 +665,6 @@ export class GetStreamFeedsService {
         await this.connect();
       }
 
-      console.log('Adding comment for task:', taskId, 'by user:', userId);
-      
       // Get the tasks feed for this task (you have this configured)
       const tasksFeed = this.getstreamClient.feed('tasks', taskId);
       
@@ -586,14 +688,6 @@ export class GetStreamFeedsService {
       try {
         const { Task } = await import('../models/Task');
         const task = await Task.findById(taskId);
-        
-        console.log('Task found for comment notification:', {
-          taskId,
-          taskName: task?.name,
-          createdBy: task?.createdBy,
-          assignee: task?.assignee,
-          channelId: task?.channelId
-        });
         
         if (task) {
           // Create a set of all users to notify (assignees + creator)

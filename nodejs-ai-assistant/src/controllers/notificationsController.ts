@@ -117,7 +117,8 @@ const getNotificationCategory = (notification: any): string => {
 
   if (verb === 'task_assigned' || verb === 'task_completed' || verb === 'task_updated' ||
       verb === 'task_priority_changed' || verb === 'task_date_changed' || verb === 'task_description_changed' ||
-      verb === 'task_status_changed' || verb === 'task_name_changed' || verb === 'task_unassigned') {
+      verb === 'task_status_changed' || verb === 'task_name_changed' || verb === 'task_unassigned' ||
+      verb === 'task_attachment_added' || verb === 'task_attachment_removed') {
     return 'tasks_projects';
   } else if (verb === 'comment_added' || verb === 'mention' || verb === 'message') {
     return 'chat_messaging';
@@ -155,6 +156,10 @@ const getNotificationIcon = (notification: any): string => {
       return 'create-outline';
     case 'task_unassigned':
       return 'person-remove-outline';
+    case 'task_attachment_added':
+      return 'attach-outline';
+    case 'task_attachment_removed':
+      return 'trash-outline';
     case 'event_created':
     case 'event_reminder':
       return 'calendar-outline';
@@ -193,6 +198,10 @@ const getNotificationTitle = (notification: any): string => {
       return 'Task Name Changed';
     case 'task_unassigned':
       return 'Task Unassigned';
+    case 'task_attachment_added':
+      return 'File Attached to Task';
+    case 'task_attachment_removed':
+      return 'File Removed from Task';
     case 'task_updated':
       return 'Task Updated';
     case 'event_created':
@@ -243,6 +252,10 @@ const getNotificationMessage = (notification: any): string => {
       return `${actor} renamed task from "${extra.oldName || 'Untitled Task'}" to "${extra.newName || 'Untitled Task'}"`;
     case 'task_unassigned':
       return `${actor} unassigned you from task: "${extra.taskName || 'Untitled Task'}"`;
+    case 'task_attachment_added':
+      return `${actor} added file "${extra.fileName || 'attachment'}" to task: "${extra.taskName || 'Untitled Task'}"`;
+    case 'task_attachment_removed':
+      return `${actor} removed file "${extra.fileName || 'attachment'}" from task: "${extra.taskName || 'Untitled Task'}"`;
     case 'task_updated':
       return `Task "${extra.taskName || 'Untitled Task'}" has been updated`;
     case 'event_created':

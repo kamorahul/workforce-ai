@@ -32,8 +32,6 @@ export class DirectPushNotificationService {
    */
   async sendSimpleNotification(payload: SimpleNotificationPayload): Promise<void> {
     try {
-      console.log(`🔔 Sending simple notification to user ${payload.userId}: ${payload.title}`);
-      
       // Create push notification payload
       const pushPayload: PushNotificationPayload = {
         title: payload.title,
@@ -50,8 +48,6 @@ export class DirectPushNotificationService {
       
       // Send push notification
       await this.sendDirectPushNotification(payload.userId, pushPayload);
-      
-      console.log(`✅ Simple notification sent to user ${payload.userId}`);
     } catch (error) {
       console.error(`❌ Failed to send simple notification to user ${payload.userId}:`, error);
       throw error;
@@ -63,8 +59,6 @@ export class DirectPushNotificationService {
    */
   async sendGroupNotification(payload: GroupNotificationPayload): Promise<void> {
     try {
-      console.log(`🔔 Sending group notification to ${payload.userIds.length} users: ${payload.title}`);
-      
       const promises = payload.userIds.map(userId => 
         this.sendSimpleNotification({
           userId,
@@ -76,7 +70,6 @@ export class DirectPushNotificationService {
       );
       
       await Promise.allSettled(promises);
-      console.log(`✅ Group notification sent to ${payload.userIds.length} users`);
     } catch (error) {
       console.error(`❌ Failed to send group notification:`, error);
       throw error;
@@ -91,22 +84,15 @@ export class DirectPushNotificationService {
     payload: PushNotificationPayload
   ): Promise<void> {
     try {
-      console.log(`🔔 Sending push notification to user ${userId}: ${payload.title}`);
-      
       // Get user's devices
       const devices = await deviceTokenService.getUserDevices(userId);
       
       if (!devices || devices.length === 0) {
-        console.log(`📱 No devices found for user ${userId}, skipping push notification`);
         return;
       }
       
-      console.log(`📱 Found ${devices.length} devices for user ${userId}`);
-      
       // Send push notification via Stream's push API
       await this.sendPushViaStream(userId, payload, devices);
-      
-      console.log(`✅ Push notification sent to user ${userId}`);
     } catch (error) {
       console.error(`❌ Failed to send push notification to user ${userId}:`, error);
       throw error;
@@ -125,12 +111,6 @@ export class DirectPushNotificationService {
       // Import Firebase Admin SDK
       const { messaging } = await import('../config/firebase');
       
-      console.log(`📱 Sending FCM push notification to user ${userId}:`, {
-        title: payload.title,
-        body: payload.message,
-        devices: devices.length
-      });
-      
       // Send push notification to each device token
       const pushPromises = devices.map(async (device) => {
         try {
@@ -145,6 +125,14 @@ export class DirectPushNotificationService {
           }
           stringData.type = payload.category || 'task';
           stringData.timestamp = new Date().toISOString();
+          
+          // Ensure taskId is in data for navigation
+          if (payload.data?.taskId) {
+            stringData.taskId = String(payload.data.taskId);
+          }
+          if (payload.data?.channelId) {
+            stringData.channelId = String(payload.data.channelId);
+          }
           
           // Create FCM message
           const message = {
@@ -176,16 +164,13 @@ export class DirectPushNotificationService {
           };
           
           // Send via Firebase Cloud Messaging
-          const response = await messaging.send(message);
-          console.log(`✅ FCM push sent to device ${deviceToken.substring(0, 10)}...: ${response}`);
+          await messaging.send(message);
         } catch (deviceError: any) {
-          console.error(`❌ Failed to send FCM push to device ${device.id?.substring(0, 10)}:`, deviceError.message);
+          console.error(`❌ FCM push failed for device ${device.id?.substring(0, 10)}:`, deviceError.message);
         }
       });
       
       await Promise.allSettled(pushPromises);
-      
-      console.log(`✅ FCM push notifications sent to user ${userId}`);
     } catch (error) {
       console.error(`❌ Failed to send FCM push for user ${userId}:`, error);
       throw error;
@@ -200,14 +185,11 @@ export class DirectPushNotificationService {
     payload: PushNotificationPayload
   ): Promise<void> {
     try {
-      console.log(`🔔 Sending bulk push notifications to ${userIds.length} users: ${payload.title}`);
-      
       const promises = userIds.map(userId => 
         this.sendDirectPushNotification(userId, payload)
       );
       
       await Promise.allSettled(promises);
-      console.log(`✅ Bulk push notifications completed for ${userIds.length} users`);
     } catch (error) {
       console.error(`❌ Failed to send bulk push notifications:`, error);
       throw error;
@@ -234,13 +216,10 @@ export class DirectPushNotificationService {
     setTimeout(async () => {
       try {
         await this.sendDirectPushNotification(userId, payload);
-        console.log(`✅ Scheduled push notification sent to user ${userId}`);
       } catch (error) {
         console.error(`❌ Failed to send scheduled push notification to user ${userId}:`, error);
       }
     }, delay);
-    
-    console.log(`⏰ Push notification scheduled for user ${userId} at ${scheduledTime.toISOString()}`);
   }
 }
 
