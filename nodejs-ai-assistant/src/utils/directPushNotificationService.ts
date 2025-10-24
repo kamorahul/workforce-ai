@@ -136,6 +136,16 @@ export class DirectPushNotificationService {
         try {
           const deviceToken = device.id; // Device token from Stream
           
+          // Convert all data values to strings (FCM requirement)
+          const stringData: Record<string, string> = {};
+          if (payload.data) {
+            for (const [key, value] of Object.entries(payload.data)) {
+              stringData[key] = typeof value === 'string' ? value : JSON.stringify(value);
+            }
+          }
+          stringData.type = payload.category || 'task';
+          stringData.timestamp = new Date().toISOString();
+          
           // Create FCM message
           const message = {
             token: deviceToken,
@@ -143,11 +153,7 @@ export class DirectPushNotificationService {
               title: payload.title,
               body: payload.message,
             },
-            data: {
-              ...payload.data,
-              type: payload.category || 'task',
-              timestamp: new Date().toISOString(),
-            },
+            data: stringData, // All values must be strings
             android: {
               priority: 'high' as const,
               notification: {
