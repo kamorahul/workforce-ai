@@ -937,6 +937,44 @@ export class GetStreamFeedsService {
 
 
   /**
+   * Get ALL activities for a task (including system updates like assignee changes, priority changes, etc.)
+   */
+  async getTaskActivities(taskId: string, limit: number = 100): Promise<any[]> {
+    try {
+      if (!this.isConnected) {
+        await this.connect();
+      }
+
+      console.log('Getting all activities for task:', taskId);
+      
+      // Get the tasks feed for this task
+      const tasksFeed = this.getstreamClient.feed('tasks', taskId);
+      
+      // Get activities from the tasks feed
+      const response = await tasksFeed.get({ 
+        limit
+      });
+      
+      if (response.results && response.results.length > 0) {
+        // Return all activities with their full data
+        return response.results.map((activity: any) => ({
+          id: activity.id,
+          actor: activity.actor,
+          verb: activity.verb,
+          object: activity.object,
+          time: activity.time,
+          extra: activity.extra || {},
+        }));
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Error getting task activities:', error);
+      return [];
+    }
+  }
+
+  /**
    * Disconnect from GetStream
    */
   async disconnect(): Promise<void> {

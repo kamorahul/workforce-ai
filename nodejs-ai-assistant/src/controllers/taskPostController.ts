@@ -84,8 +84,17 @@ router.post('/', handleTaskPost);
 
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { assignee, channelId, createdBy, isCompleted, includeSubtasks, parentTaskId } = req.query;
-    const now = new Date();
+    const { 
+      assignee, 
+      channelId, 
+      createdBy, 
+      isCompleted, 
+      includeSubtasks, 
+      parentTaskId,
+      limit = '50',  // Default 50 tasks per page (increased for better UX with grouping)
+      offset = '0'   // Default start from beginning
+    } = req.query;
+    
     const query: any = {};
     
     if (assignee && createdBy) {
@@ -117,33 +126,63 @@ router.get('/', async (req: Request, res: Response) => {
       query.parentTaskId = { $exists: false };
     }
 
-    const tasks = await Task.find(query).sort({ completionDate: 1 });
+    // Convert pagination params to numbers
+    const limitNum = parseInt(limit as string, 10);
+    const offsetNum = parseInt(offset as string, 10);
 
-    // Always fetch subtask counts for each task
+    // Get total count for pagination info
+    const totalCount = await Task.countDocuments(query);
+
+    // Fetch tasks with pagination and field selection for performance
+    const tasks = await Task.find(query)
+      .select('_id name status priority completionDate channelId createdAt createdBy assignee description completed')
+      .limit(limitNum)
+      .skip(offsetNum)
+      .sort({ createdAt: -1 })  // Newest first for better UX
+      .lean();  // Use lean() for faster queries
+
+    // Fetch subtask counts efficiently with aggregation
     const tasksWithCounts = await Promise.all(tasks.map(async (task) => {
-      const subtasks = await Task.find({ parentTaskId: task._id });
-      const totalSubtasks = subtasks.length;
-      const completedSubtasks = subtasks.filter(subtask => subtask.completed).length;
+      const subtaskStats = await Task.aggregate([
+        { $match: { parentTaskId: task._id } },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            completed: {
+              $sum: { $cond: [{ $eq: ['$completed', true] }, 1, 0] }
+            }
+          }
+        }
+      ]);
+
+      const counts = subtaskStats[0] || { total: 0, completed: 0 };
       
-      const taskObj = task.toObject();
-      
-      // Ensure status field is set based on completed flag if not already set
-      if (!taskObj.status) {
-        taskObj.status = taskObj.completed ? 'completed' : 'todo';
+      // Ensure status field is set
+      if (!task.status) {
+        task.status = task.completed ? 'completed' : 'todo';
       }
       
       return {
-        ...taskObj,
+        ...task,
         subtaskCounts: {
-          total: totalSubtasks,
-          completed: completedSubtasks
-        },
-        // Include full subtasks array only if explicitly requested
-        ...(includeSubtasks === 'true' && !parentTaskId ? { subtasks } : {})
+          total: counts.total,
+          completed: counts.completed
+        }
       };
     }));
 
-    res.status(200).json({ status: 'success', tasks: tasksWithCounts });
+    // Calculate hasMore flag
+    const hasMore = offsetNum + limitNum < totalCount;
+
+    res.status(200).json({ 
+      status: 'success', 
+      tasks: tasksWithCounts,
+      total: totalCount,
+      limit: limitNum,
+      offset: offsetNum,
+      hasMore: hasMore
+    });
   } catch (error) {
     console.error('Error fetching tasks:', error);
     res.status(500).json({ error: 'Failed to fetch tasks' });
@@ -547,6 +586,31 @@ router.delete('/:taskId/attachments/:attachmentIndex', async (req: Request, res:
   } catch (error) {
     console.error('Error removing attachment:', error);
     res.status(500).json({ error: 'Failed to remove attachment' });
+  }
+});
+
+// GET /task/:taskId/activities - Get all activities for a task from GetStream
+router.get('/:taskId/activities', async (req: Request, res: Response) => {
+  try {
+    const { taskId } = req.params;
+    
+    if (!taskId) {
+      res.status(400).json({ error: 'Task ID is required' });
+      return;
+    }
+
+    console.log('Fetching activities for task:', taskId);
+    
+    // Get activities from GetStream
+    const activities = await getStreamFeedsService.getTaskActivities(taskId);
+    
+    res.status(200).json({ 
+      status: 'success',
+      activities: activities
+    });
+  } catch (error) {
+    console.error('Error fetching task activities:', error);
+    res.status(500).json({ error: 'Failed to fetch task activities' });
   }
 });
 
