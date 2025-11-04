@@ -60,8 +60,10 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     if(message.attachments && message.attachments.length > 0) {
       attachments = message.attachments.map((att: any) => ({
         type: att.type,
+        mime_type: att.mime_type,
         url: att.image_url || att.asset_url || att.file_url,
-        name: att.title || att.name || 'attachment'
+        name: att.title || att.name || att.fallback || att.originalImage?.filename || att.originalImage?.name || 'attachment',
+        filename: att.originalImage?.filename || att.originalImage?.name || att.fallback || att.title || att.name
       }));
       
       if (!messageText || messageText.trim() === '') {

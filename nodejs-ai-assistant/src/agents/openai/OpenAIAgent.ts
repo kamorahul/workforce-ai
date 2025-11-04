@@ -181,7 +181,8 @@ export class OpenAIAgent implements AIAgent {
         // Check if user sent attachments (images or documents)
         if (attachments && attachments.length > 0) {
           const attachment = attachments[0];
-          const isImage = attachment.type?.startsWith('image/');
+          // Check if it's an image: type === 'image' OR mime_type starts with 'image/'
+          const isImage = attachment.type === 'image' || attachment.mime_type?.startsWith('image/') || attachment.type?.startsWith('image/');
           
           if (isImage) {
             // For images, use vision API with image_url
@@ -203,33 +204,85 @@ export class OpenAIAgent implements AIAgent {
             additionalInstructions = `Analyze the image and respond to the user's question. Be detailed and helpful.`;
           } else {
             // For documents, upload to OpenAI and attach
-            try {
-              const response = await fetch(attachment.url);
-              const blob = await response.blob();
-              const file = new File([blob], attachment.name, { type: attachment.type });
+            // OpenAI supports: pdf, txt, md, docx, xlsx, csv, json, pptx
+            const supportedExtensions = ['.pdf', '.txt', '.md', '.docx', '.xlsx', '.csv', '.json', '.pptx'];
+            const filename = attachment.filename || attachment.name || 'document';
+            const hasExtension = supportedExtensions.some(ext => filename.toLowerCase().endsWith(ext));
+            
+            if (!hasExtension) {
+              // Try to infer extension from mime_type
+              const mimeToExt: { [key: string]: string } = {
+                'application/pdf': '.pdf',
+                'text/plain': '.txt',
+                'text/markdown': '.md',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+                'text/csv': '.csv',
+                'application/json': '.json',
+                'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx'
+              };
               
-              const uploadedFile = await this.openai.files.create({
-                file: file,
-                purpose: 'assistants'
-              });
+              const inferredExt = attachment.mime_type ? mimeToExt[attachment.mime_type] : null;
+              const finalFilename = inferredExt ? `${filename}${inferredExt}` : `${filename}.txt`;
               
-              await this.openai.beta.threads.messages.create(tempThread.id, {
-                role: 'user',
-                content: e || 'Please analyze this document.',
-                attachments: [{
-                  file_id: uploadedFile.id,
-                  tools: [{ type: 'file_search' }]
-                }]
-              });
-              
-              additionalInstructions = `Analyze the document and respond to the user's question. Be detailed and helpful.`;
-            } catch (fileError) {
-              console.error('Error uploading file to OpenAI:', fileError);
-              await this.openai.beta.threads.messages.create(tempThread.id, {
-                role: 'user',
-                content: `${e || 'User sent a file'} (Note: File upload failed, continuing without it)`,
-              });
-              additionalInstructions = `Respond helpfully even though the file couldn't be processed.`;
+              try {
+                const response = await fetch(attachment.url);
+                const blob = await response.blob();
+                const file = new File([blob], finalFilename, { type: attachment.mime_type || attachment.type || 'application/octet-stream' });
+                
+                const uploadedFile = await this.openai.files.create({
+                  file: file,
+                  purpose: 'assistants'
+                });
+                
+                await this.openai.beta.threads.messages.create(tempThread.id, {
+                  role: 'user',
+                  content: e || 'Please analyze this document.',
+                  attachments: [{
+                    file_id: uploadedFile.id,
+                    tools: [{ type: 'file_search' }]
+                  }]
+                });
+                
+                additionalInstructions = `Analyze the document and respond to the user's question. Be detailed and helpful.`;
+              } catch (fileError) {
+                console.error('Error uploading file to OpenAI:', fileError);
+                await this.openai.beta.threads.messages.create(tempThread.id, {
+                  role: 'user',
+                  content: `${e || 'User sent a file'} (Note: File upload failed, continuing without it)`,
+                });
+                additionalInstructions = `Respond helpfully even though the file couldn't be processed.`;
+              }
+            } else {
+              // File already has supported extension
+              try {
+                const response = await fetch(attachment.url);
+                const blob = await response.blob();
+                const file = new File([blob], filename, { type: attachment.mime_type || attachment.type || 'application/octet-stream' });
+                
+                const uploadedFile = await this.openai.files.create({
+                  file: file,
+                  purpose: 'assistants'
+                });
+                
+                await this.openai.beta.threads.messages.create(tempThread.id, {
+                  role: 'user',
+                  content: e || 'Please analyze this document.',
+                  attachments: [{
+                    file_id: uploadedFile.id,
+                    tools: [{ type: 'file_search' }]
+                  }]
+                });
+                
+                additionalInstructions = `Analyze the document and respond to the user's question. Be detailed and helpful.`;
+              } catch (fileError) {
+                console.error('Error uploading file to OpenAI:', fileError);
+                await this.openai.beta.threads.messages.create(tempThread.id, {
+                  role: 'user',
+                  content: `${e || 'User sent a file'} (Note: File upload failed, continuing without it)`,
+                });
+                additionalInstructions = `Respond helpfully even though the file couldn't be processed.`;
+              }
             }
           }
         }
@@ -276,7 +329,8 @@ export class OpenAIAgent implements AIAgent {
       // Handle attachments for regular users too
       if (attachments && attachments.length > 0) {
         const attachment = attachments[0];
-        const isImage = attachment.type?.startsWith('image/');
+        // Check if it's an image: type === 'image' OR mime_type starts with 'image/'
+        const isImage = attachment.type === 'image' || attachment.mime_type?.startsWith('image/') || attachment.type?.startsWith('image/');
         
         if (isImage) {
           await this.openai.beta.threads.messages.create(this.openAiThread.id, {
@@ -298,7 +352,7 @@ export class OpenAIAgent implements AIAgent {
           // For documents in regular chat (just acknowledge, don't process)
           await this.openai.beta.threads.messages.create(this.openAiThread.id, {
             role: 'user',
-            content: `${e || 'User sent a document'}: ${attachment.name}`,
+            content: `${e || 'User sent a document'}: ${attachment.name || attachment.filename}`,
           });
         }
       } else {
