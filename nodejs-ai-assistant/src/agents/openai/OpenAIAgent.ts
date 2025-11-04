@@ -4,6 +4,7 @@ import type { AIAgent } from '../types';
 import type { Channel, StreamChat } from 'stream-chat';
 import {User} from "../createAgent";
 import { Thread } from '../../models/Thread';
+import { Task } from '../../models/Task';
 
 export class OpenAIAgent implements AIAgent {
   private openai?: OpenAI;
@@ -66,7 +67,7 @@ export class OpenAIAgent implements AIAgent {
     }
   };
 
-  public handleMessage = async (e: string, messageId?: string) => {
+  public handleMessage = async (e: string, messageId?: string, attachments?: any[]) => {
     if (!this.openai || !this.openAiThread || !this.assistant) {
       console.error('OpenAI not initialized');
       return;
@@ -124,27 +125,141 @@ export class OpenAIAgent implements AIAgent {
         
         console.log(`📅 Fetched ${recentMessages.length} recent messages from ${channels.length} channels for daily summary`);
         
-        // Step 4: Create a TEMPORARY thread (will be discarded after response)
+        // Step 4: Fetch user's tasks with status
+        let taskSummary: string[] = [];
+        try {
+          const tasks = await Task.find({
+            $or: [
+              { assignee: { $in: [this.user.id] } },
+              { createdBy: this.user.id }
+            ]
+          })
+          .select('name status completed createdAt completionDate assignee')
+          .sort({ createdAt: -1 })
+          .limit(50)
+          .lean();
+          
+          // Group tasks by status
+          const completedTasks = tasks.filter(t => t.status === 'completed' || t.completed);
+          const inProgressTasks = tasks.filter(t => t.status === 'in_progress' && !t.completed);
+          const todoTasks = tasks.filter(t => t.status === 'todo' && !t.completed);
+          
+          if (completedTasks.length > 0) {
+            taskSummary.push(`\nCompleted Tasks (${completedTasks.length}):`);
+            completedTasks.slice(0, 10).forEach(task => {
+              taskSummary.push(`✓ ${task.name}`);
+            });
+          }
+          
+          if (inProgressTasks.length > 0) {
+            taskSummary.push(`\nIn Progress Tasks (${inProgressTasks.length}):`);
+            inProgressTasks.slice(0, 10).forEach(task => {
+              taskSummary.push(`⏳ ${task.name}`);
+            });
+          }
+          
+          if (todoTasks.length > 0) {
+            taskSummary.push(`\nTo Do Tasks (${todoTasks.length}):`);
+            todoTasks.slice(0, 10).forEach(task => {
+              const dueDate = task.completionDate ? new Date(task.completionDate).toISOString().split('T')[0] : 'No due date';
+              taskSummary.push(`○ ${task.name} (Due: ${dueDate})`);
+            });
+          }
+          
+          console.log(`📊 Fetched ${tasks.length} tasks: ${completedTasks.length} completed, ${inProgressTasks.length} in progress, ${todoTasks.length} to do`);
+        } catch (error) {
+          console.error('❌ Error fetching tasks:', error);
+        }
+        
+        // Step 5: Create a TEMPORARY thread (will be discarded after response)
         const tempThread = await this.openai.beta.threads.create();
         threadToUse = tempThread;
         
         const today = new Date().toISOString().split('T')[0];
         
-        // Step 5: Add ONLY recent conversations to temp thread
-        if (recentMessages.length > 0) {
-          const context = recentMessages.join('\n');
+        // Step 6: Add user message to temp thread
+        // Check if user sent attachments (images or documents)
+        if (attachments && attachments.length > 0) {
+          const attachment = attachments[0];
+          const isImage = attachment.type?.startsWith('image/');
+          
+          if (isImage) {
+            // For images, use vision API with image_url
+            await this.openai.beta.threads.messages.create(tempThread.id, {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: e || 'Please analyze this image.'
+                },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: attachment.url
+                  }
+                }
+              ]
+            });
+            additionalInstructions = `Analyze the image and respond to the user's question. Be detailed and helpful.`;
+          } else {
+            // For documents, upload to OpenAI and attach
+            try {
+              const response = await fetch(attachment.url);
+              const blob = await response.blob();
+              const file = new File([blob], attachment.name, { type: attachment.type });
+              
+              const uploadedFile = await this.openai.files.create({
+                file: file,
+                purpose: 'assistants'
+              });
+              
+              await this.openai.beta.threads.messages.create(tempThread.id, {
+                role: 'user',
+                content: e || 'Please analyze this document.',
+                attachments: [{
+                  file_id: uploadedFile.id,
+                  tools: [{ type: 'file_search' }]
+                }]
+              });
+              
+              additionalInstructions = `Analyze the document and respond to the user's question. Be detailed and helpful.`;
+            } catch (fileError) {
+              console.error('Error uploading file to OpenAI:', fileError);
+              await this.openai.beta.threads.messages.create(tempThread.id, {
+                role: 'user',
+                content: `${e || 'User sent a file'} (Note: File upload failed, continuing without it)`,
+              });
+              additionalInstructions = `Respond helpfully even though the file couldn't be processed.`;
+            }
+          }
+        }
+        // Step 7: Add conversations and tasks summary (if no attachments or as additional context)
+        else if (recentMessages.length > 0 || taskSummary.length > 0) {
+          let context = '';
+          
+          if (recentMessages.length > 0) {
+            context += `Recent Conversations (Last 7 days):\n${recentMessages.join('\n')}`;
+          }
+          
+          if (taskSummary.length > 0) {
+            if (context) context += '\n\n';
+            context += `Task Status:\n${taskSummary.join('\n')}`;
+          }
+          
           await this.openai.beta.threads.messages.create(tempThread.id, {
             role: 'user',
-            content: `Today is ${today}. Here are the recent conversations from the last 7 days:\n\n${context}\n\nPlease provide a daily summary for ${this.user.name}.`,
+            content: `Today is ${today}.\n\n${context}\n\nPlease provide a daily summary for ${this.user.name}.`,
           });
+          
+          additionalInstructions = `Analyze these conversations and tasks. Include task progress in your summary (completed, in progress, to do). Remember dates in messages are relative to when they were sent, not today (${today}).`;
         } else {
           await this.openai.beta.threads.messages.create(tempThread.id, {
             role: 'user',
-            content: `Today is ${today}. No recent conversations found. Greet ${this.user.name} and let them know all is good.`,
+            content: `Today is ${today}. No recent conversations or tasks found. Greet ${this.user.name} and let them know all is good.`,
           });
+          
+          additionalInstructions = `Greet the user warmly.`;
         }
-        
-        additionalInstructions = `Analyze these conversations and extract events/tasks. Remember dates in messages are relative to when they were sent, not today (${today}).`;
         
       } catch (error) {
         console.error('❌ Error fetching recent messages:', error);
@@ -158,10 +273,40 @@ export class OpenAIAgent implements AIAgent {
       }
     } else {
       // FOR REGULAR USERS: Use main thread normally
-      await this.openai.beta.threads.messages.create(this.openAiThread.id, {
-        role: 'user',
-        content: e,
-      });
+      // Handle attachments for regular users too
+      if (attachments && attachments.length > 0) {
+        const attachment = attachments[0];
+        const isImage = attachment.type?.startsWith('image/');
+        
+        if (isImage) {
+          await this.openai.beta.threads.messages.create(this.openAiThread.id, {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: e || 'Analyze this image'
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: attachment.url
+                }
+              }
+            ]
+          });
+        } else {
+          // For documents in regular chat (just acknowledge, don't process)
+          await this.openai.beta.threads.messages.create(this.openAiThread.id, {
+            role: 'user',
+            content: `${e || 'User sent a document'}: ${attachment.name}`,
+          });
+        }
+      } else {
+        await this.openai.beta.threads.messages.create(this.openAiThread.id, {
+          role: 'user',
+          content: e,
+        });
+      }
       additionalInstructions = `Analyze this message and respond with only '1' if it contains a task/todo/deadline, or '0' if it does not. Be precise.`;
     }
 

@@ -54,11 +54,22 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     await agent.init(assistantId);
 
     let messageText = message.text || '';
+    let attachments = [];
+    
+    // Process attachments (images and documents)
     if(message.attachments && message.attachments.length > 0) {
-      messageText += `: ${message.attachments[0].toString()}`;
+      attachments = message.attachments.map((att: any) => ({
+        type: att.type,
+        url: att.image_url || att.asset_url || att.file_url,
+        name: att.title || att.name || 'attachment'
+      }));
+      
+      if (!messageText || messageText.trim() === '') {
+        messageText = 'Please analyze this file.';
+      }
     }
     
-    await agent.handleMessage(messageText, message.id);
+    await agent.handleMessage(messageText, message.id, attachments);
 
     res.status(200).json({ message: "Webhook processed successfully" });
   } catch (error) {
