@@ -29,8 +29,16 @@ export class OpenAIResponseHandler {
   }
 
   run = async () => {
-    for await (const event of this.assistantStream) {
-      await this.handle(event);
+    try {
+      console.log('🔄 OpenAIResponseHandler: Starting to process stream events...');
+      for await (const event of this.assistantStream) {
+        console.log('📨 Received event:', event.event);
+        await this.handle(event);
+      }
+      console.log('✅ OpenAIResponseHandler: Stream processing completed');
+    } catch (error) {
+      console.error('❌ OpenAIResponseHandler: Error in run():', error);
+      throw error;
     }
   };
 
@@ -54,6 +62,7 @@ export class OpenAIResponseHandler {
     try {
       // Retrieve events that are denoted with 'requires_action'
       // since these will have our tool_calls
+      console.log('🔧 Handling event type:', event.event);
       switch (event.event) {
         case 'thread.run.requires_action':
           console.log('Requires action');

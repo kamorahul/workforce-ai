@@ -172,8 +172,10 @@ export class OpenAIAgent implements AIAgent {
         }
         
         // Step 5: Create a TEMPORARY thread (will be discarded after response)
+        console.log('📋 Creating temporary thread for Kai user...');
         const tempThread = await this.openai.beta.threads.create();
         threadToUse = tempThread;
+        console.log('✅ Temporary thread created:', tempThread.id);
         
         const today = new Date().toISOString().split('T')[0];
         
@@ -186,6 +188,7 @@ export class OpenAIAgent implements AIAgent {
           
           if (isImage) {
             // For images, use vision API with image_url
+            console.log('📸 Processing image attachment:', attachment.url);
             await this.openai.beta.threads.messages.create(tempThread.id, {
               role: 'user',
               content: [
@@ -201,6 +204,7 @@ export class OpenAIAgent implements AIAgent {
                 }
               ]
             });
+            console.log('✅ Image message created in thread');
             additionalInstructions = `Analyze the image and respond to the user's question. Be detailed and helpful.`;
           } else {
             // For documents, upload to OpenAI and attach
@@ -364,12 +368,17 @@ export class OpenAIAgent implements AIAgent {
       additionalInstructions = `Analyze this message and respond with only '1' if it contains a task/todo/deadline, or '0' if it does not. Be precise.`;
     }
 
+    console.log('🚀 Starting OpenAI streaming for thread:', threadToUse.id);
+    console.log('📝 Additional instructions:', additionalInstructions);
+    
     try {
       const run = this.openai.beta.threads.runs.stream(threadToUse.id, {
         assistant_id: this.assistant.id,
         additional_instructions: additionalInstructions,
       });
 
+      console.log('✅ OpenAI run stream created, initializing handler...');
+      
       const handler = new OpenAIResponseHandler(
         this.openai,
         threadToUse,
@@ -382,8 +391,9 @@ export class OpenAIAgent implements AIAgent {
       
       void handler.run();
       this.handlers.push(handler);
+      console.log('✅ Handler started');
     } catch (error) {
-      console.error("Error in handleMessage:", error);
+      console.error("❌ Error in handleMessage:", error);
     }
   };
 }
