@@ -15,6 +15,9 @@ interface FetchUserConversationsArguments {
 export class OpenAIResponseHandler {
   private message_text = '';
   private run_id = '';
+  private streamingMessageId: string | null = null;
+  private lastUpdateTime = 0;
+  private updateThrottleMs = 50; // Update every 50ms for smooth streaming
 
   constructor(
     private readonly openai: OpenAI,
@@ -30,11 +33,45 @@ export class OpenAIResponseHandler {
 
   run = async () => {
     try {
+      const isKaiChannel = this.channel.id?.indexOf('kai') === 0;
+      
+      if (isKaiChannel) {
+        // ✅ STEP 1: Start AI generation indicator
+        await this.channel.sendEvent({
+          type: 'ai_indicator.update',
+          ai_state: 'AI_STATE_INDICATOR_VISIBLE',
+          user: { id: 'kai' },
+        });
+        console.log('🤖 Started AI typing indicator');
+      }
+      
       for await (const event of this.assistantStream) {
         await this.handle(event);
       }
+      
+      if (isKaiChannel) {
+        // ✅ STEP 5: Clear AI state when done
+        await this.channel.sendEvent({
+          type: 'ai_indicator.clear',
+          user: { id: 'kai' },
+        });
+        console.log('✅ Cleared AI state');
+      }
     } catch (error) {
       console.error('❌ OpenAIResponseHandler: Error in run():', error);
+      
+      // Clear AI state on error
+      const isKaiChannel = this.channel.id?.indexOf('kai') === 0;
+      if (isKaiChannel) {
+        try {
+          await this.channel.sendEvent({
+            type: 'ai_indicator.clear',
+            user: { id: 'kai' },
+          });
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
       throw error;
     }
   };
@@ -71,8 +108,48 @@ export class OpenAIResponseHandler {
         case 'thread.message.delta':
           const content = event.data.delta.content;
           if (!content || content[0]?.type !== 'text') return;
-          this.message_text += content[0].text?.value ?? '';
+          
+          const deltaText = content[0].text?.value ?? '';
+          this.message_text += deltaText;
+          
+          const isKaiChannelDelta = this.channel.id?.indexOf('kai') === 0;
+          if (isKaiChannelDelta) {
+            const now = Date.now();
+            const shouldUpdate = (now - this.lastUpdateTime) >= this.updateThrottleMs;
+            
+            if (!this.streamingMessageId) {
+              // ✅ STEP 2: Create initial message with first text chunk
+              const messageResponse = await this.channel.sendMessage({
+                text: this.message_text,
+                user: { id: "kai" },
+                ai_generated: true, // Mark as AI-generated
+              });
+              this.streamingMessageId = messageResponse.message.id;
+              this.lastUpdateTime = now;
+              
+              // Update AI state to GENERATING
+              await this.channel.sendEvent({
+                type: 'ai_indicator.update',
+                ai_state: 'AI_STATE_GENERATING',
+                user: { id: 'kai' },
+              });
+              console.log('📝 Created streaming message:', this.streamingMessageId);
+            } else if (shouldUpdate) {
+              // ✅ STEP 3: Update message with throttling (every 50ms)
+              try {
+                await this.chatClient.partialUpdateMessage(this.streamingMessageId, {
+                  set: {
+                    text: this.message_text,
+                  },
+                });
+                this.lastUpdateTime = now;
+              } catch (error) {
+                console.error('Error updating streaming message:', error);
+              }
+            }
+          }
           break;
+          
         case 'thread.message.completed':
           const text = this.message_text;
           console.log(`🤖 AI Response: "${text}"`);
@@ -81,12 +158,32 @@ export class OpenAIResponseHandler {
           const isKaiChannel = this.channel.id?.indexOf('kai') === 0;
           
           if(isKaiChannel) {
-            // KAI CHANNEL - Always send as new message from Kai
-            await this.channel.sendMessage({
-              text,
-              user: { id: "kai" },
-            });
-            console.log(`✅ Sent Kai response`);
+            if (this.streamingMessageId) {
+              // ✅ STEP 4: Final update with complete text
+              try {
+                await this.chatClient.partialUpdateMessage(this.streamingMessageId, {
+                  set: {
+                    text: text,
+                  },
+                });
+                console.log(`✅ Completed streaming Kai response`);
+              } catch (error) {
+                console.error('Error completing streaming message:', error);
+              }
+            } else {
+              // Fallback: send complete message if streaming didn't work
+              await this.channel.sendMessage({
+                text,
+                user: { id: "kai" },
+                ai_generated: true,
+              });
+              console.log(`✅ Sent Kai response (fallback)`);
+            }
+            
+            // Reset for next message
+            this.streamingMessageId = null;
+            this.message_text = '';
+            this.lastUpdateTime = 0;
           } else if(this.messageId) {
             // REGULAR CHANNEL WITH MESSAGE ID - Update original message with task detection
             const { isTask, taskData } = this.parseTaskData(text);
@@ -113,6 +210,9 @@ export class OpenAIResponseHandler {
               extraData: extraData
             });
             console.log(`✅ Updated Stream message with istask: ${isTask ? 1 : 0}, preserved text: "${originalText}"`);
+            
+            // Reset for next message
+            this.message_text = '';
           } else {
             // REGULAR CHANNEL WITHOUT MESSAGE ID - Send new message with task detection
             const messageResponse = await this.channel.sendMessage({
@@ -149,6 +249,9 @@ export class OpenAIResponseHandler {
               });
               console.log(`✅ Updated Stream message with istask: ${isTask ? 1 : 0}`);
             }
+            
+            // Reset for next message
+            this.message_text = '';
           }
 
           break;
