@@ -124,6 +124,7 @@ export class OpenAIResponseHandler {
                 text: this.message_text,
                 user: { id: "kai" },
                 ai_generated: true, // Mark as AI-generated
+                silent: true, // ✅ Silent messages don't increment unread count
                 skip_push: true, // Don't send push notification
                 skip_enrich_url: true, // Don't enrich URLs for performance
               });
@@ -196,6 +197,7 @@ export class OpenAIResponseHandler {
                 text,
                 user: { id: "kai" },
                 ai_generated: true,
+                silent: true, // ✅ Silent messages don't increment unread count
                 skip_push: true,
                 skip_enrich_url: true,
               });
