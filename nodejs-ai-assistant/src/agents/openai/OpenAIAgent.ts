@@ -290,7 +290,7 @@ export class OpenAIAgent implements AIAgent {
         else if (recentMessages.length > 0 || taskSummary.length > 0) {
           let context = '';
           
-          if (recentMessages.length > 0) {
+        if (recentMessages.length > 0) {
             context += `Recent Conversations (Last 7 days):\n${recentMessages.join('\n')}`;
           }
           
@@ -356,10 +356,10 @@ export class OpenAIAgent implements AIAgent {
           });
         }
       } else {
-        await this.openai.beta.threads.messages.create(this.openAiThread.id, {
-          role: 'user',
-          content: e,
-        });
+      await this.openai.beta.threads.messages.create(this.openAiThread.id, {
+        role: 'user',
+        content: e,
+      });
       }
       additionalInstructions = `Analyze this message and respond with only '1' if it contains a task/todo/deadline, or '0' if it does not. Be precise.`;
     }

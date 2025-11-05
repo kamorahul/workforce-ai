@@ -46,8 +46,8 @@ export class OpenAIResponseHandler {
         console.log('🤖 Started AI typing indicator');
       }
       
-      for await (const event of this.assistantStream) {
-        await this.handle(event);
+    for await (const event of this.assistantStream) {
+      await this.handle(event);
       }
       
       if (isKaiChannel) {
@@ -124,6 +124,8 @@ export class OpenAIResponseHandler {
                 text: this.message_text,
                 user: { id: "kai" },
                 ai_generated: true, // Mark as AI-generated
+                skip_push: true, // Don't send push notification
+                skip_enrich_url: true, // Don't enrich URLs for performance
               });
               this.streamingMessageId = messageResponse.message.id;
               this.streamingMessageUserId = messageResponse.message.user?.id || 'kai'; // Cache user ID
@@ -136,6 +138,13 @@ export class OpenAIResponseHandler {
                 user: { id: 'kai' },
               });
               console.log('📝 Created streaming message:', this.streamingMessageId);
+              
+              // Mark channel as read for the user immediately
+              try {
+                await this.channel.markRead({ user_id: this.user.id });
+              } catch (e) {
+                // Ignore mark read errors
+              }
             } else if (shouldUpdate) {
               // ✅ STEP 3: Update message with throttling (every 50ms)
               try {
@@ -171,6 +180,13 @@ export class OpenAIResponseHandler {
                   user_id: this.streamingMessageUserId,
                 });
                 console.log(`✅ Completed streaming Kai response`);
+                
+                // Mark as read for the user after completion
+                try {
+                  await this.channel.markRead({ user_id: this.user.id });
+                } catch (e) {
+                  // Ignore mark read errors
+                }
               } catch (error) {
                 console.error('Error completing streaming message:', error);
               }
@@ -180,8 +196,17 @@ export class OpenAIResponseHandler {
                 text,
                 user: { id: "kai" },
                 ai_generated: true,
+                skip_push: true,
+                skip_enrich_url: true,
               });
               console.log(`✅ Sent Kai response (fallback)`);
+              
+              // Mark as read for the user
+              try {
+                await this.channel.markRead({ user_id: this.user.id });
+              } catch (e) {
+                // Ignore mark read errors
+              }
             }
             
             // Reset for next message
@@ -218,42 +243,42 @@ export class OpenAIResponseHandler {
             
             // Reset for next message
             this.message_text = '';
-          } else {
+            } else {
             // REGULAR CHANNEL WITHOUT MESSAGE ID - Send new message with task detection
             const messageResponse = await this.channel.sendMessage({
-              text,
-              user_id: this.user.id,
-              type: 'system',
-              restricted_visibility: [this.user.id],
-            });
-            
-            // Determine if it's a task and update Stream message (only for regular channels)
-            if (messageResponse?.message?.id) {
-              const { isTask, taskData } = this.parseTaskData(text);
-              console.log(`🔍 Task Detection - Response: "${text}" | IsTask: ${isTask}`, taskData ? `| TaskData: ${JSON.stringify(taskData)}` : '');
-              
-              // Prepare extraData with task information
-              const extraData: any = {
-                istask: isTask ? 1 : 0
-              };
-              
-              // If it's a task with JSON data, save the task properties
-              if (isTask && taskData) {
-                extraData.taskData = taskData;
-                console.log(`📝 Saving task data: ${JSON.stringify(taskData)}`);
-              }
-              
-              // Update the message with istask field and task data
-              await this.chatClient.updateMessage({
-                id: messageResponse.message.id,
-                text: messageResponse.message.text,
-                attachments: messageResponse.message.attachments,
-                mentioned_users: messageResponse.message.mentioned_users?.map(u => u.id),
-                user_id: messageResponse.message.user?.id,
-                extraData: extraData
+                text,
+                user_id: this.user.id,
+                type: 'system',
+                restricted_visibility: [this.user.id],
               });
-              console.log(`✅ Updated Stream message with istask: ${isTask ? 1 : 0}`);
-            }
+              
+              // Determine if it's a task and update Stream message (only for regular channels)
+              if (messageResponse?.message?.id) {
+                const { isTask, taskData } = this.parseTaskData(text);
+                console.log(`🔍 Task Detection - Response: "${text}" | IsTask: ${isTask}`, taskData ? `| TaskData: ${JSON.stringify(taskData)}` : '');
+                
+                // Prepare extraData with task information
+                const extraData: any = {
+                  istask: isTask ? 1 : 0
+                };
+                
+                // If it's a task with JSON data, save the task properties
+                if (isTask && taskData) {
+                  extraData.taskData = taskData;
+                  console.log(`📝 Saving task data: ${JSON.stringify(taskData)}`);
+                }
+                
+                // Update the message with istask field and task data
+                await this.chatClient.updateMessage({
+                  id: messageResponse.message.id,
+                  text: messageResponse.message.text,
+                  attachments: messageResponse.message.attachments,
+                  mentioned_users: messageResponse.message.mentioned_users?.map(u => u.id),
+                  user_id: messageResponse.message.user?.id,
+                  extraData: extraData
+                });
+                console.log(`✅ Updated Stream message with istask: ${isTask ? 1 : 0}`);
+              }
             
             // Reset for next message
             this.message_text = '';
