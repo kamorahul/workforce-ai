@@ -16,6 +16,7 @@ export class OpenAIResponseHandler {
   private message_text = '';
   private run_id = '';
   private streamingMessageId: string | null = null;
+  private streamingMessageUserId: string | null = null; // Cache user ID
   private lastUpdateTime = 0;
   private updateThrottleMs = 50; // Update every 50ms for smooth streaming
 
@@ -125,6 +126,7 @@ export class OpenAIResponseHandler {
                 ai_generated: true, // Mark as AI-generated
               });
               this.streamingMessageId = messageResponse.message.id;
+              this.streamingMessageUserId = messageResponse.message.user?.id || 'kai'; // Cache user ID
               this.lastUpdateTime = now;
               
               // Update AI state to GENERATING
@@ -137,10 +139,11 @@ export class OpenAIResponseHandler {
             } else if (shouldUpdate) {
               // ✅ STEP 3: Update message with throttling (every 50ms)
               try {
-                await this.chatClient.partialUpdateMessage(this.streamingMessageId, {
-                  set: {
-                    text: this.message_text,
-                  },
+                // Update with new text (use cached user ID)
+                await this.chatClient.updateMessage({
+                  id: this.streamingMessageId,
+                  text: this.message_text,
+                  user_id: this.streamingMessageUserId,
                 });
                 this.lastUpdateTime = now;
               } catch (error) {
@@ -161,10 +164,11 @@ export class OpenAIResponseHandler {
             if (this.streamingMessageId) {
               // ✅ STEP 4: Final update with complete text
               try {
-                await this.chatClient.partialUpdateMessage(this.streamingMessageId, {
-                  set: {
-                    text: text,
-                  },
+                // Final update with complete text (use cached user ID)
+                await this.chatClient.updateMessage({
+                  id: this.streamingMessageId,
+                  text: text,
+                  user_id: this.streamingMessageUserId,
                 });
                 console.log(`✅ Completed streaming Kai response`);
               } catch (error) {
@@ -182,6 +186,7 @@ export class OpenAIResponseHandler {
             
             // Reset for next message
             this.streamingMessageId = null;
+            this.streamingMessageUserId = null;
             this.message_text = '';
             this.lastUpdateTime = 0;
           } else if(this.messageId) {
