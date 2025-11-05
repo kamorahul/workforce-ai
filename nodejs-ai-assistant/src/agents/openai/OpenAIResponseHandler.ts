@@ -113,54 +113,8 @@ export class OpenAIResponseHandler {
           const deltaText = content[0].text?.value ?? '';
           this.message_text += deltaText;
           
-          const isKaiChannelDelta = this.channel.id?.indexOf('kai') === 0;
-          if (isKaiChannelDelta) {
-            const now = Date.now();
-            const shouldUpdate = (now - this.lastUpdateTime) >= this.updateThrottleMs;
-            
-            if (!this.streamingMessageId) {
-              // ✅ STEP 2: Create initial message with first text chunk
-              const messageResponse = await this.channel.sendMessage({
-                text: this.message_text,
-                user: { id: "kai" },
-                ai_generated: true, // Mark as AI-generated
-                silent: true, // ✅ Silent messages don't increment unread count
-                skip_push: true, // Don't send push notification
-                skip_enrich_url: true, // Don't enrich URLs for performance
-              });
-              this.streamingMessageId = messageResponse.message.id;
-              this.streamingMessageUserId = messageResponse.message.user?.id || 'kai'; // Cache user ID
-              this.lastUpdateTime = now;
-              
-              // Update AI state to GENERATING
-              await this.channel.sendEvent({
-                type: 'ai_indicator.update',
-                ai_state: 'AI_STATE_GENERATING',
-                user: { id: 'kai' },
-              });
-              console.log('📝 Created streaming message:', this.streamingMessageId);
-              
-              // Mark channel as read for the user immediately
-              try {
-                await this.channel.markRead({ user_id: this.user.id });
-              } catch (e) {
-                // Ignore mark read errors
-              }
-            } else if (shouldUpdate) {
-              // ✅ STEP 3: Update message with throttling (every 50ms)
-              try {
-                // Update with new text (use cached user ID)
-                await this.chatClient.updateMessage({
-                  id: this.streamingMessageId,
-                  text: this.message_text,
-                  user_id: this.streamingMessageUserId,
-                });
-                this.lastUpdateTime = now;
-              } catch (error) {
-                console.error('Error updating streaming message:', error);
-              }
-            }
-          }
+          // For Kai channels, just accumulate text (don't stream)
+          // We'll send the complete message at the end
           break;
           
         case 'thread.message.completed':
@@ -171,45 +125,16 @@ export class OpenAIResponseHandler {
           const isKaiChannel = this.channel.id?.indexOf('kai') === 0;
           
           if(isKaiChannel) {
-            if (this.streamingMessageId) {
-              // ✅ STEP 4: Final update with complete text
-              try {
-                // Final update with complete text (use cached user ID)
-                await this.chatClient.updateMessage({
-                  id: this.streamingMessageId,
-                  text: text,
-                  user_id: this.streamingMessageUserId,
-                });
-                console.log(`✅ Completed streaming Kai response`);
-                
-                // Mark as read for the user after completion
-                try {
-                  await this.channel.markRead({ user_id: this.user.id });
-                } catch (e) {
-                  // Ignore mark read errors
-                }
-              } catch (error) {
-                console.error('Error completing streaming message:', error);
-              }
-            } else {
-              // Fallback: send complete message if streaming didn't work
-              await this.channel.sendMessage({
-                text,
-                user: { id: "kai" },
-                ai_generated: true,
-                silent: true, // ✅ Silent messages don't increment unread count
-                skip_push: true,
-                skip_enrich_url: true,
-              });
-              console.log(`✅ Sent Kai response (fallback)`);
-              
-              // Mark as read for the user
-              try {
-                await this.channel.markRead({ user_id: this.user.id });
-              } catch (e) {
-                // Ignore mark read errors
-              }
-            }
+            // Send complete message (silent messages can't be updated, so no streaming)
+            await this.channel.sendMessage({
+              text,
+              user: { id: "kai" },
+              ai_generated: true,
+              silent: true, // ✅ Silent messages don't increment unread count
+              skip_push: true,
+              skip_enrich_url: true,
+            });
+            console.log(`✅ Sent Kai response`);
             
             // Reset for next message
             this.streamingMessageId = null;
