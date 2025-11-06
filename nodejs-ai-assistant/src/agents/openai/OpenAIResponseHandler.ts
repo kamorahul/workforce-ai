@@ -112,35 +112,24 @@ export class OpenAIResponseHandler {
           
           const deltaText = content[0].text?.value ?? '';
           this.message_text += deltaText;
-          
-          // For Kai channels, just accumulate text (don't stream)
-          // We'll send the complete message at the end
           break;
           
         case 'thread.message.completed':
           const text = this.message_text;
           console.log(`🤖 AI Response: "${text}"`);
           
-          // Check if this is a Kai channel FIRST - Kai always sends new messages
           const isKaiChannel = this.channel.id?.indexOf('kai') === 0;
           
           if(isKaiChannel) {
-            // Send complete message (silent messages can't be updated, so no streaming)
+            // Simple: Send complete message (NOT silent)
             await this.channel.sendMessage({
               text,
               user: { id: "kai" },
-              ai_generated: true,
-              silent: true, // ✅ Silent messages don't increment unread count
-              skip_push: true,
-              skip_enrich_url: true,
             });
             console.log(`✅ Sent Kai response`);
             
             // Reset for next message
-            this.streamingMessageId = null;
-            this.streamingMessageUserId = null;
             this.message_text = '';
-            this.lastUpdateTime = 0;
           } else if(this.messageId) {
             // REGULAR CHANNEL WITH MESSAGE ID - Update original message with task detection
             const { isTask, taskData } = this.parseTaskData(text);

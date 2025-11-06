@@ -226,27 +226,36 @@ export class OpenAIAgent implements AIAgent {
               const finalFilename = inferredExt ? `${filename}${inferredExt}` : `${filename}.txt`;
               
               try {
+                console.log('📄 Fetching document from URL:', attachment.url);
                 const response = await fetch(attachment.url);
+                if (!response.ok) {
+                  throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
+                }
                 const blob = await response.blob();
+                console.log('📄 Document fetched, size:', blob.size, 'bytes');
+                
                 const file = new File([blob], finalFilename, { type: attachment.mime_type || attachment.type || 'application/octet-stream' });
+                console.log('📄 Uploading to OpenAI as:', finalFilename);
                 
                 const uploadedFile = await this.openai.files.create({
                   file: file,
                   purpose: 'assistants'
                 });
+                console.log('✅ Document uploaded to OpenAI:', uploadedFile.id);
                 
                 await this.openai.beta.threads.messages.create(tempThread.id, {
                   role: 'user',
-                  content: e || 'Please analyze this document.',
+                  content: e || 'Please analyze this document and answer my question based on its contents.',
                   attachments: [{
                     file_id: uploadedFile.id,
                     tools: [{ type: 'file_search' }]
                   }]
                 });
+                console.log('✅ Document attached to message with file_search');
                 
-                additionalInstructions = `Analyze the document and respond to the user's question. Be detailed and helpful.`;
+                additionalInstructions = `The user has uploaded a document. Use the file_search tool to analyze the document's contents and provide a detailed, helpful response based on what you find in the document. Extract specific information, quotes, and data from the document to answer the user's question.`;
               } catch (fileError) {
-                console.error('Error uploading file to OpenAI:', fileError);
+                console.error('❌ Error uploading file to OpenAI:', fileError);
                 await this.openai.beta.threads.messages.create(tempThread.id, {
                   role: 'user',
                   content: `${e || 'User sent a file'} (Note: File upload failed, continuing without it)`,
@@ -256,27 +265,36 @@ export class OpenAIAgent implements AIAgent {
             } else {
               // File already has supported extension
               try {
+                console.log('📄 Fetching document from URL:', attachment.url);
                 const response = await fetch(attachment.url);
+                if (!response.ok) {
+                  throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
+                }
                 const blob = await response.blob();
+                console.log('📄 Document fetched, size:', blob.size, 'bytes');
+                
                 const file = new File([blob], filename, { type: attachment.mime_type || attachment.type || 'application/octet-stream' });
+                console.log('📄 Uploading to OpenAI as:', filename);
                 
                 const uploadedFile = await this.openai.files.create({
                   file: file,
                   purpose: 'assistants'
                 });
+                console.log('✅ Document uploaded to OpenAI:', uploadedFile.id);
                 
                 await this.openai.beta.threads.messages.create(tempThread.id, {
                   role: 'user',
-                  content: e || 'Please analyze this document.',
+                  content: e || 'Please analyze this document and answer my question based on its contents.',
                   attachments: [{
                     file_id: uploadedFile.id,
                     tools: [{ type: 'file_search' }]
                   }]
                 });
+                console.log('✅ Document attached to message with file_search');
                 
-                additionalInstructions = `Analyze the document and respond to the user's question. Be detailed and helpful.`;
+                additionalInstructions = `The user has uploaded a document. Use the file_search tool to analyze the document's contents and provide a detailed, helpful response based on what you find in the document. Extract specific information, quotes, and data from the document to answer the user's question.`;
               } catch (fileError) {
-                console.error('Error uploading file to OpenAI:', fileError);
+                console.error('❌ Error uploading file to OpenAI:', fileError);
                 await this.openai.beta.threads.messages.create(tempThread.id, {
                   role: 'user',
                   content: `${e || 'User sent a file'} (Note: File upload failed, continuing without it)`,
