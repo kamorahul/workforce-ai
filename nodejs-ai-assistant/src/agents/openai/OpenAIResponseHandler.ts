@@ -127,10 +127,11 @@ export class OpenAIResponseHandler {
           const isKaiChannel = this.channel.id?.indexOf('kai') === 0;
           
           if(isKaiChannel) {
-            // Simple: Send complete message (NOT silent)
+            // Simple: Send complete message with ai_generated flag
             await this.channel.sendMessage({
               text,
               user: { id: "kai" },
+              ai_generated: true,  // ✅ GetStream's official AI flag
             });
             console.log(`✅ Sent Kai response`);
             
