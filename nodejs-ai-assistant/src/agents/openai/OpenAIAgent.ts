@@ -350,13 +350,13 @@ export class OpenAIAgent implements AIAgent {
         
         taskContext = `\n\n[User's Current Tasks - ${new Date().toISOString().split('T')[0]}]\n`;
         if (completedTasks.length > 0) {
-          taskContext += `Completed (${completedTasks.length}): ${completedTasks.slice(0, 5).map(t => t.name).join(', ')}\n`;
+          taskContext += `Completed (${completedTasks.length}): ${completedTasks.filter(t => t.name).slice(0, 5).map(t => t.name).join(', ')}\n`;
         }
         if (inProgressTasks.length > 0) {
-          taskContext += `In Progress (${inProgressTasks.length}): ${inProgressTasks.slice(0, 5).map(t => t.name).join(', ')}\n`;
+          taskContext += `In Progress (${inProgressTasks.length}): ${inProgressTasks.filter(t => t.name).slice(0, 5).map(t => t.name).join(', ')}\n`;
         }
         if (todoTasks.length > 0) {
-          taskContext += `To Do (${todoTasks.length}): ${todoTasks.slice(0, 5).map(t => `${t.name} (Due: ${t.completionDate ? new Date(t.completionDate).toISOString().split('T')[0] : 'No due date'})`).join(', ')}`;
+          taskContext += `To Do (${todoTasks.length}): ${todoTasks.filter(t => t.name).slice(0, 5).map(t => `${t.name} (Due: ${t.completionDate ? new Date(t.completionDate).toISOString().split('T')[0] : 'No due date'})`).join(', ')}`;
         }
         
         console.log('📊 Loaded task context:', taskContext.split('\n').length, 'lines');
@@ -471,7 +471,7 @@ export class OpenAIAgent implements AIAgent {
         // No attachments, just send the message (clean, no task context appended)
         await this.openai.beta.threads.messages.create(this.openAiThread.id, {
           role: 'user',
-          content: e,
+          content: e || 'Hi',
         });
         console.log('✅ Message created in persistent thread');
       }
