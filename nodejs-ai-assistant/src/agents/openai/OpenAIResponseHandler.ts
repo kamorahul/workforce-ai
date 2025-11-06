@@ -15,10 +15,7 @@ interface FetchUserConversationsArguments {
 export class OpenAIResponseHandler {
   private message_text = '';
   private run_id = '';
-  private streamingMessageId: string | null = null;
-  private streamingMessageUserId: string | null = null; // Cache user ID
-  private lastUpdateTime = 0;
-  private updateThrottleMs = 50; // Update every 50ms for smooth streaming
+
 
   constructor(
     private readonly openai: OpenAI,
@@ -111,11 +108,13 @@ export class OpenAIResponseHandler {
           if (!content || content[0]?.type !== 'text') return;
           
           const deltaText = content[0].text?.value ?? '';
-          this.message_text += deltaText;
+          // this.message_text += deltaText;
+          this.message_text = (this.message_text ?? '') + deltaText;
           break;
           
         case 'thread.message.completed':
-          const text = this.message_text;
+          // const text = this.message_text;
+          const text = this.message_text?.trim() || '';
           console.log(`🤖 AI Response: "${text}"`);
           
           const isKaiChannel = this.channel.id?.indexOf('kai') === 0;
