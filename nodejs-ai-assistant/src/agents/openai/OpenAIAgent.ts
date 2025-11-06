@@ -477,7 +477,20 @@ export class OpenAIAgent implements AIAgent {
       }
       
       const today = new Date().toISOString().split('T')[0];
-      additionalInstructions = `Today is ${today}. Answer the user's question based on the conversation history, uploaded files, and available task data. Be helpful and conversational.${taskContext}`;
+      
+      // Only include task context if user is asking about tasks
+      const isAskingAboutTasks = e && (
+        e.toLowerCase().includes('task') || 
+        e.toLowerCase().includes('todo') || 
+        e.toLowerCase().includes('completed') ||
+        e.toLowerCase().includes('in progress')
+      );
+      
+      if (isAskingAboutTasks && taskContext) {
+        additionalInstructions = `Today is ${today}. The user is asking about tasks. Here is their current task summary:${taskContext}\n\nFormat your response cleanly with proper task names and due dates. Be conversational and helpful.`;
+      } else {
+        additionalInstructions = `Today is ${today}. Answer the user's question based on the conversation history and uploaded files. Be helpful and conversational.`;
+      }
     } else {
       // FOR REGULAR USERS: Use main thread normally
       // Handle attachments for regular users too
