@@ -110,12 +110,19 @@ export class OpenAIResponseHandler {
           const deltaText = content[0].text?.value ?? '';
           // this.message_text += deltaText;
           this.message_text = (this.message_text ?? '') + deltaText;
+          console.log(`🤖 AI Response: "${this.message_text}"`);
           break;
           
         case 'thread.message.completed':
-          // const text = this.message_text;
           const text = this.message_text?.trim() || '';
           console.log(`🤖 AI Response: "${text}"`);
+          
+          // ⚠️ Safety check: Don't send empty messages
+          if (!text || text.length === 0) {
+            console.warn('⚠️ Skipping empty message');
+            this.message_text = '';
+            break;
+          }
           
           const isKaiChannel = this.channel.id?.indexOf('kai') === 0;
           
