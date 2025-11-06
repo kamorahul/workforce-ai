@@ -379,7 +379,7 @@ export class OpenAIAgent implements AIAgent {
             content: [
               {
                 type: 'text',
-                text: e + taskContext || 'Please analyze this image.'
+                text: e || 'Please analyze this image.'
               },
               {
                 type: 'image_url',
@@ -425,7 +425,7 @@ export class OpenAIAgent implements AIAgent {
               
               await this.openai.beta.threads.messages.create(this.openAiThread.id, {
                 role: 'user',
-                content: e + taskContext,
+                content: e || 'Please analyze this document.',
                 attachments: [{ file_id: uploadedFile.id, tools: [{ type: 'file_search' }] }]
               });
               
@@ -435,7 +435,7 @@ export class OpenAIAgent implements AIAgent {
               // Fallback: just send the message with filename
               await this.openai.beta.threads.messages.create(this.openAiThread.id, {
                 role: 'user',
-                content: `${e}\n\n[User uploaded a document: ${filename}]${taskContext}`,
+                content: `${e || 'Please analyze this file.'}\n\n[User uploaded: ${filename}]`,
               });
             }
           } else {
@@ -452,7 +452,7 @@ export class OpenAIAgent implements AIAgent {
               
               await this.openai.beta.threads.messages.create(this.openAiThread.id, {
                 role: 'user',
-                content: e + taskContext,
+                content: e || 'Please analyze this document.',
                 attachments: [{ file_id: uploadedFile.id, tools: [{ type: 'file_search' }] }]
               });
               
@@ -462,22 +462,22 @@ export class OpenAIAgent implements AIAgent {
               // Fallback: just send the message with filename
               await this.openai.beta.threads.messages.create(this.openAiThread.id, {
                 role: 'user',
-                content: `${e}\n\n[User uploaded a document: ${filename}]${taskContext}`,
+                content: `${e || 'Please analyze this file.'}\n\n[User uploaded: ${filename}]`,
               });
             }
           }
         }
       } else {
-        // No attachments, just send the message with task context
+        // No attachments, just send the message (clean, no task context appended)
         await this.openai.beta.threads.messages.create(this.openAiThread.id, {
           role: 'user',
-          content: e + taskContext,
+          content: e,
         });
         console.log('✅ Message created in persistent thread');
       }
       
       const today = new Date().toISOString().split('T')[0];
-      additionalInstructions = `Today is ${today}. Answer the user's question based on the conversation history, uploaded files, and available task data. Be helpful and conversational.`;
+      additionalInstructions = `Today is ${today}. Answer the user's question based on the conversation history, uploaded files, and available task data. Be helpful and conversational.${taskContext}`;
     } else {
       // FOR REGULAR USERS: Use main thread normally
       // Handle attachments for regular users too
