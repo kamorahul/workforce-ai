@@ -432,10 +432,10 @@ export class OpenAIAgent implements AIAgent {
               console.log('✅ Document uploaded and attached to thread:', uploadedFile.id);
             } catch (error) {
               console.error('❌ Error uploading document:', error);
-              // Fallback: just send the message with filename
+              // Fallback: just send the message
               await this.openai.beta.threads.messages.create(this.openAiThread.id, {
                 role: 'user',
-                content: `${e || 'Please analyze this file.'}\n\n[User uploaded: ${filename}]`,
+                content: e || 'Please analyze this document.',
               });
             }
           } else {
@@ -459,10 +459,10 @@ export class OpenAIAgent implements AIAgent {
               console.log('✅ Document uploaded and attached to thread:', uploadedFile.id);
             } catch (error) {
               console.error('❌ Error uploading document:', error);
-              // Fallback: just send the message with filename
+              // Fallback: just send the message
               await this.openai.beta.threads.messages.create(this.openAiThread.id, {
                 role: 'user',
-                content: `${e || 'Please analyze this file.'}\n\n[User uploaded: ${filename}]`,
+                content: e || 'Please analyze this document.',
               });
             }
           }
