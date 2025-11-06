@@ -49,9 +49,11 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const assistantId = process.env.OPENAI_ASSISTANT_ID || "asst_Q8vD9YOGcO3es62kFjeVZI5L";
+    // FOR KAI CHANNELS: Use Q&A Assistant with PERSISTENT thread (conversation memory)
+    const qaAssistantId = process.env.OPENAI_QA_ASSISTANT_ID || "asst_SIcQ1bD17QezZbQIQEzuYMhg";
+    console.log('🤖 Using Q&A Assistant for kai channel:', qaAssistantId);
     
-    await agent.init(assistantId);
+    await agent.init(qaAssistantId);
 
     let messageText = message.text || '';
     let attachments = [];
@@ -69,9 +71,12 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       if (!messageText || messageText.trim() === '') {
         messageText = 'Please analyze this file.';
       }
+      
+      console.log('📎 Attachments detected:', attachments.length, 'file(s)');
     }
     
-    await agent.handleMessage(messageText, message.id, attachments);
+    // Use persistent thread = true for Q&A agent (remembers conversation)
+    await agent.handleMessage(messageText, message.id, attachments, true);
 
     res.status(200).json({ message: "Webhook processed successfully" });
   } catch (error) {

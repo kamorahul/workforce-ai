@@ -4,7 +4,7 @@ export interface AIAgent {
   init(agentId: string): Promise<void>;
   dispose(): Promise<void>;
   getLastInteraction(): number;
-  handleMessage(e: string, messageId?: string, attachments?: any[]): Promise<void>;
+  handleMessage(e: string, messageId?: string, attachments?: any[], usePersistentThread?: boolean): Promise<void>;
 
   chatClient: StreamChat;
   channel: Channel;

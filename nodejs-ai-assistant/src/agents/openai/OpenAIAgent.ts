@@ -67,7 +67,7 @@ export class OpenAIAgent implements AIAgent {
     }
   };
 
-  public handleMessage = async (e: string, messageId?: string, attachments?: any[]) => {
+  public handleMessage = async (e: string, messageId?: string, attachments?: any[], usePersistentThread: boolean = false) => {
     if (!this.openai || !this.openAiThread || !this.assistant) {
       console.error('OpenAI not initialized');
       return;
@@ -85,9 +85,10 @@ export class OpenAIAgent implements AIAgent {
     let threadToUse = this.openAiThread;
     let additionalInstructions = '';
     
-    if (isKaiUser) {
-      // FOR KAI: Create a temporary thread with ONLY recent GetStream conversations
+    if (isKaiUser && !usePersistentThread) {
+      // FOR DAILY SUMMARY AGENT: Create a temporary thread with ONLY recent GetStream conversations
       // This ensures the AI only sees fresh data, not old accumulated messages
+      console.log('📋 Using TEMPORARY thread for daily summary (no conversation memory)');
       
       try {
         const sevenDaysAgo = new Date();
@@ -226,36 +227,27 @@ export class OpenAIAgent implements AIAgent {
               const finalFilename = inferredExt ? `${filename}${inferredExt}` : `${filename}.txt`;
               
               try {
-                console.log('📄 Fetching document from URL:', attachment.url);
                 const response = await fetch(attachment.url);
-                if (!response.ok) {
-                  throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
-                }
                 const blob = await response.blob();
-                console.log('📄 Document fetched, size:', blob.size, 'bytes');
-                
                 const file = new File([blob], finalFilename, { type: attachment.mime_type || attachment.type || 'application/octet-stream' });
-                console.log('📄 Uploading to OpenAI as:', finalFilename);
                 
                 const uploadedFile = await this.openai.files.create({
                   file: file,
                   purpose: 'assistants'
                 });
-                console.log('✅ Document uploaded to OpenAI:', uploadedFile.id);
                 
                 await this.openai.beta.threads.messages.create(tempThread.id, {
                   role: 'user',
-                  content: e || 'Please analyze this document and answer my question based on its contents.',
+                  content: e || 'Please analyze this document.',
                   attachments: [{
                     file_id: uploadedFile.id,
                     tools: [{ type: 'file_search' }]
                   }]
                 });
-                console.log('✅ Document attached to message with file_search');
                 
-                additionalInstructions = `The user has uploaded a document. Use the file_search tool to analyze the document's contents and provide a detailed, helpful response based on what you find in the document. Extract specific information, quotes, and data from the document to answer the user's question.`;
+                additionalInstructions = `Analyze the document and respond to the user's question. Be detailed and helpful.`;
               } catch (fileError) {
-                console.error('❌ Error uploading file to OpenAI:', fileError);
+                console.error('Error uploading file to OpenAI:', fileError);
                 await this.openai.beta.threads.messages.create(tempThread.id, {
                   role: 'user',
                   content: `${e || 'User sent a file'} (Note: File upload failed, continuing without it)`,
@@ -265,36 +257,27 @@ export class OpenAIAgent implements AIAgent {
             } else {
               // File already has supported extension
               try {
-                console.log('📄 Fetching document from URL:', attachment.url);
                 const response = await fetch(attachment.url);
-                if (!response.ok) {
-                  throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
-                }
                 const blob = await response.blob();
-                console.log('📄 Document fetched, size:', blob.size, 'bytes');
-                
                 const file = new File([blob], filename, { type: attachment.mime_type || attachment.type || 'application/octet-stream' });
-                console.log('📄 Uploading to OpenAI as:', filename);
                 
                 const uploadedFile = await this.openai.files.create({
                   file: file,
                   purpose: 'assistants'
                 });
-                console.log('✅ Document uploaded to OpenAI:', uploadedFile.id);
                 
                 await this.openai.beta.threads.messages.create(tempThread.id, {
                   role: 'user',
-                  content: e || 'Please analyze this document and answer my question based on its contents.',
+                  content: e || 'Please analyze this document.',
                   attachments: [{
                     file_id: uploadedFile.id,
                     tools: [{ type: 'file_search' }]
                   }]
                 });
-                console.log('✅ Document attached to message with file_search');
                 
-                additionalInstructions = `The user has uploaded a document. Use the file_search tool to analyze the document's contents and provide a detailed, helpful response based on what you find in the document. Extract specific information, quotes, and data from the document to answer the user's question.`;
+                additionalInstructions = `Analyze the document and respond to the user's question. Be detailed and helpful.`;
               } catch (fileError) {
-                console.error('❌ Error uploading file to OpenAI:', fileError);
+                console.error('Error uploading file to OpenAI:', fileError);
                 await this.openai.beta.threads.messages.create(tempThread.id, {
                   role: 'user',
                   content: `${e || 'User sent a file'} (Note: File upload failed, continuing without it)`,
@@ -342,6 +325,159 @@ export class OpenAIAgent implements AIAgent {
         const today = new Date().toISOString().split('T')[0];
         additionalInstructions = `Today is ${today}. Analyze recent conversations and provide a daily summary.`;
       }
+    } else if (isKaiUser && usePersistentThread) {
+      // FOR Q&A AGENT: Use PERSISTENT thread to remember conversation history
+      console.log('🧠 Using PERSISTENT thread for Q&A (remembers conversation + uploaded files)');
+      console.log('📝 Thread ID:', this.openAiThread.id);
+      
+      // Fetch user's tasks to provide context
+      let taskContext = '';
+      try {
+        const tasks = await Task.find({
+          $or: [
+            { assignee: { $in: [this.user.id] } },
+            { createdBy: this.user.id }
+          ]
+        })
+        .select('name status completed createdAt completionDate assignee')
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean();
+        
+        const completedTasks = tasks.filter(t => t.status === 'completed' || t.completed);
+        const inProgressTasks = tasks.filter(t => t.status === 'in_progress' && !t.completed);
+        const todoTasks = tasks.filter(t => t.status === 'todo' && !t.completed);
+        
+        taskContext = `\n\n[User's Current Tasks - ${new Date().toISOString().split('T')[0]}]\n`;
+        if (completedTasks.length > 0) {
+          taskContext += `Completed (${completedTasks.length}): ${completedTasks.slice(0, 5).map(t => t.name).join(', ')}\n`;
+        }
+        if (inProgressTasks.length > 0) {
+          taskContext += `In Progress (${inProgressTasks.length}): ${inProgressTasks.slice(0, 5).map(t => t.name).join(', ')}\n`;
+        }
+        if (todoTasks.length > 0) {
+          taskContext += `To Do (${todoTasks.length}): ${todoTasks.slice(0, 5).map(t => `${t.name} (Due: ${t.completionDate ? new Date(t.completionDate).toISOString().split('T')[0] : 'No due date'})`).join(', ')}`;
+        }
+        
+        console.log('📊 Loaded task context:', taskContext.split('\n').length, 'lines');
+      } catch (error) {
+        console.error('❌ Error fetching tasks for Q&A context:', error);
+      }
+      
+      // Handle attachments (images and documents)
+      if (attachments && attachments.length > 0) {
+        const attachment = attachments[0];
+        const isImage = attachment.type === 'image' || attachment.mime_type?.startsWith('image/') || attachment.type?.startsWith('image/');
+        
+        console.log(`📎 Processing attachment: ${attachment.name} (type: ${attachment.type}, isImage: ${isImage})`);
+        
+        if (isImage) {
+          // For images, use vision API with image_url
+          console.log('📸 Processing image attachment:', attachment.url);
+          await this.openai.beta.threads.messages.create(this.openAiThread.id, {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: e + taskContext || 'Please analyze this image.'
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: attachment.url
+                }
+              }
+            ]
+          });
+          console.log('✅ Image message created in thread');
+        } else {
+          // For documents, upload to OpenAI and attach
+          console.log('📄 Processing document attachment:', attachment.name);
+          const supportedExtensions = ['.pdf', '.txt', '.md', '.docx', '.xlsx', '.csv', '.json', '.pptx'];
+          const filename = attachment.filename || attachment.name || 'document';
+          const hasExtension = supportedExtensions.some(ext => filename.toLowerCase().endsWith(ext));
+          
+          if (!hasExtension) {
+            // Try to infer extension from mime_type
+            const mimeToExt: { [key: string]: string } = {
+              'application/pdf': '.pdf',
+              'text/plain': '.txt',
+              'text/markdown': '.md',
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+              'text/csv': '.csv',
+              'application/json': '.json',
+              'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx'
+            };
+            
+            const inferredExt = attachment.mime_type ? mimeToExt[attachment.mime_type] : null;
+            const finalFilename = inferredExt ? `${filename}${inferredExt}` : `${filename}.txt`;
+            
+            try {
+              const response = await fetch(attachment.url);
+              const fileBlob = await response.blob();
+              const file = new File([fileBlob], finalFilename, { type: attachment.mime_type || 'application/octet-stream' });
+              
+              const uploadedFile = await this.openai.files.create({
+                file: file,
+                purpose: 'assistants'
+              });
+              
+              await this.openai.beta.threads.messages.create(this.openAiThread.id, {
+                role: 'user',
+                content: e + taskContext,
+                attachments: [{ file_id: uploadedFile.id, tools: [{ type: 'file_search' }] }]
+              });
+              
+              console.log('✅ Document uploaded and attached to thread:', uploadedFile.id);
+            } catch (error) {
+              console.error('❌ Error uploading document:', error);
+              // Fallback: just send the message with filename
+              await this.openai.beta.threads.messages.create(this.openAiThread.id, {
+                role: 'user',
+                content: `${e}\n\n[User uploaded a document: ${filename}]${taskContext}`,
+              });
+            }
+          } else {
+            // Filename already has extension
+            try {
+              const response = await fetch(attachment.url);
+              const fileBlob = await response.blob();
+              const file = new File([fileBlob], filename, { type: attachment.mime_type || 'application/octet-stream' });
+              
+              const uploadedFile = await this.openai.files.create({
+                file: file,
+                purpose: 'assistants'
+              });
+              
+              await this.openai.beta.threads.messages.create(this.openAiThread.id, {
+                role: 'user',
+                content: e + taskContext,
+                attachments: [{ file_id: uploadedFile.id, tools: [{ type: 'file_search' }] }]
+              });
+              
+              console.log('✅ Document uploaded and attached to thread:', uploadedFile.id);
+            } catch (error) {
+              console.error('❌ Error uploading document:', error);
+              // Fallback: just send the message with filename
+              await this.openai.beta.threads.messages.create(this.openAiThread.id, {
+                role: 'user',
+                content: `${e}\n\n[User uploaded a document: ${filename}]${taskContext}`,
+              });
+            }
+          }
+        }
+      } else {
+        // No attachments, just send the message with task context
+        await this.openai.beta.threads.messages.create(this.openAiThread.id, {
+          role: 'user',
+          content: e + taskContext,
+        });
+        console.log('✅ Message created in persistent thread');
+      }
+      
+      const today = new Date().toISOString().split('T')[0];
+      additionalInstructions = `Today is ${today}. Answer the user's question based on the conversation history, uploaded files, and available task data. Be helpful and conversational.`;
     } else {
       // FOR REGULAR USERS: Use main thread normally
       // Handle attachments for regular users too
