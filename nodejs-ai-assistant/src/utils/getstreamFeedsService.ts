@@ -476,53 +476,62 @@ export class GetStreamFeedsService {
       ].filter(Boolean));
 
       // Check for specific changes and create notifications + activities
+      // Only create activity if assignee actually changed (not just if it's defined)
       if (updateData.assignee !== undefined) {
-        // Assignee changed
         const originalAssignees = new Set(originalTask.assignee || []);
         const newAssignees = new Set(updatedTask.assignee || []);
-        const taskId = String((updatedTask._id as any) || '');
         
-        // Add activity to tasks feed for assignee change
-        const tasksFeed = this.getstreamClient.feed('tasks', taskId);
-        await tasksFeed.addActivity({
-          actor: actor,
-          verb: 'task_assignee_changed',
-          object: taskId,
-          extra: {
-            taskId: taskId,
-            taskName: updatedTask.name || 'Untitled Task',
-            oldAssignees: Array.from(originalAssignees),
-            newAssignees: Array.from(newAssignees),
-            actor: actor
-          }
-        });
+        // Check if assignees actually changed by comparing sets
+        const assigneesChanged = 
+          originalAssignees.size !== newAssignees.size ||
+          !Array.from(originalAssignees).every(id => newAssignees.has(id));
         
-        // Notify newly assigned users
-        for (const assigneeId of newAssignees) {
-          if (!originalAssignees.has(assigneeId)) {
-            await this.createNotification(assigneeId as string, 'task_assigned', taskId, {
+        if (assigneesChanged) {
+          // Assignee actually changed
+          const taskId = String((updatedTask._id as any) || '');
+          
+          // Add activity to tasks feed for assignee change
+          const tasksFeed = this.getstreamClient.feed('tasks', taskId);
+          await tasksFeed.addActivity({
+            actor: actor,
+            verb: 'task_assignee_changed',
+            object: taskId,
+            extra: {
               taskId: taskId,
               taskName: updatedTask.name || 'Untitled Task',
-              priority: updatedTask.priority || 'medium',
-              description: updatedTask.description,
-              assignee: assigneeId,
-              createdBy: updatedTask.createdBy,
-              channelId: updatedTask.channelId,
-              action: 'newly_assigned',
+              oldAssignees: Array.from(originalAssignees),
+              newAssignees: Array.from(newAssignees),
               actor: actor
-            });
+            }
+          });
+          
+          // Notify newly assigned users
+          for (const assigneeId of newAssignees) {
+            if (!originalAssignees.has(assigneeId)) {
+              await this.createNotification(assigneeId as string, 'task_assigned', taskId, {
+                taskId: taskId,
+                taskName: updatedTask.name || 'Untitled Task',
+                priority: updatedTask.priority || 'medium',
+                description: updatedTask.description,
+                assignee: assigneeId,
+                createdBy: updatedTask.createdBy,
+                channelId: updatedTask.channelId,
+                action: 'newly_assigned',
+                actor: actor
+              });
+            }
           }
-        }
-        
-        // Notify unassigned users
-        for (const assigneeId of originalAssignees) {
-          if (!newAssignees.has(assigneeId)) {
-            await this.createNotification(assigneeId as string, 'task_unassigned', taskId, {
-              taskId: taskId,
-              taskName: updatedTask.name || 'Untitled Task',
-              action: 'unassigned',
-              actor: actor
-            });
+          
+          // Notify unassigned users
+          for (const assigneeId of originalAssignees) {
+            if (!newAssignees.has(assigneeId)) {
+              await this.createNotification(assigneeId as string, 'task_unassigned', taskId, {
+                taskId: taskId,
+                taskName: updatedTask.name || 'Untitled Task',
+                action: 'unassigned',
+                actor: actor
+              });
+            }
           }
         }
       }

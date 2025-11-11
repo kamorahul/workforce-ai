@@ -353,8 +353,10 @@ router.put('/:taskId', async (req: Request, res: Response) => {
       const actorUserId = userId || req.body.userId || updatedTask.createdBy || 'system';
       console.log('Task update - Actor userId:', actorUserId, 'from req.body.userId:', req.body.userId);
       
+      // Only include fields that are actually being updated (from updateData, not the entire req.body)
+      // This prevents creating activities for fields that didn't change
       const updateDataWithActor = {
-        ...req.body,
+        ...updateData, // Only include fields that were actually updated
         actor: actorUserId,
         userId: actorUserId // Also set userId explicitly for consistency
       };
