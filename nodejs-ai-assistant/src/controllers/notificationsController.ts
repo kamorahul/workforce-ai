@@ -219,57 +219,70 @@ const getNotificationTitle = (notification: any): string => {
   }
 };
 
-// Helper function to generate notification message
+// Helper function to generate notification message - Professional and contextual
 const getNotificationMessage = (notification: any): string => {
   const verb = notification.verb;
   const extra = notification.extra || {};
-  const actor = notification.actor || extra.assigneeId || 'System';
+  const actor = notification.actor || extra.assigneeId || 'Someone';
+  const taskName = extra.taskName || 'a task';
+  const priority = extra.newPriority || extra.priority || 'medium';
+  const capitalizeFirst = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
 
   switch (verb) {
     case 'task_assigned':
-      return `${actor} assigned you a new task: "${extra.taskName || 'Untitled Task'}"`;
+      return `${actor} assigned you a new task: "${taskName}". Check your tasks to get started.`;
     case 'task_completed':
-      return `Task "${extra.taskName || 'Untitled Task'}" has been marked as completed`;
+      return `Great work! Task "${taskName}" has been completed.`;
     case 'comment_added':
       if (extra.action === 'commented') {
-        return `You commented on task: "${extra.taskName || 'Untitled Task'}"`;
+        return `Your comment was added to task "${taskName}".`;
       } else if (extra.isTaskCreator) {
-        return `${actor} commented on your created task: "${extra.commentPreview || 'New comment'}"`;
+        const preview = extra.commentPreview ? `: "${extra.commentPreview.substring(0, 50)}${extra.commentPreview.length > 50 ? '...' : ''}"` : '';
+        return `${actor} commented on your task "${taskName}"${preview}`;
       } else {
-        return `${actor} commented on your assigned task: "${extra.commentPreview || 'New comment'}"`;
+        const preview = extra.commentPreview ? `: "${extra.commentPreview.substring(0, 50)}${extra.commentPreview.length > 50 ? '...' : ''}"` : '';
+        return `${actor} commented on task "${taskName}"${preview}`;
       }
     case 'mention':
-      return `${actor} mentioned you in a comment: "${extra.message || '@mention'}"`;
+      return `${actor} mentioned you in a comment on task "${taskName}". Tap to view.`;
     case 'task_priority_changed':
-      return `${actor} changed priority from "${extra.oldPriority || 'unknown'}" to "${extra.newPriority || 'unknown'}" for task: "${extra.taskName || 'Untitled Task'}"`;
+      return `${actor} updated the priority of "${taskName}" to ${capitalizeFirst(priority)}.`;
     case 'task_date_changed':
-      return `${actor} changed due date from "${new Date(extra.oldDate).toLocaleDateString()}" to "${new Date(extra.newDate).toLocaleDateString()}" for task: "${extra.taskName || 'Untitled Task'}"`;
+      const oldDate = extra.oldDate ? new Date(extra.oldDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'previous date';
+      const newDate = extra.newDate ? new Date(extra.newDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'new date';
+      return `${actor} updated the due date for "${taskName}" from ${oldDate} to ${newDate}.`;
     case 'task_description_changed':
-      return `${actor} updated description for task: "${extra.taskName || 'Untitled Task'}"`;
+      return `${actor} updated the description for "${taskName}". Tap to see what changed.`;
     case 'task_status_changed':
-      return `${actor} changed status from "${extra.oldStatus || 'unknown'}" to "${extra.newStatus || 'unknown'}" for task: "${extra.taskName || 'Untitled Task'}"`;
+      const oldStatus = extra.oldStatus ? capitalizeFirst(extra.oldStatus.replace('_', ' ')) : 'previous status';
+      const newStatus = extra.newStatus ? capitalizeFirst(extra.newStatus.replace('_', ' ')) : 'new status';
+      return `${actor} changed the status of "${taskName}" from ${oldStatus} to ${newStatus}.`;
     case 'task_name_changed':
-      return `${actor} renamed task from "${extra.oldName || 'Untitled Task'}" to "${extra.newName || 'Untitled Task'}"`;
+      const oldName = extra.oldName || 'previous name';
+      const newName = extra.newName || 'new name';
+      return `${actor} renamed "${oldName}" to "${newName}".`;
     case 'task_unassigned':
-      return `${actor} unassigned you from task: "${extra.taskName || 'Untitled Task'}"`;
+      return `${actor} removed you from task "${taskName}".`;
     case 'task_attachment_added':
-      return `${actor} added file "${extra.fileName || 'attachment'}" to task: "${extra.taskName || 'Untitled Task'}"`;
+      const fileName = extra.fileName || 'a file';
+      return `${actor} added "${fileName}" to task "${taskName}". Tap to view the attachment.`;
     case 'task_attachment_removed':
-      return `${actor} removed file "${extra.fileName || 'attachment'}" from task: "${extra.taskName || 'Untitled Task'}"`;
+      const removedFileName = extra.fileName || 'a file';
+      return `${actor} removed "${removedFileName}" from task "${taskName}".`;
     case 'task_updated':
-      return `Task "${extra.taskName || 'Untitled Task'}" has been updated`;
+      return `Task "${taskName}" has been updated. Tap to see the changes.`;
     case 'event_created':
-      return `${actor} created a new event: "${extra.eventName || 'Untitled Event'}"`;
+      return `${actor} created a new event: "${extra.eventName || 'Untitled Event'}".`;
     case 'event_reminder':
-      return `Reminder: "${extra.eventName || 'Untitled Event'}" starts in ${extra.timeRemaining || 'soon'}`;
+      return `Reminder: "${extra.eventName || 'Untitled Event'}" starts ${extra.timeRemaining || 'soon'}.`;
     case 'location_checkin':
-      return `${actor} checked in at ${extra.locationName || 'location'}`;
+      return `${actor} checked in at ${extra.locationName || 'a location'}.`;
     case 'attendance_marked':
-      return `${actor} marked attendance for ${extra.eventName || 'event'}`;
+      return `${actor} marked attendance for ${extra.eventName || 'an event'}.`;
     case 'system':
-      return extra.message || 'System notification';
+      return extra.message || 'You have a new notification from Convoe.';
     default:
-      return 'You have a new notification';
+      return 'You have a new notification from Convoe. Tap to view.';
   }
 };
 

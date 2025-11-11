@@ -262,71 +262,101 @@ export class GetStreamFeedsService {
   }
 
   /**
-   * Get push notification title and message based on verb
+   * Get push notification title and message based on verb - Professional and contextual
    */
   private async getPushNotificationContent(verb: string, extra: any = {}): Promise<{ title: string; message: string }> {
     const actorId = extra.actor || extra.commentedBy || extra.createdBy || 'System';
     
     // Get user name for the actor
-    const actor = actorId === 'System' ? 'System' : await this.getUserName(actorId);
+    const actor = actorId === 'System' ? 'Someone' : await this.getUserName(actorId);
+    const taskName = extra.taskName || 'a task';
+    const priority = extra.newPriority || extra.priority || 'medium';
+    const capitalizeFirst = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
     
     switch (verb) {
       case 'task_created':
         return {
           title: 'Task Created',
-          message: `You created a new task: "${extra.taskName || 'Untitled Task'}"`
+          message: `You created a new task: "${taskName}"`
         };
       case 'task_assigned':
         return {
           title: 'New Task Assigned',
-          message: `${actor} assigned you: "${extra.taskName || 'Untitled Task'}"`
+          message: `${actor} assigned you: "${taskName}"`
         };
       case 'task_attachment_added':
+        const fileName = extra.fileName || 'a file';
         return {
-          title: 'File Attached to Task',
-          message: `${actor} added "${extra.fileName}" to "${extra.taskName || 'Untitled Task'}"`
+          title: 'File Added to Task',
+          message: `${actor} added "${fileName}" to "${taskName}"`
         };
       case 'task_attachment_removed':
+        const removedFileName = extra.fileName || 'a file';
         return {
           title: 'File Removed from Task',
-          message: `${actor} removed "${extra.fileName}" from "${extra.taskName || 'Untitled Task'}"`
+          message: `${actor} removed "${removedFileName}" from "${taskName}"`
         };
       case 'task_priority_changed':
         return {
-          title: 'Task Priority Changed',
-          message: `${actor} changed priority to "${extra.newPriority}" for "${extra.taskName || 'Untitled Task'}"`
+          title: 'Task Priority Updated',
+          message: `${actor} updated priority of "${taskName}" to ${capitalizeFirst(priority)}`
         };
       case 'task_date_changed':
+        const newDate = extra.newDate ? new Date(extra.newDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'new date';
         return {
-          title: 'Task Due Date Changed',
-          message: `${actor} changed due date for "${extra.taskName || 'Untitled Task'}"`
+          title: 'Task Due Date Updated',
+          message: `${actor} updated due date for "${taskName}" to ${newDate}`
         };
       case 'task_status_changed':
+        const newStatus = extra.newStatus ? capitalizeFirst(extra.newStatus.replace('_', ' ')) : 'new status';
         return {
-          title: 'Task Status Changed',
-          message: `${actor} changed status to "${extra.newStatus}" for "${extra.taskName || 'Untitled Task'}"`
+          title: 'Task Status Updated',
+          message: `${actor} changed status of "${taskName}" to ${newStatus}`
+        };
+      case 'task_description_changed':
+        return {
+          title: 'Task Description Updated',
+          message: `${actor} updated the description for "${taskName}"`
+        };
+      case 'task_name_changed':
+        const newName = extra.newName || 'new name';
+        return {
+          title: 'Task Renamed',
+          message: `${actor} renamed task to "${newName}"`
+        };
+      case 'task_unassigned':
+        return {
+          title: 'Removed from Task',
+          message: `${actor} removed you from task "${taskName}"`
         };
       case 'comment_added':
         if (extra.action === 'commented') {
           return {
             title: 'Comment Added',
-            message: `You commented on task: "${extra.taskName || 'Untitled Task'}"`
+            message: `Your comment was added to task "${taskName}"`
           };
         } else if (extra.isTaskCreator) {
+          const preview = extra.commentPreview ? `: "${extra.commentPreview.substring(0, 50)}${extra.commentPreview.length > 50 ? '...' : ''}"` : '';
           return {
             title: 'New Comment on Your Task',
-            message: `${actor} commented on your created task: "${extra.taskName || 'Untitled Task'}"`
+            message: `${actor} commented on "${taskName}"${preview}`
           };
         } else {
+          const preview = extra.commentPreview ? `: "${extra.commentPreview.substring(0, 50)}${extra.commentPreview.length > 50 ? '...' : ''}"` : '';
           return {
-            title: 'New Comment on Assigned Task',
-            message: `${actor} commented on your assigned task: "${extra.taskName || 'Untitled Task'}"`
+            title: 'New Comment on Task',
+            message: `${actor} commented on "${taskName}"${preview}`
           };
         }
+      case 'mention':
+        return {
+          title: 'You Were Mentioned',
+          message: `${actor} mentioned you in a comment on "${taskName}"`
+        };
       default:
         return {
-          title: 'New Notification',
-          message: 'You have a new notification'
+          title: 'Convoe Notification',
+          message: 'You have a new notification. Tap to view.'
         };
     }
   }
