@@ -465,6 +465,9 @@ export class GetStreamFeedsService {
         await this.connect();
       }
 
+      // Get the actor (user making the change) from updateData, fallback to createdBy
+      const actor = updateData.actor || updateData.userId || updatedTask.createdBy || 'system';
+
       // Get all users to notify (assignees + creator)
       const usersToNotify = new Set([
         ...(updatedTask.assignee || []),
@@ -481,7 +484,7 @@ export class GetStreamFeedsService {
         // Add activity to tasks feed for assignee change
         const tasksFeed = this.getstreamClient.feed('tasks', taskId);
         await tasksFeed.addActivity({
-          actor: updatedTask.createdBy || 'system',
+          actor: actor,
           verb: 'task_assignee_changed',
           object: taskId,
           extra: {
@@ -489,7 +492,7 @@ export class GetStreamFeedsService {
             taskName: updatedTask.name || 'Untitled Task',
             oldAssignees: Array.from(originalAssignees),
             newAssignees: Array.from(newAssignees),
-            actor: updatedTask.createdBy
+            actor: actor
           }
         });
         
@@ -505,7 +508,7 @@ export class GetStreamFeedsService {
               createdBy: updatedTask.createdBy,
               channelId: updatedTask.channelId,
               action: 'newly_assigned',
-              actor: updatedTask.createdBy
+              actor: actor
             });
           }
         }
@@ -517,7 +520,7 @@ export class GetStreamFeedsService {
               taskId: taskId,
               taskName: updatedTask.name || 'Untitled Task',
               action: 'unassigned',
-              actor: updatedTask.createdBy
+              actor: actor
             });
           }
         }
@@ -530,7 +533,7 @@ export class GetStreamFeedsService {
         // Add activity to tasks feed
         const tasksFeed = this.getstreamClient.feed('tasks', taskId);
         await tasksFeed.addActivity({
-          actor: updatedTask.createdBy || 'system',
+          actor: actor,
           verb: 'task_priority_changed',
           object: taskId,
           extra: {
@@ -538,7 +541,7 @@ export class GetStreamFeedsService {
             taskName: updatedTask.name || 'Untitled Task',
             oldPriority: originalTask.priority,
             newPriority: updateData.priority,
-            actor: updatedTask.createdBy
+            actor: actor
           }
         });
         
@@ -550,7 +553,7 @@ export class GetStreamFeedsService {
             oldPriority: originalTask.priority,
             newPriority: updateData.priority,
             action: 'priority_changed',
-            actor: updatedTask.createdBy
+            actor: actor
           });
         }
       }
@@ -563,7 +566,7 @@ export class GetStreamFeedsService {
         // Add activity to tasks feed
         const tasksFeed = this.getstreamClient.feed('tasks', taskId);
         await tasksFeed.addActivity({
-          actor: updatedTask.createdBy || 'system',
+          actor: actor,
           verb: 'task_date_changed',
           object: taskId,
           extra: {
@@ -571,7 +574,7 @@ export class GetStreamFeedsService {
             taskName: updatedTask.name || 'Untitled Task',
             oldDate: originalTask.completionDate,
             newDate: updateData.completionDate,
-            actor: updatedTask.createdBy
+            actor: actor
           }
         });
         
@@ -583,7 +586,7 @@ export class GetStreamFeedsService {
             oldDate: originalTask.completionDate,
             newDate: updateData.completionDate,
             action: 'date_changed',
-            actor: updatedTask.createdBy
+            actor: actor
           });
         }
       }
@@ -595,7 +598,7 @@ export class GetStreamFeedsService {
         // Add activity to tasks feed
         const tasksFeed = this.getstreamClient.feed('tasks', taskId);
         await tasksFeed.addActivity({
-          actor: updatedTask.createdBy || 'system',
+          actor: actor,
           verb: 'task_description_changed',
           object: taskId,
           extra: {
@@ -603,7 +606,7 @@ export class GetStreamFeedsService {
             taskName: updatedTask.name || 'Untitled Task',
             oldDescription: originalTask.description,
             newDescription: updateData.description,
-            actor: updatedTask.createdBy
+            actor: actor
           }
         });
         
@@ -615,7 +618,7 @@ export class GetStreamFeedsService {
             oldDescription: originalTask.description,
             newDescription: updateData.description,
             action: 'description_changed',
-            actor: updatedTask.createdBy
+            actor: actor
           });
         }
       }
@@ -627,7 +630,7 @@ export class GetStreamFeedsService {
         // Add activity to tasks feed
         const tasksFeed = this.getstreamClient.feed('tasks', taskId);
         await tasksFeed.addActivity({
-          actor: updatedTask.createdBy || 'system',
+          actor: actor,
           verb: 'task_status_changed',
           object: taskId,
           extra: {
@@ -635,7 +638,7 @@ export class GetStreamFeedsService {
             taskName: updatedTask.name || 'Untitled Task',
             oldStatus: originalTask.completed ? 'completed' : 'in_progress',
             newStatus: updateData.completed ? 'completed' : 'in_progress',
-            actor: updatedTask.createdBy
+            actor: actor
           }
         });
         
@@ -647,7 +650,7 @@ export class GetStreamFeedsService {
             oldStatus: originalTask.completed ? 'completed' : 'in_progress',
             newStatus: updateData.completed ? 'completed' : 'in_progress',
             action: 'status_changed',
-            actor: updatedTask.createdBy
+            actor: actor
           });
         }
       }
@@ -659,14 +662,14 @@ export class GetStreamFeedsService {
         // Add activity to tasks feed
         const tasksFeed = this.getstreamClient.feed('tasks', taskId);
         await tasksFeed.addActivity({
-          actor: updatedTask.createdBy || 'system',
+          actor: actor,
           verb: 'task_name_changed',
           object: taskId,
           extra: {
             taskId: taskId,
             oldName: originalTask.name,
             newName: updateData.name,
-            actor: updatedTask.createdBy
+            actor: actor
           }
         });
         
@@ -677,7 +680,7 @@ export class GetStreamFeedsService {
             oldName: originalTask.name,
             newName: updateData.name,
             action: 'name_changed',
-            actor: updatedTask.createdBy
+            actor: actor
           });
         }
       }

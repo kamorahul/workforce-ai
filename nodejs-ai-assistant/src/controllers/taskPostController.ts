@@ -62,6 +62,24 @@ export const handleTaskPost = async (req: Request, res: Response) => {
         await newSubtask.save();
         // Create notification for subtask (with self-exclusion)
         await getStreamFeedsService.createTaskActivity(newSubtask._id as string, newSubtask);
+        
+        // Create activity on parent task for subtask addition
+        const taskCreator = createdBy || assignee[0];
+        const tasksFeed = getStreamFeedsService['getstreamClient'].feed('tasks', task._id.toString());
+        await tasksFeed.addActivity({
+          actor: taskCreator,
+          verb: 'task_subtask_added',
+          object: task._id.toString(),
+          extra: {
+            taskId: task._id.toString(),
+            taskName: task.name || 'Untitled Task',
+            subtaskId: newSubtask._id.toString(),
+            subtaskName: newSubtask.name,
+            actor: taskCreator,
+            channelId: task.channelId
+          }
+        });
+        
         createdSubtasks.push(newSubtask);
       }
     }
@@ -295,7 +313,8 @@ router.put('/:taskId', async (req: Request, res: Response) => {
     
     const { 
       name, assignee, priority, completionDate, channelId, 
-      description, completed, status, parentTaskId, attachments 
+      description, completed, status, parentTaskId, attachments,
+      userId  // User making the update
     } = req.body;
     
     const updateData: any = {};
@@ -328,8 +347,13 @@ router.put('/:taskId', async (req: Request, res: Response) => {
     }
     
     // Create notifications for task updates (with self-exclusion)
+    // Pass userId as actor for activities
     try {
-      await getStreamFeedsService.createTaskUpdateNotifications(originalTask, updatedTask, req.body);
+      const updateDataWithActor = {
+        ...req.body,
+        actor: userId || updatedTask.createdBy || 'system'
+      };
+      await getStreamFeedsService.createTaskUpdateNotifications(originalTask, updatedTask, updateDataWithActor);
     } catch (error) {
       console.error('Error creating task update notifications:', error);
       // Continue even if notifications fail
