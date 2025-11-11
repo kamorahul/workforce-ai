@@ -349,9 +349,14 @@ router.put('/:taskId', async (req: Request, res: Response) => {
     // Create notifications for task updates (with self-exclusion)
     // Pass userId as actor for activities
     try {
+      // Ensure we have the userId - check both req.body.userId and the extracted userId
+      const actorUserId = userId || req.body.userId || updatedTask.createdBy || 'system';
+      console.log('Task update - Actor userId:', actorUserId, 'from req.body.userId:', req.body.userId);
+      
       const updateDataWithActor = {
         ...req.body,
-        actor: userId || updatedTask.createdBy || 'system'
+        actor: actorUserId,
+        userId: actorUserId // Also set userId explicitly for consistency
       };
       await getStreamFeedsService.createTaskUpdateNotifications(originalTask, updatedTask, updateDataWithActor);
     } catch (error) {
@@ -442,10 +447,14 @@ router.post('/:taskId/attachments/upload', upload.single('file'), async (req: Re
 
     // Create activity and notification for attachment addition
     try {
+      // Get userId from FormData (multer parses it into req.body)
+      const attachmentUserId = req.body.userId || 'system';
+      console.log('Attachment upload - Actor userId:', attachmentUserId);
+      
       // Add activity to tasks feed
       const tasksFeed = await getStreamFeedsService['getstreamClient'].feed('tasks', taskId);
       await tasksFeed.addActivity({
-        actor: req.body.userId || 'system',
+        actor: attachmentUserId,
         verb: 'task_attachment_added',
         object: taskId,
         extra: {
@@ -453,7 +462,7 @@ router.post('/:taskId/attachments/upload', upload.single('file'), async (req: Re
           taskName: task.name,
           fileName: file.originalname,
           fileType: file.mimetype,
-          actor: req.body.userId || 'system',
+          actor: attachmentUserId, // Store in extra for reliable extraction
           channelId: task.channelId
         }
       });
@@ -465,7 +474,7 @@ router.post('/:taskId/attachments/upload', upload.single('file'), async (req: Re
       ].filter(Boolean));
 
       for (const userId of usersToNotify) {
-        await getStreamFeedsService.createNotification(
+            await getStreamFeedsService.createNotification(
           userId,
           'task_attachment_added',
           taskId,
@@ -474,7 +483,7 @@ router.post('/:taskId/attachments/upload', upload.single('file'), async (req: Re
             taskName: task.name,
             fileName: file.originalname,
             fileType: file.mimetype,
-            actor: req.body.userId || 'system',
+            actor: attachmentUserId,
             channelId: task.channelId
           }
         );
@@ -527,6 +536,8 @@ router.get('/:taskId/attachments', async (req: Request, res: Response) => {
 router.delete('/:taskId/attachments/:attachmentIndex', async (req: Request, res: Response) => {
   try {
     const { taskId, attachmentIndex } = req.params;
+    // Get userId from query params (more reliable for DELETE requests)
+    const userId = req.query.userId as string || req.body.userId;
     
     if (!taskId) {
       res.status(400).json({ error: 'Missing required parameter: taskId' });
@@ -562,17 +573,21 @@ router.delete('/:taskId/attachments/:attachmentIndex', async (req: Request, res:
 
     // Create activity and notification for attachment removal
     try {
+      // Get userId from query params (for DELETE) or body
+      const attachmentRemoveUserId = userId || 'system';
+      console.log('Attachment removal - Actor userId:', attachmentRemoveUserId);
+      
       // Add activity to tasks feed
       const tasksFeed = await getStreamFeedsService['getstreamClient'].feed('tasks', taskId);
       await tasksFeed.addActivity({
-        actor: req.body.userId || 'system',
+        actor: attachmentRemoveUserId,
         verb: 'task_attachment_removed',
         object: taskId,
         extra: {
           taskId: taskId,
           taskName: task.name,
           fileName: removedAttachment.name,
-          actor: req.body.userId || 'system',
+          actor: attachmentRemoveUserId, // Store in extra for reliable extraction
           channelId: task.channelId
         }
       });
@@ -583,16 +598,16 @@ router.delete('/:taskId/attachments/:attachmentIndex', async (req: Request, res:
         task.createdBy
       ].filter(Boolean));
 
-      for (const userId of usersToNotify) {
+      for (const userIdToNotify of usersToNotify) {
         await getStreamFeedsService.createNotification(
-          userId,
+          userIdToNotify,
           'task_attachment_removed',
           taskId,
           {
             taskId: taskId,
             taskName: task.name,
             fileName: removedAttachment.name,
-            actor: req.body.userId || 'system',
+            actor: attachmentRemoveUserId,
             channelId: task.channelId
           }
         );

@@ -467,6 +467,7 @@ export class GetStreamFeedsService {
 
       // Get the actor (user making the change) from updateData, fallback to createdBy
       const actor = updateData.actor || updateData.userId || updatedTask.createdBy || 'system';
+      console.log('createTaskUpdateNotifications - Using actor:', actor, 'from updateData:', { actor: updateData.actor, userId: updateData.userId });
 
       // Get all users to notify (assignees + creator)
       const usersToNotify = new Set([
@@ -623,9 +624,21 @@ export class GetStreamFeedsService {
         }
       }
 
-      if (updateData.completed !== undefined && updateData.completed !== originalTask.completed) {
-        // Completion status changed
+      // Check for status changes (either completed field or status field)
+      const statusChanged = (updateData.completed !== undefined && updateData.completed !== originalTask.completed) ||
+                           (updateData.status !== undefined && updateData.status !== originalTask.status);
+      
+      if (statusChanged) {
+        // Status changed
         const taskId = updatedTask._id?.toString() || '';
+        
+        // Determine old and new status
+        const oldStatus = updateData.status !== undefined 
+          ? (originalTask.status || (originalTask.completed ? 'completed' : 'in_progress'))
+          : (originalTask.completed ? 'completed' : 'in_progress');
+        const newStatus = updateData.status !== undefined 
+          ? updateData.status
+          : (updateData.completed ? 'completed' : 'in_progress');
         
         // Add activity to tasks feed
         const tasksFeed = this.getstreamClient.feed('tasks', taskId);
@@ -636,8 +649,8 @@ export class GetStreamFeedsService {
           extra: {
             taskId: taskId,
             taskName: updatedTask.name || 'Untitled Task',
-            oldStatus: originalTask.completed ? 'completed' : 'in_progress',
-            newStatus: updateData.completed ? 'completed' : 'in_progress',
+            oldStatus: oldStatus,
+            newStatus: newStatus,
             actor: actor
           }
         });
@@ -647,8 +660,8 @@ export class GetStreamFeedsService {
           await this.createNotification(userId, 'task_status_changed', taskId, {
             taskId: taskId,
             taskName: updatedTask.name || 'Untitled Task',
-            oldStatus: originalTask.completed ? 'completed' : 'in_progress',
-            newStatus: updateData.completed ? 'completed' : 'in_progress',
+            oldStatus: oldStatus,
+            newStatus: newStatus,
             action: 'status_changed',
             actor: actor
           });
