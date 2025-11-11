@@ -449,9 +449,17 @@ router.post('/:taskId/attachments/upload', upload.single('file'), async (req: Re
 
     // Create activity and notification for attachment addition
     try {
-      // Get userId from FormData (multer parses it into req.body)
-      const attachmentUserId = req.body.userId || 'system';
+      // Get userId from FormData - multer parses all fields into req.body
+      // Check multiple sources to ensure we get the userId
+      const attachmentUserId = req.body?.userId || req.query?.userId as string || task.createdBy || 'system';
       console.log('Attachment upload - Actor userId:', attachmentUserId);
+      console.log('Attachment upload - req.body:', JSON.stringify(req.body));
+      console.log('Attachment upload - req.query:', JSON.stringify(req.query));
+      
+      // If userId is still 'system', log a warning
+      if (attachmentUserId === 'system') {
+        console.warn('⚠️ Attachment upload - userId not found in request, using system as fallback');
+      }
       
       // Add activity to tasks feed
       const tasksFeed = await getStreamFeedsService['getstreamClient'].feed('tasks', taskId);
