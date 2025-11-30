@@ -65,6 +65,8 @@ export const handleTaskPost = async (req: Request, res: Response) => {
         
         // Create activity on parent task for subtask addition
         const taskCreator = createdBy || assignee[0];
+        // Resolve username for display in activity feed
+        const actorName = await getStreamFeedsService.getUserName(taskCreator);
         const tasksFeed = getStreamFeedsService['getstreamClient'].feed('tasks', task._id.toString());
         await tasksFeed.addActivity({
           actor: taskCreator,
@@ -76,6 +78,7 @@ export const handleTaskPost = async (req: Request, res: Response) => {
             subtaskId: newSubtask._id.toString(),
             subtaskName: newSubtask.name,
             actor: taskCreator,
+            actorName: actorName, // Resolved username for display
             channelId: task.channelId
           }
         });
@@ -459,7 +462,10 @@ router.post('/:taskId/attachments/upload', upload.single('file'), async (req: Re
       if (attachmentUserId === 'system') {
         console.warn('⚠️ Attachment upload - userId not found in request, using system as fallback');
       }
-      
+
+      // Resolve username for display in activity feed
+      const attachmentActorName = await getStreamFeedsService.getUserName(attachmentUserId);
+
       // Add activity to tasks feed
       const tasksFeed = await getStreamFeedsService['getstreamClient'].feed('tasks', taskId);
       await tasksFeed.addActivity({
@@ -472,6 +478,7 @@ router.post('/:taskId/attachments/upload', upload.single('file'), async (req: Re
           fileName: file.originalname,
           fileType: file.mimetype,
           actor: attachmentUserId, // Store in extra for reliable extraction
+          actorName: attachmentActorName, // Resolved username for display
           channelId: task.channelId
         }
       });
@@ -585,7 +592,10 @@ router.delete('/:taskId/attachments/:attachmentIndex', async (req: Request, res:
       // Get userId from query params (for DELETE) or body
       const attachmentRemoveUserId = userId || 'system';
       console.log('Attachment removal - Actor userId:', attachmentRemoveUserId);
-      
+
+      // Resolve username for display in activity feed
+      const attachmentRemoveActorName = await getStreamFeedsService.getUserName(attachmentRemoveUserId);
+
       // Add activity to tasks feed
       const tasksFeed = await getStreamFeedsService['getstreamClient'].feed('tasks', taskId);
       await tasksFeed.addActivity({
@@ -597,6 +607,7 @@ router.delete('/:taskId/attachments/:attachmentIndex', async (req: Request, res:
           taskName: task.name,
           fileName: removedAttachment.name,
           actor: attachmentRemoveUserId, // Store in extra for reliable extraction
+          actorName: attachmentRemoveActorName, // Resolved username for display
           channelId: task.channelId
         }
       });

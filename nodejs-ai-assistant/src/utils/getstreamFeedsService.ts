@@ -194,7 +194,7 @@ export class GetStreamFeedsService {
   /**
    * Get user name by ID from GetStream
    */
-  private async getUserName(userId: string): Promise<string> {
+  async getUserName(userId: string): Promise<string> {
     try {
       const response = await serverClient.queryUsers({ id: userId });
       const user = response.users[0];
@@ -497,7 +497,9 @@ export class GetStreamFeedsService {
 
       // Get the actor (user making the change) from updateData, fallback to createdBy
       const actor = updateData.actor || updateData.userId || updatedTask.createdBy || 'system';
-      console.log('createTaskUpdateNotifications - Using actor:', actor, 'from updateData:', { actor: updateData.actor, userId: updateData.userId });
+      // Resolve actor name for display in activity feed
+      const actorName = await this.getUserName(actor);
+      console.log('createTaskUpdateNotifications - Using actor:', actor, 'actorName:', actorName, 'from updateData:', { actor: updateData.actor, userId: updateData.userId });
 
       // Get all users to notify (assignees + creator)
       const usersToNotify = new Set([
@@ -531,7 +533,8 @@ export class GetStreamFeedsService {
               taskName: updatedTask.name || 'Untitled Task',
               oldAssignees: Array.from(originalAssignees),
               newAssignees: Array.from(newAssignees),
-              actor: actor
+              actor: actor,
+              actorName: actorName
             }
           });
           
@@ -569,7 +572,7 @@ export class GetStreamFeedsService {
       if (updateData.priority !== undefined && updateData.priority !== originalTask.priority) {
         // Priority changed
         const taskId = updatedTask._id?.toString() || '';
-        
+
         // Add activity to tasks feed
         const tasksFeed = this.getstreamClient.feed('tasks', taskId);
         await tasksFeed.addActivity({
@@ -581,7 +584,8 @@ export class GetStreamFeedsService {
             taskName: updatedTask.name || 'Untitled Task',
             oldPriority: originalTask.priority,
             newPriority: updateData.priority,
-            actor: actor
+            actor: actor,
+            actorName: actorName
           }
         });
         
@@ -598,11 +602,11 @@ export class GetStreamFeedsService {
         }
       }
 
-      if (updateData.completionDate !== undefined && 
+      if (updateData.completionDate !== undefined &&
           new Date(updateData.completionDate).getTime() !== new Date(originalTask.completionDate).getTime()) {
         // Completion date changed
         const taskId = updatedTask._id?.toString() || '';
-        
+
         // Add activity to tasks feed
         const tasksFeed = this.getstreamClient.feed('tasks', taskId);
         await tasksFeed.addActivity({
@@ -614,7 +618,8 @@ export class GetStreamFeedsService {
             taskName: updatedTask.name || 'Untitled Task',
             oldDate: originalTask.completionDate,
             newDate: updateData.completionDate,
-            actor: actor
+            actor: actor,
+            actorName: actorName
           }
         });
         
@@ -634,7 +639,7 @@ export class GetStreamFeedsService {
       if (updateData.description !== undefined && updateData.description !== originalTask.description) {
         // Description changed
         const taskId = updatedTask._id?.toString() || '';
-        
+
         // Add activity to tasks feed
         const tasksFeed = this.getstreamClient.feed('tasks', taskId);
         await tasksFeed.addActivity({
@@ -646,7 +651,8 @@ export class GetStreamFeedsService {
             taskName: updatedTask.name || 'Untitled Task',
             oldDescription: originalTask.description,
             newDescription: updateData.description,
-            actor: actor
+            actor: actor,
+            actorName: actorName
           }
         });
         
@@ -690,7 +696,8 @@ export class GetStreamFeedsService {
             taskName: updatedTask.name || 'Untitled Task',
             oldStatus: oldStatus,
             newStatus: newStatus,
-            actor: actor
+            actor: actor,
+            actorName: actorName
           }
         });
         
@@ -710,7 +717,7 @@ export class GetStreamFeedsService {
       if (updateData.name !== undefined && updateData.name !== originalTask.name) {
         // Task name changed
         const taskId = updatedTask._id?.toString() || '';
-        
+
         // Add activity to tasks feed
         const tasksFeed = this.getstreamClient.feed('tasks', taskId);
         await tasksFeed.addActivity({
@@ -721,7 +728,8 @@ export class GetStreamFeedsService {
             taskId: taskId,
             oldName: originalTask.name,
             newName: updateData.name,
-            actor: actor
+            actor: actor,
+            actorName: actorName
           }
         });
         
