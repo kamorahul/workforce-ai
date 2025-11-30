@@ -672,19 +672,19 @@ export class GetStreamFeedsService {
       // Check for status changes (either completed field or status field)
       const statusChanged = (updateData.completed !== undefined && updateData.completed !== originalTask.completed) ||
                            (updateData.status !== undefined && updateData.status !== originalTask.status);
-      
+
       if (statusChanged) {
         // Status changed
         const taskId = updatedTask._id?.toString() || '';
-        
+
         // Determine old and new status
-        const oldStatus = updateData.status !== undefined 
+        const oldStatus = updateData.status !== undefined
           ? (originalTask.status || (originalTask.completed ? 'completed' : 'in_progress'))
           : (originalTask.completed ? 'completed' : 'in_progress');
-        const newStatus = updateData.status !== undefined 
+        const newStatus = updateData.status !== undefined
           ? updateData.status
           : (updateData.completed ? 'completed' : 'in_progress');
-        
+
         // Add activity to tasks feed
         const tasksFeed = this.getstreamClient.feed('tasks', taskId);
         await tasksFeed.addActivity({
@@ -700,7 +700,27 @@ export class GetStreamFeedsService {
             actorName: actorName
           }
         });
-        
+
+        // If this is a subtask, also add activity to parent task's feed
+        if (updatedTask.parentTaskId) {
+          const parentTaskId = updatedTask.parentTaskId.toString();
+          const parentTasksFeed = this.getstreamClient.feed('tasks', parentTaskId);
+          await parentTasksFeed.addActivity({
+            actor: actor,
+            verb: 'subtask_status_changed',
+            object: parentTaskId,
+            extra: {
+              taskId: parentTaskId,
+              subtaskId: taskId,
+              subtaskName: updatedTask.name || 'Untitled Subtask',
+              oldStatus: oldStatus,
+              newStatus: newStatus,
+              actor: actor,
+              actorName: actorName
+            }
+          });
+        }
+
         // Send notifications to users
         for (const userId of usersToNotify) {
           await this.createNotification(userId, 'task_status_changed', taskId, {
