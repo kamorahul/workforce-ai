@@ -15,6 +15,7 @@ import taskPostControllerRouter from './controllers/taskPostController';
 import commentControllerRouter from './controllers/commentController';
 import notificationsControllerRouter from './controllers/notificationsController';
 import audioUploadPostControllerRouter from './controllers/audioUploadPostController';
+import channelMemberRolePostControllerRouter from './controllers/channelMemberRolePostController';
 
 const app = express();
 app.use(express.json({ limit: '200mb' }));
@@ -45,5 +46,6 @@ app.use('/task', taskPostControllerRouter);
 app.use('/task', commentControllerRouter);
 app.use('/notifications', notificationsControllerRouter); // Mount comment routes under /task
 app.use('/upload', audioUploadPostControllerRouter); // Mount audio upload routes
+app.use('/channel-member-role', channelMemberRolePostControllerRouter); // Mount channel member role routes
 
 export { app }; // Export the app instance
