@@ -85,7 +85,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     });
     await channelKai.create();
     await channelKai.addMembers([username, 'Kai']);
-    await channelKai.hide(username); // Hide for "kai" channel
+    // await channelKai.hide(username); // Hide for "kai" channel
 
     // 3. "tai" Channel Logic
     const channelTai = serverClient.channel('messaging', `tai_${username}`, {
