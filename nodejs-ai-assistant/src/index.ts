@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import joinPostControllerRouter from './controllers/joinPostController';
+import authControllerRouter from './controllers/authController';
 import channelJoinPostControllerRouter from './controllers/channelJoinPostController';
 import getstreamWebhooksPostControllerRouter from './controllers/getstreamWebhooksPostController';
 import webhookPostControllerRouter from './controllers/webhookPostController';
@@ -39,6 +40,12 @@ app.get('/', (req, res) => {
 app.use('/getstream/webhooks', getstreamWebhooksPostControllerRouter);
 app.use('/webhook', webhookPostControllerRouter);
 
+// Auth endpoints - public (handles phone/SMS verification)
+app.use('/auth', authControllerRouter);
+
+// Join endpoint - public (user authenticates via Auth0 first, then calls /join)
+app.use('/join', joinPostControllerRouter);
+
 // =============================================================================
 // PROTECTED ROUTES (Auth0 JWT validation required)
 // =============================================================================
@@ -47,10 +54,13 @@ app.use('/webhook', webhookPostControllerRouter);
 app.use(requireAuth);
 
 // User management
-app.use('/join', joinPostControllerRouter);
 app.use('/channel-join', channelJoinPostControllerRouter);
 app.use('/profile', profileUpdatePostControllerRouter);
 app.use('/channel-member-role', channelMemberRolePostControllerRouter);
+
+// Tasks
+app.use('/task', taskPostControllerRouter);
+app.use('/task', commentControllerRouter);
 
 // Attendance
 app.use('/attendance', attendancePostControllerRouter);
@@ -58,10 +68,8 @@ app.use('/attendance', attendanceGetControllerRouter);
 app.use('/send-attendance-message', sendAttendanceMessagePostControllerRouter);
 app.use('/check-message-status', checkMessageStatusGetControllerRouter);
 
-// Projects & Tasks
+// Projects
 app.use('/projects', projectsGetControllerRouter);
-app.use('/task', taskPostControllerRouter);
-app.use('/task', commentControllerRouter);
 
 // Notifications & Uploads
 app.use('/notifications', notificationsControllerRouter);
