@@ -1,5 +1,5 @@
 import express, { Request, Response, Router } from 'express';
-import { Task } from '../models/Task';
+import { Task, ITask } from '../models/Task';
 import { Comment } from '../models/Comment';
 import { getStreamFeedsService } from '../utils/getstreamFeedsService';
 import multer from 'multer';
@@ -32,7 +32,7 @@ export const handleTaskPost = async (req: Request, res: Response) => {
     }
 
     // Create the main task
-    const task = new Task({
+    const task: ITask = new Task({
       name,
       assignee,
       priority,
@@ -49,7 +49,7 @@ export const handleTaskPost = async (req: Request, res: Response) => {
     const createdSubtasks = [];
     if (subtasks && Array.isArray(subtasks)) {
       for (const subtask of subtasks) {
-        const newSubtask = new Task({
+        const newSubtask: ITask = new Task({
           name: subtask.name,
           assignee: subtask.assignee || assignee, // Inherit assignees from parent if not specified
           priority: subtask.priority || priority, // Inherit priority from parent if not specified
@@ -67,15 +67,15 @@ export const handleTaskPost = async (req: Request, res: Response) => {
         const taskCreator = createdBy || assignee[0];
         // Resolve username for display in activity feed
         const actorName = await getStreamFeedsService.getUserName(taskCreator);
-        const tasksFeed = getStreamFeedsService['getstreamClient'].feed('tasks', task._id.toString());
+        const tasksFeed = getStreamFeedsService['getstreamClient'].feed('tasks', String(task._id));
         await tasksFeed.addActivity({
           actor: taskCreator,
           verb: 'task_subtask_added',
-          object: task._id.toString(),
+          object: String(task._id),
           extra: {
-            taskId: task._id.toString(),
+            taskId: String(task._id),
             taskName: task.name || 'Untitled Task',
-            subtaskId: newSubtask._id.toString(),
+            subtaskId: String(newSubtask._id),
             subtaskName: newSubtask.name,
             actor: taskCreator,
             actorName: actorName, // Resolved username for display
