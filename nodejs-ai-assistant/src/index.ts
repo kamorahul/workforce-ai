@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import joinPostControllerRouter from './controllers/joinPostController'; // Renamed for clarity
+import joinPostControllerRouter from './controllers/joinPostController';
 import channelJoinPostControllerRouter from './controllers/channelJoinPostController';
 import getstreamWebhooksPostControllerRouter from './controllers/getstreamWebhooksPostController';
 import webhookPostControllerRouter from './controllers/webhookPostController';
@@ -16,36 +16,62 @@ import commentControllerRouter from './controllers/commentController';
 import notificationsControllerRouter from './controllers/notificationsController';
 import audioUploadPostControllerRouter from './controllers/audioUploadPostController';
 import channelMemberRolePostControllerRouter from './controllers/channelMemberRolePostController';
+import { requireAuth, authErrorHandler } from './middleware/auth';
 
 const app = express();
 app.use(express.json({ limit: '200mb' }));
 app.use(express.urlencoded({ limit: '200mb', extended: true }));
 app.use(cors({ origin: '*' }));
 
+// =============================================================================
+// PUBLIC ROUTES (No authentication required)
+// =============================================================================
+
+// Health check endpoint
 app.get('/', (req, res) => {
   res.json({
-    message: 'GetStream AI Server is running',
-    // apiKey usage was already commented out
+    message: 'Convoe API Server is running',
+    version: '1.0.0',
   });
 });
 
-// Use the new controller for the /join route
-app.use('/join', joinPostControllerRouter); // Updated to new router name
-
-// Mount new controllers
-app.use('/channel-join', channelJoinPostControllerRouter);
+// Webhook endpoints (called by external services with their own auth)
 app.use('/getstream/webhooks', getstreamWebhooksPostControllerRouter);
 app.use('/webhook', webhookPostControllerRouter);
+
+// =============================================================================
+// PROTECTED ROUTES (Auth0 JWT validation required)
+// =============================================================================
+
+// Apply Auth0 JWT validation middleware to all routes below
+app.use(requireAuth);
+
+// User management
+app.use('/join', joinPostControllerRouter);
+app.use('/channel-join', channelJoinPostControllerRouter);
+app.use('/profile', profileUpdatePostControllerRouter);
+app.use('/channel-member-role', channelMemberRolePostControllerRouter);
+
+// Attendance
 app.use('/attendance', attendancePostControllerRouter);
-app.use('/attendance', attendanceGetControllerRouter); // Note: Both POST and GET for /attendance use the same base path
+app.use('/attendance', attendanceGetControllerRouter);
 app.use('/send-attendance-message', sendAttendanceMessagePostControllerRouter);
 app.use('/check-message-status', checkMessageStatusGetControllerRouter);
+
+// Projects & Tasks
 app.use('/projects', projectsGetControllerRouter);
-app.use('/profile', profileUpdatePostControllerRouter);
 app.use('/task', taskPostControllerRouter);
 app.use('/task', commentControllerRouter);
-app.use('/notifications', notificationsControllerRouter); // Mount comment routes under /task
-app.use('/upload', audioUploadPostControllerRouter); // Mount audio upload routes
-app.use('/channel-member-role', channelMemberRolePostControllerRouter); // Mount channel member role routes
 
-export { app }; // Export the app instance
+// Notifications & Uploads
+app.use('/notifications', notificationsControllerRouter);
+app.use('/upload', audioUploadPostControllerRouter);
+
+// =============================================================================
+// ERROR HANDLING
+// =============================================================================
+
+// Auth error handler (handles 401 Unauthorized errors)
+app.use(authErrorHandler);
+
+export { app };
