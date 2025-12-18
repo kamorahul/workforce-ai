@@ -54,6 +54,7 @@ export const handleTaskPost = async (req: Request, res: Response) => {
     await task.save();
 
     // Create subtasks if provided
+    // NOTE: Subtasks do NOT trigger separate notifications - only parent task notifies
     const createdSubtasks = [];
     if (subtasks && Array.isArray(subtasks)) {
       for (const subtask of subtasks) {
@@ -68,12 +69,12 @@ export const handleTaskPost = async (req: Request, res: Response) => {
           parentTaskId: task._id, // Link to parent task
         });
         await newSubtask.save();
-        // Create notification for subtask (with self-exclusion)
-        await getStreamFeedsService.createTaskActivity(newSubtask._id as string, newSubtask);
-        
-        // Create activity on parent task for subtask addition
+
+        // NO notification for subtasks - only activity feed entry on parent task
+        // This prevents notification overkill (3-4 notifications for one task creation)
+
+        // Create activity on parent task for subtask addition (activity feed only, no push notification)
         const taskCreator = createdBy || assignee[0];
-        // Resolve username for display in activity feed
         const actorName = await getStreamFeedsService.getUserName(taskCreator);
         const tasksFeed = getStreamFeedsService['getstreamClient'].feed('tasks', String(task._id));
         await tasksFeed.addActivity({
@@ -86,21 +87,51 @@ export const handleTaskPost = async (req: Request, res: Response) => {
             subtaskId: String(newSubtask._id),
             subtaskName: newSubtask.name,
             actor: taskCreator,
-            actorName: actorName, // Resolved username for display
+            actorName: actorName,
             channelId: task.channelId
           }
         });
-        
+
         createdSubtasks.push(newSubtask);
       }
     }
 
     // Create notification for main task (with self-exclusion)
-    await getStreamFeedsService.createTaskActivity(task._id as string, task);
-    res.status(201).json({ 
-      status: 'success', 
+    // BUT skip notification if this is a subtask (has parentTaskId) - only add activity to parent task feed
+    if (parentTaskId) {
+      // This is a subtask being created separately - add activity to parent task feed, no push notification
+      const taskCreator = createdBy || assignee[0];
+      const actorName = await getStreamFeedsService.getUserName(taskCreator);
+
+      // Get parent task name for the activity
+      const parentTask = await Task.findById(parentTaskId);
+      const parentTaskName = parentTask?.name || 'Untitled Task';
+
+      const tasksFeed = getStreamFeedsService['getstreamClient'].feed('tasks', String(parentTaskId));
+      await tasksFeed.addActivity({
+        actor: taskCreator,
+        verb: 'task_subtask_added',
+        object: String(parentTaskId),
+        extra: {
+          taskId: String(parentTaskId),
+          taskName: parentTaskName,
+          subtaskId: String(task._id),
+          subtaskName: task.name,
+          actor: taskCreator,
+          actorName: actorName,
+          channelId: task.channelId
+        }
+      });
+      console.log(`Subtask created - activity added to parent task ${parentTaskId}, no push notification`);
+    } else {
+      // This is a parent task - send notifications to assignees (excluding creator)
+      await getStreamFeedsService.createTaskActivity(task._id as string, task);
+    }
+
+    res.status(201).json({
+      status: 'success',
       task,
-      subtasks: createdSubtasks 
+      subtasks: createdSubtasks
     });
   } catch (error) {
     console.error('Error saving task:', error);

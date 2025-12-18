@@ -430,22 +430,19 @@ export class GetStreamFeedsService {
         }
       });
 
-      // Create notification for task creator (who is doing the activity)
-      if (task.createdBy) {
-        await this.createNotification(task.createdBy, 'task_created', taskId, {
-          taskId: taskId,
-          taskName: task.title || task.name,
-          priority: task.priority || 'medium',
-          description: task.description,
-          action: 'created',
-          assignee: task.assignee,
-          channelId: task.channelId
-        });
-      }
+      // DON'T notify the task creator - they already know they created the task
+      // Only notify assignees who are NOT the creator
 
       // Create notification for each assignee using their feed groups
+      // SKIP if assignee is the task creator (don't notify yourself)
       if (task.assignee && Array.isArray(task.assignee)) {
         for (const assigneeId of task.assignee) {
+          // Skip if assignee is the task creator - they don't need notification for their own task
+          if (assigneeId === task.createdBy) {
+            console.log(`Skipping notification for task creator ${assigneeId} - they created this task`);
+            continue;
+          }
+
           // Add activity to assignee's feed group
           const assigneeFeed = this.getstreamClient.feed('notification', assigneeId);
           await assigneeFeed.addActivity({
@@ -463,7 +460,7 @@ export class GetStreamFeedsService {
               feedGroup: 'notification'
             }
           });
-          
+
           // Also create notification for push notifications
           await this.createNotification(assigneeId, 'task_assigned', taskId, {
             taskId: taskId,
@@ -474,7 +471,7 @@ export class GetStreamFeedsService {
             createdBy: task.createdBy,
             channelId: task.channelId
           });
-          
+
           console.log(`Added task_assigned activity to assignee ${assigneeId}'s notification feed`);
         }
       }
