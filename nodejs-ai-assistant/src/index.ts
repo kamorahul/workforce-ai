@@ -18,6 +18,7 @@ import notificationsControllerRouter from './controllers/notificationsController
 import audioUploadPostControllerRouter from './controllers/audioUploadPostController';
 import channelMemberRolePostControllerRouter from './controllers/channelMemberRolePostController';
 import homescreenControllerRouter from './controllers/homescreenController';
+import contactsControllerRouter from './controllers/contactsController';
 import { requireAuth, authErrorHandler } from './middleware/auth';
 
 const app = express();
@@ -58,6 +59,7 @@ app.use(requireAuth);
 app.use('/channel-join', channelJoinPostControllerRouter);
 app.use('/profile', profileUpdatePostControllerRouter);
 app.use('/channel-member-role', channelMemberRolePostControllerRouter);
+app.use('/contacts', contactsControllerRouter);
 
 // HomeScreen - optimized single endpoint for all homescreen data
 app.use('/homescreen', homescreenControllerRouter);
