@@ -5,6 +5,14 @@ import { getStreamFeedsService } from '../utils/getstreamFeedsService';
 import multer from 'multer';
 import { uploadToS3 } from '../utils/s3';
 
+interface TaskAttachment {
+  uri: string;
+  name: string;
+  type: string;
+  size?: number;
+  commentId?: string; 
+}
+
 // Configure multer for memory storage
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -438,6 +446,7 @@ router.post('/:taskId/attachments/upload', upload.single('file'), async (req: Re
       name: file.originalname,
       type: file.mimetype,
       size: file.size,
+      commentId: req.body.commentId ? String(req.body.commentId) : null,
     };
 
     // Add new attachment to task
@@ -537,11 +546,22 @@ router.get('/:taskId/attachments', async (req: Request, res: Response) => {
       return;
     }
 
-    res.status(200).json({ 
+    {/*res.status(200).json({ 
       status: 'success', 
       attachments: task.attachments || [],
       taskId: taskId
-    });
+    });*/}
+    res.status(200).json({ 
+      status: 'success', 
+      attachments: (task.attachments || []).map((att: TaskAttachment) => ({
+        uri: att.uri,
+        name: att.name,
+        type: att.type,
+        size: att.size,
+        commentId: att.commentId || null
+      })),
+      taskId
+    });    
   } catch (error) {
     console.error('Error fetching attachments:', error);
     res.status(500).json({ error: 'Failed to fetch attachments' });

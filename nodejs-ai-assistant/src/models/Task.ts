@@ -18,6 +18,7 @@ export interface ITask extends Document {
     name: string;
     type: string;
     size?: number;
+    commentId?: string;
   }>;
 }
 
@@ -90,6 +91,7 @@ const TaskSchema: Schema = new Schema({
         type: Number,
         required: false,
       },
+      commentId: { type: String, required: false, default: null },
     }],
     required: false,
     default: [],
