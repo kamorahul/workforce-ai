@@ -125,21 +125,41 @@ router.get('/', async (req: Request, res: Response) => {
     } = req.query;
     
     const query: any = {};
-    
+    const andConditions: any[] = [];
+
     if (assignee && createdBy) {
       // Fetch tasks where user is either in assignee array or creator
-      query.$or = [
-        { assignee: { $in: [assignee as string] } },
-        { createdBy: createdBy as string }
-      ];
+      andConditions.push({
+        $or: [
+          { assignee: { $in: [assignee as string] } },
+          { createdBy: createdBy as string }
+        ]
+      });
     } else if (assignee) {
       query.assignee = { $in: [assignee as string] };
     } else if (createdBy) {
       query.createdBy = createdBy as string;
     }
-    
+
     if (channelId) {
-      query.channelId = channelId as string;
+      // Support both full cid format (messaging:channel-name) and extracted ID (channel-name)
+      const channelIdStr = channelId as string;
+      const extractedId = channelIdStr.includes(':') ? channelIdStr.split(':')[1] : channelIdStr;
+      const fullCid = channelIdStr.includes(':') ? channelIdStr : `messaging:${channelIdStr}`;
+
+      // Match tasks with any of the channelId formats
+      andConditions.push({
+        $or: [
+          { channelId: channelIdStr },
+          { channelId: extractedId },
+          { channelId: fullCid }
+        ]
+      });
+    }
+
+    // Combine $and conditions if any exist
+    if (andConditions.length > 0) {
+      query.$and = andConditions;
     }
 
     // Add completed filter if isCompleted is provided
