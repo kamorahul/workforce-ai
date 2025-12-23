@@ -45,18 +45,16 @@ router.get('/', async (req: Request, res: Response) => {
     const today = new Date();
     const todayString = today.toISOString().split('T')[0];
 
-    // Filter tasks due today
+    // Filter tasks due today (only tasks actually due today, no fallback)
     const tasksDueToday = tasks.filter(task => {
       if (!task.completionDate) return false;
       const dueDate = new Date(task.completionDate);
       const dueDateString = dueDate.toISOString().split('T')[0];
       return dueDateString === todayString;
-    }).slice(0, 2);
+    });
 
-    // If no tasks due today, show 2 most recent
-    const tasksToShow = tasksDueToday.length > 0
-      ? tasksDueToday
-      : tasks.slice(0, 2);
+    // Only show tasks actually due today
+    const tasksToShow = tasksDueToday;
 
     // Get subtask counts for tasks due today
     const tasksWithCounts = await Promise.all(tasksToShow.map(async (task) => {
