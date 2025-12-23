@@ -212,7 +212,7 @@ router.get('/', async (req: Request, res: Response) => {
       .select('_id name status priority completionDate channelId createdAt createdBy assignee description completed updatedAt')
       .limit(limitNum)
       .skip(offsetNum)
-      .sort({ completionDate: 1, createdAt: -1 })
+      .sort({ createdAt: -1 })
       .lean();
 
     const tasksWithCounts = await Promise.all(tasks.map(async (task) => {
