@@ -10,18 +10,16 @@ interface TaskAttachment {
   name: string;
   type: string;
   size?: number;
-  commentId?: string; 
+  commentId?: string;
 }
 
-// Configure multer for memory storage
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 200 * 1024 * 1024, // 200MB limit for videos
+    fileSize: 200 * 1024 * 1024,
   },
   fileFilter: (req, file, cb) => {
-    // Accept images, PDFs, and videos
-    if (file.mimetype.startsWith('image/') || 
+    if (file.mimetype.startsWith('image/') ||
         file.mimetype === 'application/pdf' ||
         file.mimetype.startsWith('video/')) {
       cb(null, true);
@@ -34,12 +32,12 @@ const upload = multer({
 export const handleTaskPost = async (req: Request, res: Response) => {
   try {
     const { name, assignee, priority, completionDate, channelId, description, subtasks, createdBy, parentTaskId, attachments } = req.body;
+
     if (!name || !assignee || !Array.isArray(assignee) || assignee.length === 0 || !priority || !completionDate) {
       res.status(400).json({ error: 'Missing required fields or assignee must be a non-empty array' });
       return;
     }
 
-    // Create the main task
     const task: ITask = new Task({
       name,
       assignee,
@@ -47,33 +45,27 @@ export const handleTaskPost = async (req: Request, res: Response) => {
       completionDate: new Date(completionDate),
       channelId,
       description,
-      createdBy: createdBy || assignee[0], // Use first assignee as default creator
-      parentTaskId, // Will be undefined for top-level tasks
-      attachments: attachments || [], // Handle attachments
+      createdBy: createdBy || assignee[0],
+      parentTaskId,
+      attachments: attachments || [],
     });
     await task.save();
 
-    // Create subtasks if provided
-    // NOTE: Subtasks do NOT trigger separate notifications - only parent task notifies
     const createdSubtasks = [];
     if (subtasks && Array.isArray(subtasks)) {
       for (const subtask of subtasks) {
         const newSubtask: ITask = new Task({
           name: subtask.name,
-          assignee: subtask.assignee || assignee, // Inherit assignees from parent if not specified
-          priority: subtask.priority || priority, // Inherit priority from parent if not specified
+          assignee: subtask.assignee || assignee,
+          priority: subtask.priority || priority,
           completionDate: subtask.completionDate ? new Date(subtask.completionDate) : new Date(completionDate),
           channelId,
           description: subtask.description,
           createdBy: createdBy || assignee[0],
-          parentTaskId: task._id, // Link to parent task
+          parentTaskId: task._id,
         });
         await newSubtask.save();
 
-        // NO notification for subtasks - only activity feed entry on parent task
-        // This prevents notification overkill (3-4 notifications for one task creation)
-
-        // Create activity on parent task for subtask addition (activity feed only, no push notification)
         const taskCreator = createdBy || assignee[0];
         const actorName = await getStreamFeedsService.getUserName(taskCreator);
         const tasksFeed = getStreamFeedsService['getstreamClient'].feed('tasks', String(task._id));
@@ -96,14 +88,9 @@ export const handleTaskPost = async (req: Request, res: Response) => {
       }
     }
 
-    // Create notification for main task (with self-exclusion)
-    // BUT skip notification if this is a subtask (has parentTaskId) - only add activity to parent task feed
     if (parentTaskId) {
-      // This is a subtask being created separately - add activity to parent task feed, no push notification
       const taskCreator = createdBy || assignee[0];
       const actorName = await getStreamFeedsService.getUserName(taskCreator);
-
-      // Get parent task name for the activity
       const parentTask = await Task.findById(parentTaskId);
       const parentTaskName = parentTask?.name || 'Untitled Task';
 
@@ -122,9 +109,7 @@ export const handleTaskPost = async (req: Request, res: Response) => {
           channelId: task.channelId
         }
       });
-      console.log(`Subtask created - activity added to parent task ${parentTaskId}, no push notification`);
     } else {
-      // This is a parent task - send notifications to assignees (excluding creator)
       await getStreamFeedsService.createTaskActivity(task._id as string, task);
     }
 
@@ -144,22 +129,23 @@ router.post('/', handleTaskPost);
 
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { 
-      assignee, 
-      channelId, 
-      createdBy, 
-      isCompleted, 
-      includeSubtasks, 
+    const {
+      assignee,
+      channelId,
+      createdBy,
+      isCompleted,
+      includeSubtasks,
       parentTaskId,
-      limit = '50',  // Default 50 tasks per page (increased for better UX with grouping)
-      offset = '0'   // Default start from beginning
+      limit = '50',
+      offset = '0',
+      excludeOldIncomplete = 'true',
+      maxAgeDays = '90'
     } = req.query;
-    
+
     const query: any = {};
     const andConditions: any[] = [];
 
     if (assignee && createdBy) {
-      // Fetch tasks where user is either in assignee array or creator
       andConditions.push({
         $or: [
           { assignee: { $in: [assignee as string] } },
@@ -173,12 +159,10 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     if (channelId) {
-      // Support both full cid format (messaging:channel-name) and extracted ID (channel-name)
       const channelIdStr = channelId as string;
       const extractedId = channelIdStr.includes(':') ? channelIdStr.split(':')[1] : channelIdStr;
       const fullCid = channelIdStr.includes(':') ? channelIdStr : `messaging:${channelIdStr}`;
 
-      // Match tasks with any of the channelId formats
       andConditions.push({
         $or: [
           { channelId: channelIdStr },
@@ -188,40 +172,49 @@ router.get('/', async (req: Request, res: Response) => {
       });
     }
 
-    // Combine $and conditions if any exist
+    if (excludeOldIncomplete === 'true' && isCompleted !== 'true') {
+      const maxAge = parseInt(maxAgeDays as string, 10) || 90;
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - maxAge);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      andConditions.push({
+        $or: [
+          { completed: true },
+          { status: 'completed' },
+          { createdAt: { $gte: cutoffDate } },
+          { completionDate: { $gte: today } }
+        ]
+      });
+    }
+
     if (andConditions.length > 0) {
       query.$and = andConditions;
     }
 
-    // Add completed filter if isCompleted is provided
     if (isCompleted !== undefined) {
       query.completed = isCompleted === 'true';
     }
 
-    // Filter by parent task ID if provided
     if (parentTaskId) {
       query.parentTaskId = parentTaskId;
     } else if (includeSubtasks !== 'true') {
-      // If not explicitly including subtasks and no parent specified, only show top-level tasks
       query.parentTaskId = { $exists: false };
     }
 
-    // Convert pagination params to numbers
     const limitNum = parseInt(limit as string, 10);
     const offsetNum = parseInt(offset as string, 10);
-
-    // Get total count for pagination info
     const totalCount = await Task.countDocuments(query);
 
-    // Fetch tasks with pagination and field selection for performance
     const tasks = await Task.find(query)
-      .select('_id name status priority completionDate channelId createdAt createdBy assignee description completed')
+      .select('_id name status priority completionDate channelId createdAt createdBy assignee description completed updatedAt')
       .limit(limitNum)
       .skip(offsetNum)
-      .sort({ createdAt: -1 })  // Newest first for better UX
-      .lean();  // Use lean() for faster queries
+      .sort({ completionDate: 1, createdAt: -1 })
+      .lean();
 
-    // Fetch subtask counts efficiently with aggregation
     const tasksWithCounts = await Promise.all(tasks.map(async (task) => {
       const subtaskStats = await Task.aggregate([
         { $match: { parentTaskId: task._id } },
@@ -237,12 +230,11 @@ router.get('/', async (req: Request, res: Response) => {
       ]);
 
       const counts = subtaskStats[0] || { total: 0, completed: 0 };
-      
-      // Ensure status field is set
+
       if (!task.status) {
         task.status = task.completed ? 'completed' : 'todo';
       }
-      
+
       return {
         ...task,
         subtaskCounts: {
@@ -252,11 +244,10 @@ router.get('/', async (req: Request, res: Response) => {
       };
     }));
 
-    // Calculate hasMore flag
     const hasMore = offsetNum + limitNum < totalCount;
 
-    res.status(200).json({ 
-      status: 'success', 
+    res.status(200).json({
+      status: 'success',
       tasks: tasksWithCounts,
       total: totalCount,
       limit: limitNum,
@@ -268,7 +259,7 @@ router.get('/', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to fetch tasks' });
   }
 });
-// Get task details with comments and subtasks
+
 router.get('/:taskId', async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
@@ -283,23 +274,19 @@ router.get('/:taskId', async (req: Request, res: Response) => {
       return;
     }
 
-    // Fetch comments for the task
     const comments = await Comment.find({ taskId }).sort({ createdAt: 1 });
-
-    // Fetch subtasks if this is a parent task
     const subtasks = await Task.find({ parentTaskId: taskId });
 
-    // Ensure status field is set based on completed flag if not already set
     const taskObj = task.toObject();
     if (!taskObj.status) {
       taskObj.status = taskObj.completed ? 'completed' : 'todo';
     }
 
-    res.status(200).json({ 
-      status: 'success', 
+    res.status(200).json({
+      status: 'success',
       task: taskObj,
       subtasks,
-      comments 
+      comments
     });
   } catch (error) {
     console.error('Error fetching task details:', error);
@@ -311,20 +298,18 @@ router.patch('/:taskId/complete', async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
     const { completeSubtasks, completed } = req.query;
-    
+
     if (!taskId) {
       res.status(400).json({ error: 'Missing required parameter: taskId' });
       return;
     }
 
-    // Get current task to determine new completion status
     const currentTask = await Task.findById(taskId);
     if (!currentTask) {
       res.status(404).json({ error: 'Task not found' });
       return;
     }
 
-    // Toggle completion status if 'completed' query param is provided, otherwise default to true
     const newCompletedStatus = completed !== undefined ? completed === 'true' : !currentTask.completed;
 
     const task = await Task.findByIdAndUpdate(
@@ -333,7 +318,6 @@ router.patch('/:taskId/complete', async (req: Request, res: Response) => {
       { new: true }
     );
 
-    // If completeSubtasks is true, also toggle all subtasks
     if (completeSubtasks === 'true') {
       await Task.updateMany(
         { parentTaskId: taskId },
@@ -341,13 +325,12 @@ router.patch('/:taskId/complete', async (req: Request, res: Response) => {
       );
     }
 
-    // Fetch updated subtasks if any were toggled
-    const subtasks = completeSubtasks === 'true' 
+    const subtasks = completeSubtasks === 'true'
       ? await Task.find({ parentTaskId: taskId })
       : [];
 
-    res.status(200).json({ 
-      status: 'success', 
+    res.status(200).json({
+      status: 'success',
       task,
       subtasks: completeSubtasks === 'true' ? subtasks : undefined
     });
@@ -364,20 +347,19 @@ router.put('/:taskId', async (req: Request, res: Response) => {
       res.status(400).json({ error: 'Missing required parameter: taskId' });
       return;
     }
-    
-    // Get the original task before updating
+
     const originalTask = await Task.findById(taskId);
     if (!originalTask) {
       res.status(404).json({ error: 'Task not found' });
       return;
     }
-    
-    const { 
-      name, assignee, priority, completionDate, channelId, 
+
+    const {
+      name, assignee, priority, completionDate, channelId,
       description, completed, status, parentTaskId, attachments,
-      userId  // User making the update
+      userId
     } = req.body;
-    
+
     const updateData: any = {};
     if (name !== undefined) updateData.name = name;
     if (assignee !== undefined) {
@@ -395,38 +377,30 @@ router.put('/:taskId', async (req: Request, res: Response) => {
     if (status !== undefined) updateData.status = status;
     if (parentTaskId !== undefined) updateData.parentTaskId = parentTaskId;
     if (attachments !== undefined) updateData.attachments = attachments;
-    
+
     const updatedTask = await Task.findByIdAndUpdate(
       taskId,
       updateData,
       { new: true, runValidators: true }
     );
-    
+
     if (!updatedTask) {
       res.status(404).json({ error: 'Task not found' });
       return;
     }
-    
-    // Create notifications for task updates (with self-exclusion)
-    // Pass userId as actor for activities
+
     try {
-      // Ensure we have the userId - check both req.body.userId and the extracted userId
-      const actorUserId = userId || req.body.userId || updatedTask.createdBy || 'system';
-      console.log('Task update - Actor userId:', actorUserId, 'from req.body.userId:', req.body.userId);
-      
-      // Only include fields that are actually being updated (from updateData, not the entire req.body)
-      // This prevents creating activities for fields that didn't change
+      const actorUserId = userId || updatedTask.createdBy || 'system';
       const updateDataWithActor = {
-        ...updateData, // Only include fields that were actually updated
+        ...updateData,
         actor: actorUserId,
-        userId: actorUserId // Also set userId explicitly for consistency
+        userId: actorUserId
       };
       await getStreamFeedsService.createTaskUpdateNotifications(originalTask, updatedTask, updateDataWithActor);
     } catch (error) {
       console.error('Error creating task update notifications:', error);
-      // Continue even if notifications fail
     }
-    
+
     res.status(200).json({ status: 'success', task: updatedTask });
   } catch (error) {
     console.error('Error updating task:', error);
@@ -434,7 +408,6 @@ router.put('/:taskId', async (req: Request, res: Response) => {
   }
 });
 
-// Delete a task
 router.delete('/:taskId', async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
@@ -449,18 +422,16 @@ router.delete('/:taskId', async (req: Request, res: Response) => {
       return;
     }
 
-    // If this is a parent task, also delete all subtasks
     if (!task.parentTaskId) {
       await Task.deleteMany({ parentTaskId: taskId });
     }
 
-    // Delete the task itself
     await Task.findByIdAndDelete(taskId);
 
-    res.status(200).json({ 
-      status: 'success', 
+    res.status(200).json({
+      status: 'success',
       message: 'Task deleted successfully',
-      deletedTaskId: taskId 
+      deletedTaskId: taskId
     });
   } catch (error) {
     console.error('Error deleting task:', error);
@@ -468,12 +439,11 @@ router.delete('/:taskId', async (req: Request, res: Response) => {
   }
 });
 
-// Handle file upload
 router.post('/:taskId/attachments/upload', upload.single('file'), async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
     const file = req.file;
-    
+
     if (!taskId || !file) {
       res.status(400).json({ error: 'Missing required parameters' });
       return;
@@ -485,13 +455,9 @@ router.post('/:taskId/attachments/upload', upload.single('file'), async (req: Re
       return;
     }
 
-    // Generate unique file name
     const uniqueFileName = `${Date.now()}-${file.originalname}`;
-    
-    // Upload file to S3 and get URL
     const fileUrl = await uploadToS3(file.buffer, uniqueFileName, file.mimetype);
 
-    // Create attachment object
     const newAttachment = {
       uri: fileUrl,
       name: file.originalname,
@@ -500,33 +466,18 @@ router.post('/:taskId/attachments/upload', upload.single('file'), async (req: Re
       commentId: req.body.commentId ? String(req.body.commentId) : null,
     };
 
-    // Add new attachment to task
     const updatedAttachments = [...(task.attachments || []), newAttachment];
-    
+
     const updatedTask = await Task.findByIdAndUpdate(
       taskId,
       { attachments: updatedAttachments },
       { new: true }
     );
 
-    // Create activity and notification for attachment addition
     try {
-      // Get userId from FormData - multer parses all fields into req.body
-      // Check multiple sources to ensure we get the userId
       const attachmentUserId = req.body?.userId || req.query?.userId as string || task.createdBy || 'system';
-      console.log('Attachment upload - Actor userId:', attachmentUserId);
-      console.log('Attachment upload - req.body:', JSON.stringify(req.body));
-      console.log('Attachment upload - req.query:', JSON.stringify(req.query));
-      
-      // If userId is still 'system', log a warning
-      if (attachmentUserId === 'system') {
-        console.warn('⚠️ Attachment upload - userId not found in request, using system as fallback');
-      }
-
-      // Resolve username for display in activity feed
       const attachmentActorName = await getStreamFeedsService.getUserName(attachmentUserId);
 
-      // Add activity to tasks feed
       const tasksFeed = await getStreamFeedsService['getstreamClient'].feed('tasks', taskId);
       await tasksFeed.addActivity({
         actor: attachmentUserId,
@@ -537,20 +488,19 @@ router.post('/:taskId/attachments/upload', upload.single('file'), async (req: Re
           taskName: task.name,
           fileName: file.originalname,
           fileType: file.mimetype,
-          actor: attachmentUserId, // Store in extra for reliable extraction
-          actorName: attachmentActorName, // Resolved username for display
+          actor: attachmentUserId,
+          actorName: attachmentActorName,
           channelId: task.channelId
         }
       });
-      
-      // Send notifications to users
+
       const usersToNotify = new Set([
         ...(task.assignee || []),
         task.createdBy
       ].filter(Boolean));
 
       for (const userId of usersToNotify) {
-            await getStreamFeedsService.createNotification(
+        await getStreamFeedsService.createNotification(
           userId,
           'task_attachment_added',
           taskId,
@@ -566,10 +516,9 @@ router.post('/:taskId/attachments/upload', upload.single('file'), async (req: Re
       }
     } catch (error) {
       console.error('Error creating attachment notification:', error);
-      // Continue even if notification fails
     }
 
-    res.status(200).json({ 
+    res.status(200).json({
       status: 'success',
       task: updatedTask,
       attachment: newAttachment,
@@ -581,11 +530,10 @@ router.post('/:taskId/attachments/upload', upload.single('file'), async (req: Re
   }
 });
 
-// Get task attachments
 router.get('/:taskId/attachments', async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
-    
+
     if (!taskId) {
       res.status(400).json({ error: 'Missing required parameter: taskId' });
       return;
@@ -597,13 +545,8 @@ router.get('/:taskId/attachments', async (req: Request, res: Response) => {
       return;
     }
 
-    {/*res.status(200).json({ 
-      status: 'success', 
-      attachments: task.attachments || [],
-      taskId: taskId
-    });*/}
-    res.status(200).json({ 
-      status: 'success', 
+    res.status(200).json({
+      status: 'success',
       attachments: (task.attachments || []).map((att: TaskAttachment) => ({
         uri: att.uri,
         name: att.name,
@@ -612,20 +555,18 @@ router.get('/:taskId/attachments', async (req: Request, res: Response) => {
         commentId: att.commentId || null
       })),
       taskId
-    });    
+    });
   } catch (error) {
     console.error('Error fetching attachments:', error);
     res.status(500).json({ error: 'Failed to fetch attachments' });
   }
 });
 
-// Remove attachment from task
 router.delete('/:taskId/attachments/:attachmentIndex', async (req: Request, res: Response) => {
   try {
     const { taskId, attachmentIndex } = req.params;
-    // Get userId from query params (more reliable for DELETE requests)
     const userId = req.query.userId as string || req.body.userId;
-    
+
     if (!taskId) {
       res.status(400).json({ error: 'Missing required parameter: taskId' });
       return;
@@ -648,26 +589,19 @@ router.delete('/:taskId/attachments/:attachmentIndex', async (req: Request, res:
       return;
     }
 
-    // Remove the attachment at the specified index
     const removedAttachment = task.attachments[index];
     const updatedAttachments = task.attachments.filter((_, i) => i !== index);
-    
+
     const updatedTask = await Task.findByIdAndUpdate(
       taskId,
       { attachments: updatedAttachments },
       { new: true }
     );
 
-    // Create activity and notification for attachment removal
     try {
-      // Get userId from query params (for DELETE) or body
       const attachmentRemoveUserId = userId || 'system';
-      console.log('Attachment removal - Actor userId:', attachmentRemoveUserId);
-
-      // Resolve username for display in activity feed
       const attachmentRemoveActorName = await getStreamFeedsService.getUserName(attachmentRemoveUserId);
 
-      // Add activity to tasks feed
       const tasksFeed = await getStreamFeedsService['getstreamClient'].feed('tasks', taskId);
       await tasksFeed.addActivity({
         actor: attachmentRemoveUserId,
@@ -677,13 +611,12 @@ router.delete('/:taskId/attachments/:attachmentIndex', async (req: Request, res:
           taskId: taskId,
           taskName: task.name,
           fileName: removedAttachment.name,
-          actor: attachmentRemoveUserId, // Store in extra for reliable extraction
-          actorName: attachmentRemoveActorName, // Resolved username for display
+          actor: attachmentRemoveUserId,
+          actorName: attachmentRemoveActorName,
           channelId: task.channelId
         }
       });
-      
-      // Send notifications to users
+
       const usersToNotify = new Set([
         ...(task.assignee || []),
         task.createdBy
@@ -705,11 +638,10 @@ router.delete('/:taskId/attachments/:attachmentIndex', async (req: Request, res:
       }
     } catch (error) {
       console.error('Error creating attachment removal notification:', error);
-      // Continue even if notification fails
     }
 
-    res.status(200).json({ 
-      status: 'success', 
+    res.status(200).json({
+      status: 'success',
       task: updatedTask,
       message: 'Attachment removed successfully'
     });
@@ -719,22 +651,18 @@ router.delete('/:taskId/attachments/:attachmentIndex', async (req: Request, res:
   }
 });
 
-// GET /task/:taskId/activities - Get all activities for a task from GetStream
 router.get('/:taskId/activities', async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
-    
+
     if (!taskId) {
       res.status(400).json({ error: 'Task ID is required' });
       return;
     }
 
-    console.log('Fetching activities for task:', taskId);
-    
-    // Get activities from GetStream
     const activities = await getStreamFeedsService.getTaskActivities(taskId);
-    
-    res.status(200).json({ 
+
+    res.status(200).json({
       status: 'success',
       activities: activities
     });
