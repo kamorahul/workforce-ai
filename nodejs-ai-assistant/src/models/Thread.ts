@@ -6,6 +6,7 @@ export interface IThread extends Document {
   userId: string;
   createdAt: Date;
   updatedAt: Date;
+  expiresAt: Date;
 }
 
 const ThreadSchema: Schema = new Schema({
@@ -24,6 +25,11 @@ const ThreadSchema: Schema = new Schema({
     type: String,
     required: true,
     index: true,
+  },
+  expiresAt: {
+    type: Date,
+    default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from creation
+    index: { expireAfterSeconds: 0 } // MongoDB TTL index - auto-deletes when expiresAt is reached
   }
 }, {
   timestamps: true,

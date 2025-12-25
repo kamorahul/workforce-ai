@@ -2,6 +2,7 @@ import express, { Request, Response, Router } from 'express';
 import { createAgent, User } from '../agents/createAgent';
 import { agent } from 'supertest';
 import { AIAgent } from '../agents/types';
+import { serverClient } from '../serverClient';
 
 const router: Router = express.Router();
 
@@ -44,7 +45,31 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
     // For regular channels (not kai channels), use task detection
     if(channel.id.indexOf('kai') !== 0) {
-      doAnalyzeMessage(agent, user, message);
+      // Check if this is a threaded reply (has parent_id)
+      const parentId = message.parent_id;
+      let threadContext = null;
+
+      if (parentId) {
+        console.log(`🧵 Threaded reply detected, parent_id: ${parentId}`);
+        try {
+          const parentMessage = await serverClient.getMessage(parentId);
+
+          if (parentMessage?.message) {
+            const extraData = parentMessage.message.extraData as any;
+            threadContext = {
+              parentId: parentId,
+              parentText: parentMessage.message.text || '',
+              parentUser: parentMessage.message.user?.name || parentMessage.message.user?.id || 'Unknown',
+              parentIstask: extraData?.istask
+            };
+            console.log(`📝 Parent message context: "${threadContext.parentText}" by ${threadContext.parentUser}`);
+          }
+        } catch (err) {
+          console.error('Error fetching parent message:', err);
+        }
+      }
+
+      doAnalyzeMessage(agent, user, message, threadContext);
       res.json(req.body);
       return;
     }
@@ -86,9 +111,26 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-async function doAnalyzeMessage(agent: AIAgent, user: User, message: any) {
+async function doAnalyzeMessage(agent: AIAgent, user: User, message: any, threadContext?: any) {
   await agent.init("asst_ercPXUnj2oTtMpqjk4cfJWCD");
-  await agent.handleMessage(`${user.name}: ${message.text}`, message.id);
+
+  let messageToAnalyze = '';
+
+  if (threadContext) {
+    // Include parent message context for threaded replies
+    messageToAnalyze = `[THREADED CONVERSATION]
+Parent message by ${threadContext.parentUser}: "${threadContext.parentText}"
+Reply by ${user.name}: "${message.text}"
+
+Analyze if this thread contains a task. Consider the parent message context and the reply together.`;
+
+    console.log(`🧵 Analyzing threaded message with parent context`);
+  } else {
+    // Single message analysis
+    messageToAnalyze = `${user.name}: ${message.text}`;
+  }
+
+  await agent.handleMessage(messageToAnalyze, message.id);
 }
 
 export default router;
