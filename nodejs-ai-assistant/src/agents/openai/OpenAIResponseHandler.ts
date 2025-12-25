@@ -598,14 +598,19 @@ export class OpenAIResponseHandler {
         switch (data.type) {
           case 'task':
             console.log('📝 Detected TASK:', data.title);
+            console.log('📋 Subtasks:', data.subtasks);
+            console.log('📋 Priority:', data.priority);
+            // Normalize priority to lowercase
+            const priority = (data.priority || 'medium').toLowerCase();
             const taskData = this.removeNullValues({
               title: data.title,
               description: data.description,
-              priority: data.priority || 'medium',
+              priority: priority,
               dueDate: data.dueDate,
               assignees: data.assignees,
               subtasks: data.subtasks
             });
+            console.log('📋 Final taskData:', JSON.stringify(taskData));
             return {
               isTask: true,
               isEvent: false,
@@ -634,9 +639,18 @@ export class OpenAIResponseHandler {
         }
       }
 
-      // Legacy format: { title, priority, ... } without type
+      // Legacy format: { title, priority, ... } without type (old instruction format)
       if (data && (data.title || data.description || data.priority || data.subtasks)) {
-        return { isTask: true, isEvent: false, taskData: this.removeNullValues(data) };
+        console.log('📝 Detected TASK (legacy format):', data.title);
+        console.log('📋 Subtasks:', data.subtasks);
+        console.log('📋 Priority:', data.priority);
+        // Normalize priority to lowercase
+        if (data.priority) {
+          data.priority = data.priority.toLowerCase();
+        }
+        const legacyTaskData = this.removeNullValues(data);
+        console.log('📋 Final taskData:', JSON.stringify(legacyTaskData));
+        return { isTask: true, isEvent: false, taskData: legacyTaskData };
       }
     } catch (error) {
       // Not valid JSON, fall back to original logic
