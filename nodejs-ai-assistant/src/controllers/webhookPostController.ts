@@ -89,12 +89,12 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     // FOR KAI CHANNELS: Use Q&A Assistant with PERSISTENT thread (conversation memory)
     const qaAssistantId = process.env.OPENAI_QA_ASSISTANT_ID || "asst_SIcQ1bD17QezZbQIQEzuYMhg";
     console.log('🤖 Using Q&A Assistant for kai channel:', qaAssistantId);
-    
+
     await agent.init(qaAssistantId);
 
     let messageText = message.text || '';
     let attachments = [];
-    
+
     // Process attachments (images and documents)
     if(message.attachments && message.attachments.length > 0) {
       attachments = message.attachments.map((att: any) => ({
@@ -104,16 +104,26 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         name: att.title || att.name || att.fallback || att.originalImage?.filename || att.originalImage?.name || 'attachment',
         filename: att.originalImage?.filename || att.originalImage?.name || att.fallback || att.title || att.name
       }));
-      
+
       if (!messageText || messageText.trim() === '') {
         messageText = 'Please analyze this file.';
       }
-      
+
       console.log('📎 Attachments detected:', attachments.length, 'file(s)');
     }
-    
+
+    // Extract mentioned users for task/event assignment
+    const mentionedUsers = message.mentioned_users?.map((u: any) => ({
+      id: u.id,
+      name: u.name || u.id
+    })) || [];
+
+    if (mentionedUsers.length > 0) {
+      console.log('👥 Mentioned users:', mentionedUsers.map((u: any) => `${u.name} (${u.id})`).join(', '));
+    }
+
     // Use persistent thread = true for Q&A agent (remembers conversation)
-    await agent.handleMessage(messageText, message.id, attachments, true);
+    await agent.handleMessage(messageText, message.id, attachments, true, mentionedUsers);
 
     res.status(200).json({ message: "Webhook processed successfully" });
   } catch (error) {

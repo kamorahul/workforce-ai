@@ -67,7 +67,7 @@ export class OpenAIAgent implements AIAgent {
     }
   };
 
-  public handleMessage = async (e: string, messageId?: string, attachments?: any[], usePersistentThread: boolean = false) => {
+  public handleMessage = async (e: string, messageId?: string, attachments?: any[], usePersistentThread: boolean = false, mentionedUsers?: { id: string; name: string }[]) => {
     if (!this.openai || !this.openAiThread || !this.assistant) {
       console.error('OpenAI not initialized');
       return;
@@ -528,18 +528,8 @@ export class OpenAIAgent implements AIAgent {
         content: e,
       });
       }
-      additionalInstructions = `Analyze this message and any attached images. Classify it as a task, event, or none.
-
-If it's a TASK (action item, todo, deliverable), respond with JSON:
-{"type": "task", "title": "...", "description": "...", "priority": "low|medium|high", "dueDate": "ISO date or null", "assignees": ["@mentioned users"]}
-
-If it's an EVENT (meeting, call, scheduled occurrence), respond with JSON:
-{"type": "event", "title": "...", "startDate": "ISO date", "endDate": "ISO date or null", "location": "...", "attendees": ["@mentioned users"]}
-
-If it's neither, respond: {"type": "none"}
-
-For images: Extract any dates, times, meeting details, deadlines, or task information visible in the image.
-Only respond with JSON, no other text.`;
+      const today = new Date().toISOString().split('T')[0];
+      additionalInstructions = `Today's date is ${today}.`;
     }
 
     try {
@@ -556,8 +546,9 @@ Only respond with JSON, no other text.`;
         this.channel,
         this.user,
         messageId,
+        mentionedUsers,
       );
-      
+
       void handler.run();
       this.handlers.push(handler);
     } catch (error) {

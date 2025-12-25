@@ -4,6 +4,7 @@ import type {Channel, DefaultGenerics, MessageResponse, StreamChat} from 'stream
 import {User} from "../createAgent";
 import { Task } from '../../models/Task';
 import { Event } from '../../models/Event';
+import { serverClient } from '../../serverClient';
 
 interface FetchGroupConversationArguments {
   groupId: string;
@@ -32,6 +33,11 @@ interface CreateEventArguments {
   reminder?: number;
 }
 
+interface MentionedUser {
+  id: string;
+  name: string;
+}
+
 export class OpenAIResponseHandler {
   private message_text = '';
   private run_id = '';
@@ -45,6 +51,7 @@ export class OpenAIResponseHandler {
     private readonly channel: Channel,
     private readonly user: User,
     private readonly messageId?: string,
+    private readonly mentionedUsers?: MentionedUser[],
   ) {
     this.chatClient.on('ai_indicator.stop', this.handleStopGenerating);
   }
@@ -395,17 +402,68 @@ export class OpenAIResponseHandler {
     });
   }
 
+  // Get user IDs from mentioned users by matching names from OpenAI
+  private getAssigneeIds = (assigneeNames?: string[]): string[] => {
+    if (!assigneeNames || assigneeNames.length === 0) {
+      return [this.user.id]; // Default to current user
+    }
+
+    // If we have mentioned users from the message, use their IDs
+    if (this.mentionedUsers && this.mentionedUsers.length > 0) {
+      const assigneeIds: string[] = [];
+
+      for (const name of assigneeNames) {
+        // Find matching mentioned user by name (case-insensitive)
+        const matchedUser = this.mentionedUsers.find(u =>
+          u.name.toLowerCase().includes(name.toLowerCase()) ||
+          name.toLowerCase().includes(u.name.toLowerCase()) ||
+          u.id.toLowerCase().includes(name.toLowerCase())
+        );
+
+        if (matchedUser) {
+          assigneeIds.push(matchedUser.id);
+          console.log(`✅ Matched "${name}" → "${matchedUser.id}" (${matchedUser.name})`);
+        } else {
+          console.log(`⚠️ No match for "${name}" in mentioned users`);
+        }
+      }
+
+      // If we found matches, return them; otherwise default to current user
+      return assigneeIds.length > 0 ? assigneeIds : [this.user.id];
+    }
+
+    // No mentioned users, default to current user
+    return [this.user.id];
+  }
+
+  // Get user names for response
+  private getAssigneeNames = (assigneeIds: string[]): string[] => {
+    if (!this.mentionedUsers || this.mentionedUsers.length === 0) {
+      return assigneeIds;
+    }
+
+    return assigneeIds.map(id => {
+      const user = this.mentionedUsers?.find(u => u.id === id);
+      return user?.name || id;
+    });
+  }
+
   // Create a new task via Kai command
   private createTask = async (args: CreateTaskArguments): Promise<{ success: boolean; task?: any; error?: string }> => {
     try {
       console.log('📝 Creating task via Kai:', args.title);
+      console.log('📋 Mentioned users available:', this.mentionedUsers?.map(u => `${u.name} (${u.id})`).join(', ') || 'none');
+
+      // Get assignee IDs from mentioned users
+      const assigneeIds = this.getAssigneeIds(args.assignees);
+      const assigneeNames = this.getAssigneeNames(assigneeIds);
 
       const task = new Task({
         name: args.title,
         description: args.description || '',
         priority: args.priority || 'medium',
         completionDate: args.dueDate ? new Date(args.dueDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days
-        assignee: args.assignees || [this.user.id],
+        assignee: assigneeIds,
         createdBy: this.user.id,
         channelId: this.channel.id,
         status: 'todo',
@@ -413,7 +471,7 @@ export class OpenAIResponseHandler {
       });
 
       await task.save();
-      console.log('✅ Task created:', task._id);
+      console.log('✅ Task created:', task._id, 'Assignees:', assigneeIds);
 
       return {
         success: true,
@@ -422,7 +480,7 @@ export class OpenAIResponseHandler {
           title: task.name,
           priority: task.priority,
           dueDate: task.completionDate,
-          assignees: task.assignee,
+          assignees: assigneeNames,
         }
       };
     } catch (error) {
@@ -438,6 +496,11 @@ export class OpenAIResponseHandler {
   private createEvent = async (args: CreateEventArguments): Promise<{ success: boolean; event?: any; error?: string }> => {
     try {
       console.log('📅 Creating event via Kai:', args.title);
+      console.log('📋 Mentioned users available:', this.mentionedUsers?.map(u => `${u.name} (${u.id})`).join(', ') || 'none');
+
+      // Get attendee IDs from mentioned users
+      const attendeeIds = this.getAssigneeIds(args.attendees);
+      const attendeeNames = this.getAssigneeNames(attendeeIds);
 
       const event = new Event({
         title: args.title,
@@ -445,7 +508,7 @@ export class OpenAIResponseHandler {
         startDate: new Date(args.startDate),
         endDate: args.endDate ? new Date(args.endDate) : null,
         location: args.location || '',
-        attendees: args.attendees || [this.user.id],
+        attendees: attendeeIds,
         organizer: this.user.id,
         channelId: this.channel.id,
         status: 'scheduled',
@@ -453,7 +516,7 @@ export class OpenAIResponseHandler {
       });
 
       await event.save();
-      console.log('✅ Event created:', event._id);
+      console.log('✅ Event created:', event._id, 'Attendees:', attendeeIds);
 
       return {
         success: true,
@@ -463,7 +526,7 @@ export class OpenAIResponseHandler {
           startDate: event.startDate,
           endDate: event.endDate,
           location: event.location,
-          attendees: event.attendees,
+          attendees: attendeeNames,
         }
       };
     } catch (error) {
@@ -500,6 +563,24 @@ export class OpenAIResponseHandler {
     return this.determineIfTask(text);
   };
 
+  // Helper to remove null/undefined values from object
+  private removeNullValues = (obj: any): any => {
+    const result: any = {};
+    for (const key in obj) {
+      if (obj[key] !== null && obj[key] !== undefined && obj[key] !== '') {
+        // For arrays, only include if not empty
+        if (Array.isArray(obj[key])) {
+          if (obj[key].length > 0) {
+            result[key] = obj[key];
+          }
+        } else {
+          result[key] = obj[key];
+        }
+      }
+    }
+    return result;
+  };
+
   private parseTaskData = (text: string): { isTask: boolean; isEvent: boolean; taskData?: any; eventData?: any } => {
     const trimmedText = text.trim();
 
@@ -517,33 +598,35 @@ export class OpenAIResponseHandler {
         switch (data.type) {
           case 'task':
             console.log('📝 Detected TASK:', data.title);
+            const taskData = this.removeNullValues({
+              title: data.title,
+              description: data.description,
+              priority: data.priority || 'medium',
+              dueDate: data.dueDate,
+              assignees: data.assignees,
+              subtasks: data.subtasks
+            });
             return {
               isTask: true,
               isEvent: false,
-              taskData: {
-                title: data.title,
-                description: data.description,
-                priority: data.priority || 'medium',
-                dueDate: data.dueDate,
-                assignees: data.assignees,
-                subtasks: data.subtasks
-              }
+              taskData
             };
 
           case 'event':
             console.log('📅 Detected EVENT:', data.title);
+            const eventData = this.removeNullValues({
+              title: data.title,
+              description: data.description,
+              startDate: data.startDate,
+              endDate: data.endDate,
+              location: data.location,
+              attendees: data.attendees,
+              reminder: data.reminder || 15
+            });
             return {
               isTask: false,
               isEvent: true,
-              eventData: {
-                title: data.title,
-                description: data.description,
-                startDate: data.startDate,
-                endDate: data.endDate,
-                location: data.location,
-                attendees: data.attendees,
-                reminder: data.reminder || 15
-              }
+              eventData
             };
 
           case 'none':
@@ -553,7 +636,7 @@ export class OpenAIResponseHandler {
 
       // Legacy format: { title, priority, ... } without type
       if (data && (data.title || data.description || data.priority || data.subtasks)) {
-        return { isTask: true, isEvent: false, taskData: data };
+        return { isTask: true, isEvent: false, taskData: this.removeNullValues(data) };
       }
     } catch (error) {
       // Not valid JSON, fall back to original logic
