@@ -2,6 +2,8 @@ import OpenAI from 'openai';
 import type { AssistantStream } from 'openai/lib/AssistantStream';
 import type {Channel, DefaultGenerics, MessageResponse, StreamChat} from 'stream-chat';
 import {User} from "../createAgent";
+import { Task } from '../../models/Task';
+import { Event } from '../../models/Event';
 
 interface FetchGroupConversationArguments {
   groupId: string;
@@ -10,6 +12,24 @@ interface FetchGroupConversationArguments {
 
 interface FetchUserConversationsArguments {
   username: string;
+}
+
+interface CreateTaskArguments {
+  title: string;
+  description?: string;
+  priority?: 'low' | 'medium' | 'high';
+  dueDate?: string;
+  assignees?: string[];
+}
+
+interface CreateEventArguments {
+  title: string;
+  description?: string;
+  startDate: string;
+  endDate?: string;
+  location?: string;
+  attendees?: string[];
+  reminder?: number;
 }
 
 export class OpenAIResponseHandler {
@@ -138,22 +158,28 @@ export class OpenAIResponseHandler {
             // Reset for next message
             this.message_text = '';
           } else if(this.messageId) {
-            // REGULAR CHANNEL WITH MESSAGE ID - Update original message with task detection
-            const { isTask, taskData } = this.parseTaskData(text);
-            console.log(`🔍 Task Detection - Response: "${text}" | IsTask: ${isTask}`, taskData ? `| TaskData: ${JSON.stringify(taskData)}` : '');
-            
+            // REGULAR CHANNEL WITH MESSAGE ID - Update original message with task/event detection
+            const { isTask, isEvent, taskData, eventData } = this.parseTaskData(text);
+            console.log(`🔍 Classification - IsTask: ${isTask} | IsEvent: ${isEvent}`);
+
             const originalMessage = await this.chatClient.getMessage(this.messageId);
             const originalText = originalMessage?.message?.text || '';
-            
+
             const extraData: any = {
-              istask: isTask ? 1 : 0
+              istask: isTask ? 1 : 0,
+              isevent: isEvent ? 1 : 0
             };
-            
+
             if (isTask && taskData) {
               extraData.taskData = taskData;
               console.log(`📝 Saving task data: ${JSON.stringify(taskData)}`);
             }
-            
+
+            if (isEvent && eventData) {
+              extraData.eventData = eventData;
+              console.log(`📅 Saving event data: ${JSON.stringify(eventData)}`);
+            }
+
             await this.chatClient.updateMessage({
               id: originalMessage.message.id,
               text: originalMessage.message.text,
@@ -162,47 +188,50 @@ export class OpenAIResponseHandler {
               user_id: originalMessage.message.user?.id,
               extraData: extraData
             });
-            console.log(`✅ Updated Stream message with istask: ${isTask ? 1 : 0}, preserved text: "${originalText}"`);
-            
+            console.log(`✅ Updated message - istask: ${isTask ? 1 : 0}, isevent: ${isEvent ? 1 : 0}`);
+
             // Reset for next message
             this.message_text = '';
-            } else {
-            // REGULAR CHANNEL WITHOUT MESSAGE ID - Send new message with task detection
+          } else {
+            // REGULAR CHANNEL WITHOUT MESSAGE ID - Send new message with task/event detection
             const messageResponse = await this.channel.sendMessage({
-                text,
-                user_id: this.user.id,
-                type: 'system',
-                restricted_visibility: [this.user.id],
-              });
-              
-              // Determine if it's a task and update Stream message (only for regular channels)
-              if (messageResponse?.message?.id) {
-                const { isTask, taskData } = this.parseTaskData(text);
-                console.log(`🔍 Task Detection - Response: "${text}" | IsTask: ${isTask}`, taskData ? `| TaskData: ${JSON.stringify(taskData)}` : '');
-                
-                // Prepare extraData with task information
-                const extraData: any = {
-                  istask: isTask ? 1 : 0
-                };
-                
-                // If it's a task with JSON data, save the task properties
-                if (isTask && taskData) {
-                  extraData.taskData = taskData;
-                  console.log(`📝 Saving task data: ${JSON.stringify(taskData)}`);
-                }
-                
-                // Update the message with istask field and task data
-                await this.chatClient.updateMessage({
-                  id: messageResponse.message.id,
-                  text: messageResponse.message.text,
-                  attachments: messageResponse.message.attachments,
-                  mentioned_users: messageResponse.message.mentioned_users?.map(u => u.id),
-                  user_id: messageResponse.message.user?.id,
-                  extraData: extraData
-                });
-                console.log(`✅ Updated Stream message with istask: ${isTask ? 1 : 0}`);
+              text,
+              user_id: this.user.id,
+              type: 'system',
+              restricted_visibility: [this.user.id],
+            });
+
+            // Determine if it's a task/event and update Stream message
+            if (messageResponse?.message?.id) {
+              const { isTask, isEvent, taskData, eventData } = this.parseTaskData(text);
+              console.log(`🔍 Classification - IsTask: ${isTask} | IsEvent: ${isEvent}`);
+
+              const extraData: any = {
+                istask: isTask ? 1 : 0,
+                isevent: isEvent ? 1 : 0
+              };
+
+              if (isTask && taskData) {
+                extraData.taskData = taskData;
+                console.log(`📝 Saving task data: ${JSON.stringify(taskData)}`);
               }
-            
+
+              if (isEvent && eventData) {
+                extraData.eventData = eventData;
+                console.log(`📅 Saving event data: ${JSON.stringify(eventData)}`);
+              }
+
+              await this.chatClient.updateMessage({
+                id: messageResponse.message.id,
+                text: messageResponse.message.text,
+                attachments: messageResponse.message.attachments,
+                mentioned_users: messageResponse.message.mentioned_users?.map(u => u.id),
+                user_id: messageResponse.message.user?.id,
+                extraData: extraData
+              });
+              console.log(`✅ Updated message - istask: ${isTask ? 1 : 0}, isevent: ${isEvent ? 1 : 0}`);
+            }
+
             // Reset for next message
             this.message_text = '';
           }
@@ -243,25 +272,40 @@ export class OpenAIResponseHandler {
                   tool_call_id: toolCall.id,
                   output: groupMessages.join(", "),
                 };
-                break;
 
               case 'fetch_user_conversations' :
                 const getUserConversationsArgs = JSON.parse(
                     argumentsString,
                 ) as FetchUserConversationsArguments;
                 const userMessages = await this.getUserConversationsByLimit(getUserConversationsArgs);
-
                 console.log("userMessages: ", userMessages);
-                
-
                 return {
                   tool_call_id: toolCall.id,
                   output: userMessages?.join(", "),
                 };
-                break;
+
+              case 'create_task':
+                const createTaskArgs = JSON.parse(argumentsString) as CreateTaskArguments;
+                const taskResult = await this.createTask(createTaskArgs);
+                return {
+                  tool_call_id: toolCall.id,
+                  output: JSON.stringify(taskResult),
+                };
+
+              case 'create_event':
+                const createEventArgs = JSON.parse(argumentsString) as CreateEventArguments;
+                const eventResult = await this.createEvent(createEventArgs);
+                return {
+                  tool_call_id: toolCall.id,
+                  output: JSON.stringify(eventResult),
+                };
 
               default:
-                return
+                console.log('Unknown tool call:', toolCall.function.name);
+                return {
+                  tool_call_id: toolCall.id,
+                  output: 'Unknown function',
+                };
             }
 
 
@@ -349,7 +393,87 @@ export class OpenAIResponseHandler {
     ).map((message) => {
       return `${message.user?.name}: ${message.text}`;
     });
+  }
+
+  // Create a new task via Kai command
+  private createTask = async (args: CreateTaskArguments): Promise<{ success: boolean; task?: any; error?: string }> => {
+    try {
+      console.log('📝 Creating task via Kai:', args.title);
+
+      const task = new Task({
+        name: args.title,
+        description: args.description || '',
+        priority: args.priority || 'medium',
+        completionDate: args.dueDate ? new Date(args.dueDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days
+        assignee: args.assignees || [this.user.id],
+        createdBy: this.user.id,
+        channelId: this.channel.id,
+        status: 'todo',
+        completed: false,
+      });
+
+      await task.save();
+      console.log('✅ Task created:', task._id);
+
+      return {
+        success: true,
+        task: {
+          id: task._id,
+          title: task.name,
+          priority: task.priority,
+          dueDate: task.completionDate,
+          assignees: task.assignee,
+        }
+      };
+    } catch (error) {
+      console.error('❌ Error creating task:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create task'
+      };
     }
+  }
+
+  // Create a new event via Kai command
+  private createEvent = async (args: CreateEventArguments): Promise<{ success: boolean; event?: any; error?: string }> => {
+    try {
+      console.log('📅 Creating event via Kai:', args.title);
+
+      const event = new Event({
+        title: args.title,
+        description: args.description || '',
+        startDate: new Date(args.startDate),
+        endDate: args.endDate ? new Date(args.endDate) : null,
+        location: args.location || '',
+        attendees: args.attendees || [this.user.id],
+        organizer: this.user.id,
+        channelId: this.channel.id,
+        status: 'scheduled',
+        reminder: args.reminder || 15,
+      });
+
+      await event.save();
+      console.log('✅ Event created:', event._id);
+
+      return {
+        success: true,
+        event: {
+          id: event._id,
+          title: event.title,
+          startDate: event.startDate,
+          endDate: event.endDate,
+          location: event.location,
+          attendees: event.attendees,
+        }
+      };
+    } catch (error) {
+      console.error('❌ Error creating event:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create event'
+      };
+    }
+  }
 
   private determineIfTask = (text: string): boolean => {
     // Check if this is a kai user/channel response (structured format)
@@ -376,28 +500,68 @@ export class OpenAIResponseHandler {
     return this.determineIfTask(text);
   };
 
-  private parseTaskData = (text: string): { isTask: boolean; taskData?: any } => {
+  private parseTaskData = (text: string): { isTask: boolean; isEvent: boolean; taskData?: any; eventData?: any } => {
     const trimmedText = text.trim();
-    
-    // If response is "0", it's not a task
+
+    // If response is "0", it's not a task or event
     if (trimmedText === '0') {
-      return { isTask: false };
+      return { isTask: false, isEvent: false };
     }
-    
-    // Try to parse as JSON - if successful, it's a task with data
+
+    // Try to parse as JSON - new classification format
     try {
-      const taskData = JSON.parse(trimmedText);
-      // Validate that it has expected task structure
-      if (taskData && (taskData.title || taskData.description || taskData.priority || taskData.subtasks)) {
-        return { isTask: true, taskData };
+      const data = JSON.parse(trimmedText);
+
+      // New format: { type: "task" | "event" | "none", ... }
+      if (data && data.type) {
+        switch (data.type) {
+          case 'task':
+            console.log('📝 Detected TASK:', data.title);
+            return {
+              isTask: true,
+              isEvent: false,
+              taskData: {
+                title: data.title,
+                description: data.description,
+                priority: data.priority || 'medium',
+                dueDate: data.dueDate,
+                assignees: data.assignees,
+                subtasks: data.subtasks
+              }
+            };
+
+          case 'event':
+            console.log('📅 Detected EVENT:', data.title);
+            return {
+              isTask: false,
+              isEvent: true,
+              eventData: {
+                title: data.title,
+                description: data.description,
+                startDate: data.startDate,
+                endDate: data.endDate,
+                location: data.location,
+                attendees: data.attendees,
+                reminder: data.reminder || 15
+              }
+            };
+
+          case 'none':
+            return { isTask: false, isEvent: false };
+        }
+      }
+
+      // Legacy format: { title, priority, ... } without type
+      if (data && (data.title || data.description || data.priority || data.subtasks)) {
+        return { isTask: true, isEvent: false, taskData: data };
       }
     } catch (error) {
       // Not valid JSON, fall back to original logic
       console.log('Response is not valid JSON, using original task detection logic');
     }
-    
+
     // Fall back to original task detection logic
-    return { isTask: this.determineIfTask(text) };
+    return { isTask: this.determineIfTask(text), isEvent: false };
   };
 
   private handleError = async (error: Error) => {

@@ -1,0 +1,112 @@
+import mongoose, { Schema, Document } from 'mongoose';
+
+export interface IEvent extends Document {
+  title: string;
+  description?: string;
+  startDate: Date;
+  endDate?: Date;
+  allDay: boolean;
+  location?: string;
+  attendees: string[]; // Array of userIds
+  organizer: string; // userId of the event creator
+  channelId?: string;
+  messageId?: string; // Reference to the original message
+  status: 'scheduled' | 'cancelled' | 'completed';
+  reminder?: number; // Minutes before event to remind
+  recurrence?: {
+    type: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    interval: number;
+    endDate?: Date;
+  };
+  attachments?: Array<{
+    uri: string;
+    name: string;
+    type: string;
+    size?: number;
+  }>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const EventSchema: Schema = new Schema({
+  title: {
+    type: String,
+    required: true,
+  },
+  description: {
+    type: String,
+    required: false,
+  },
+  startDate: {
+    type: Date,
+    required: true,
+  },
+  endDate: {
+    type: Date,
+    required: false,
+  },
+  allDay: {
+    type: Boolean,
+    default: false,
+  },
+  location: {
+    type: String,
+    required: false,
+  },
+  attendees: {
+    type: [String],
+    required: true,
+    default: [],
+    index: true,
+  },
+  organizer: {
+    type: String,
+    required: true,
+    index: true,
+  },
+  channelId: {
+    type: String,
+    required: false,
+    index: true,
+  },
+  messageId: {
+    type: String,
+    required: false,
+  },
+  status: {
+    type: String,
+    enum: ['scheduled', 'cancelled', 'completed'],
+    default: 'scheduled',
+    required: true,
+  },
+  reminder: {
+    type: Number,
+    required: false,
+  },
+  recurrence: {
+    type: {
+      type: String,
+      enum: ['daily', 'weekly', 'monthly', 'yearly'],
+    },
+    interval: Number,
+    endDate: Date,
+  },
+  attachments: {
+    type: [{
+      uri: { type: String, required: true },
+      name: { type: String, required: true },
+      type: { type: String, required: true },
+      size: { type: Number, required: false },
+    }],
+    required: false,
+    default: [],
+  }
+}, {
+  timestamps: true,
+});
+
+// Index for querying events by date range
+EventSchema.index({ startDate: 1, endDate: 1 });
+EventSchema.index({ attendees: 1, startDate: 1 });
+
+export const Event = mongoose.model<IEvent>('Event', EventSchema);

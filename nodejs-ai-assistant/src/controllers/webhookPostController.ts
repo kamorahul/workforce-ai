@@ -69,7 +69,19 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         }
       }
 
-      doAnalyzeMessage(agent, user, message, threadContext);
+      // Extract attachments for Vision API analysis (screenshots, images)
+      let attachments: any[] = [];
+      if (message.attachments && message.attachments.length > 0) {
+        attachments = message.attachments.map((att: any) => ({
+          type: att.type,
+          mime_type: att.mime_type,
+          url: att.image_url || att.asset_url || att.file_url,
+          name: att.title || att.name || att.fallback || 'attachment'
+        }));
+        console.log('📎 Attachments for task/event detection:', attachments.length, 'file(s)');
+      }
+
+      doAnalyzeMessage(agent, user, message, threadContext, attachments);
       res.json(req.body);
       return;
     }
@@ -111,7 +123,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-async function doAnalyzeMessage(agent: AIAgent, user: User, message: any, threadContext?: any) {
+async function doAnalyzeMessage(agent: AIAgent, user: User, message: any, threadContext?: any, attachments?: any[]) {
   await agent.init("asst_ercPXUnj2oTtMpqjk4cfJWCD");
 
   let messageToAnalyze = '';
@@ -122,7 +134,7 @@ async function doAnalyzeMessage(agent: AIAgent, user: User, message: any, thread
 Parent message by ${threadContext.parentUser}: "${threadContext.parentText}"
 Reply by ${user.name}: "${message.text}"
 
-Analyze if this thread contains a task. Consider the parent message context and the reply together.`;
+Analyze if this thread contains a task or event. Consider the parent message context and the reply together.`;
 
     console.log(`🧵 Analyzing threaded message with parent context`);
   } else {
@@ -130,7 +142,22 @@ Analyze if this thread contains a task. Consider the parent message context and 
     messageToAnalyze = `${user.name}: ${message.text}`;
   }
 
-  await agent.handleMessage(messageToAnalyze, message.id);
+  // Add instruction if there are image attachments
+  if (attachments && attachments.length > 0) {
+    const hasImages = attachments.some((att: any) =>
+      att.type === 'image' ||
+      att.mime_type?.startsWith('image/') ||
+      att.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+    );
+
+    if (hasImages) {
+      messageToAnalyze += `\n\n[IMAGE ATTACHED - Analyze the image for any task or event information like dates, times, meeting details, deadlines, etc.]`;
+      console.log('🖼️ Image detected - will use Vision API for analysis');
+    }
+  }
+
+  // Pass attachments for Vision API processing
+  await agent.handleMessage(messageToAnalyze, message.id, attachments || []);
 }
 
 export default router;
