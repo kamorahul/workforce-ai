@@ -260,6 +260,63 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+// Get open task count for a channel (lightweight endpoint for badges/counts)
+router.get('/count/open', async (req: Request, res: Response) => {
+  try {
+    const { channelId, assignee, createdBy } = req.query;
+
+    const query: any = {
+      // Open tasks: status is not 'completed' AND completed is not true
+      $and: [
+        { $or: [{ status: { $ne: 'completed' } }, { status: { $exists: false } }] },
+        { $or: [{ completed: { $ne: true } }, { completed: { $exists: false } }] }
+      ]
+    };
+
+    // Exclude subtasks from count
+    query.parentTaskId = { $exists: false };
+
+    // Filter by channel if provided
+    if (channelId) {
+      const channelIdStr = channelId as string;
+      const extractedId = channelIdStr.includes(':') ? channelIdStr.split(':')[1] : channelIdStr;
+      const fullCid = channelIdStr.includes(':') ? channelIdStr : `messaging:${channelIdStr}`;
+
+      query.$and.push({
+        $or: [
+          { channelId: channelIdStr },
+          { channelId: extractedId },
+          { channelId: fullCid }
+        ]
+      });
+    }
+
+    // Filter by assignee or createdBy if provided
+    if (assignee && createdBy) {
+      query.$and.push({
+        $or: [
+          { assignee: { $in: [assignee as string] } },
+          { createdBy: createdBy as string }
+        ]
+      });
+    } else if (assignee) {
+      query.assignee = { $in: [assignee as string] };
+    } else if (createdBy) {
+      query.createdBy = createdBy as string;
+    }
+
+    const count = await Task.countDocuments(query);
+
+    res.status(200).json({
+      status: 'success',
+      count
+    });
+  } catch (error) {
+    console.error('Error fetching open task count:', error);
+    res.status(500).json({ error: 'Failed to fetch open task count' });
+  }
+});
+
 router.get('/:taskId', async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
