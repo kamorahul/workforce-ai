@@ -18,6 +18,7 @@ import notificationsControllerRouter from './controllers/notificationsController
 import audioUploadPostControllerRouter from './controllers/audioUploadPostController';
 import channelMemberRolePostControllerRouter from './controllers/channelMemberRolePostController';
 import homescreenControllerRouter from './controllers/homescreenController';
+import teamActivityControllerRouter from './controllers/teamActivityController';
 import contactsControllerRouter from './controllers/contactsController';
 import { requireAuth, authErrorHandler } from './middleware/auth';
 
@@ -63,6 +64,9 @@ app.use('/contacts', contactsControllerRouter);
 
 // HomeScreen - optimized single endpoint for all homescreen data
 app.use('/homescreen', homescreenControllerRouter);
+
+// Team Activity - dedicated endpoint for team activity feed with filters
+app.use('/teamactivity', teamActivityControllerRouter);
 
 // Tasks
 app.use('/task', taskPostControllerRouter);
