@@ -4,7 +4,7 @@ export interface ITask extends Document {
   name: string;
   assignee: string[]; // Array of userIds of the assignees
   priority: 'low' | 'medium' | 'high';
-  completionDate: Date;
+  completionDate?: Date;
   channelId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -40,7 +40,7 @@ const TaskSchema: Schema = new Schema({
   },
   completionDate: {
     type: Date,
-    required: true,
+    required: false,
   },
   channelId: {
     type: String,

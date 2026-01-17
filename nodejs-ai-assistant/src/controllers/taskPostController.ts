@@ -33,7 +33,7 @@ export const handleTaskPost = async (req: Request, res: Response) => {
   try {
     const { name, assignee, priority, completionDate, channelId, description, subtasks, createdBy, parentTaskId, attachments } = req.body;
 
-    if (!name || !assignee || !Array.isArray(assignee) || assignee.length === 0 || !priority || !completionDate) {
+    if (!name || !assignee || !Array.isArray(assignee) || assignee.length === 0 || !priority) {
       res.status(400).json({ error: 'Missing required fields or assignee must be a non-empty array' });
       return;
     }
@@ -42,7 +42,7 @@ export const handleTaskPost = async (req: Request, res: Response) => {
       name,
       assignee,
       priority,
-      completionDate: new Date(completionDate),
+      ...(completionDate && { completionDate: new Date(completionDate) }),
       channelId,
       description,
       createdBy: createdBy || assignee[0],
@@ -58,7 +58,7 @@ export const handleTaskPost = async (req: Request, res: Response) => {
           name: subtask.name,
           assignee: subtask.assignee || assignee,
           priority: subtask.priority || priority,
-          completionDate: subtask.completionDate ? new Date(subtask.completionDate) : new Date(completionDate),
+          ...(subtask.completionDate ? { completionDate: new Date(subtask.completionDate) } : (completionDate ? { completionDate: new Date(completionDate) } : {})),
           channelId,
           description: subtask.description,
           createdBy: createdBy || assignee[0],
@@ -427,7 +427,10 @@ router.put('/:taskId', async (req: Request, res: Response) => {
       updateData.assignee = assignee;
     }
     if (priority !== undefined) updateData.priority = priority;
-    if (completionDate !== undefined) updateData.completionDate = new Date(completionDate);
+    if (completionDate !== undefined) {
+      // Allow clearing completionDate by passing empty string or null
+      updateData.completionDate = completionDate ? new Date(completionDate) : null;
+    }
     if (channelId !== undefined) updateData.channelId = channelId;
     if (description !== undefined) updateData.description = description;
     if (completed !== undefined) updateData.completed = completed;
