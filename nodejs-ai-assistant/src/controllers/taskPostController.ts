@@ -185,7 +185,9 @@ router.get('/', async (req: Request, res: Response) => {
           { completed: true },
           { status: 'completed' },
           { createdAt: { $gte: cutoffDate } },
-          { completionDate: { $gte: today } }
+          { completionDate: { $gte: today } },
+          { completionDate: null },  // Include tasks with no due date
+          { completionDate: { $exists: false } }  // Include tasks where completionDate field doesn't exist
         ]
       });
     }
