@@ -27,6 +27,13 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Skip processing if message is already being analyzed (prevents loop)
+    if (message.extraData && message.extraData.processing === true) {
+      console.log("Message already being processed, skipping...");
+      res.status(200).json({ message: "Message already being processed" });
+      return;
+    }
+
     // Skip processing if message text is empty (usually means it's an update)
     if (!message.text || message.text.trim() === '') {
       console.log("Message has no text, skipping...");
@@ -134,6 +141,19 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 });
 
 async function doAnalyzeMessage(agent: AIAgent, user: User, message: any, threadContext?: any, attachments?: any[]) {
+  // Mark message as processing immediately so mobile can show analyzing UI
+  try {
+    await serverClient.updateMessage({
+      id: message.id,
+      text: message.text,
+      user_id: user.id,
+      extraData: { processing: true }
+    });
+    console.log('🔄 Marked message as processing');
+  } catch (err) {
+    console.error('Failed to mark message as processing:', err);
+  }
+
   await agent.init("asst_ercPXUnj2oTtMpqjk4cfJWCD");
 
   let messageToAnalyze = '';

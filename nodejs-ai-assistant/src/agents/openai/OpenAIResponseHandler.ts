@@ -174,7 +174,8 @@ export class OpenAIResponseHandler {
 
             const extraData: any = {
               istask: isTask ? 1 : 0,
-              isevent: isEvent ? 1 : 0
+              isevent: isEvent ? 1 : 0,
+              processing: false  // AI analysis complete
             };
 
             if (isTask && taskData) {
@@ -215,7 +216,8 @@ export class OpenAIResponseHandler {
 
               const extraData: any = {
                 istask: isTask ? 1 : 0,
-                isevent: isEvent ? 1 : 0
+                isevent: isEvent ? 1 : 0,
+                processing: false  // AI analysis complete
               };
 
               if (isTask && taskData) {
