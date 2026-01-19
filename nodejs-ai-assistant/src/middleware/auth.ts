@@ -30,11 +30,26 @@ export const optionalAuth = (req: Request, res: Response, next: NextFunction) =>
 };
 
 /**
- * Extract user ID from authenticated request
+ * Extract user ID from authenticated request (Auth0 sub claim)
  */
 export const getUserId = (req: Request): string | null => {
   const auth = (req as any).auth;
   return auth?.payload?.sub || null;
+};
+
+/**
+ * Extract GetStream user ID from request header
+ * Mobile app sends this as 'x-stream-user-id' header
+ * Falls back to Auth0 user ID if header not present
+ */
+export const getStreamUserId = (req: Request): string | null => {
+  // First check for the Stream user ID header
+  const streamUserId = req.headers['x-stream-user-id'] as string;
+  if (streamUserId) {
+    return streamUserId;
+  }
+  // Fallback to Auth0 ID
+  return getUserId(req);
 };
 
 /**

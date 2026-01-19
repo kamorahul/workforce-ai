@@ -4,7 +4,7 @@ import { Comment } from '../models/Comment';
 import { getStreamFeedsService } from '../utils/getstreamFeedsService';
 import multer from 'multer';
 import { uploadToS3 } from '../utils/s3';
-import { getUserId } from '../middleware/auth';
+import { getUserId, getStreamUserId } from '../middleware/auth';
 import { serverClient } from '../serverClient';
 
 // Helper function to check if user is a member of a channel
@@ -363,23 +363,13 @@ router.get('/:taskId', async (req: Request, res: Response) => {
     }
 
     // Permission check: user must be creator, assignee, or channel member
-    const userId = getUserId(req);
-
-    // Helper to compare user IDs (handles Auth0 format auth0|xxx vs plain xxx)
-    const userIdsMatch = (id1: string | null | undefined, id2: string | null | undefined): boolean => {
-      if (!id1 || !id2) return false;
-      // Direct match
-      if (id1 === id2) return true;
-      // Extract ID after pipe (auth0|xxx -> xxx)
-      const extractId = (id: string) => id.includes('|') ? id.split('|')[1] : id;
-      return extractId(id1) === extractId(id2);
-    };
-
-    const isCreator = userIdsMatch(task.createdBy, userId);
-    const isAssignee = task.assignee?.some(assigneeId => userIdsMatch(assigneeId, userId)) || false;
+    // Uses GetStream user ID from x-stream-user-id header (sent by mobile app)
+    const userId = getStreamUserId(req);
+    const isCreator = task.createdBy === userId;
+    const isAssignee = task.assignee?.includes(userId || '');
     const isMember = task.channelId ? await isChannelMember(task.channelId, userId || '') : false;
 
-    console.log('Permission check:', { userId, taskCreatedBy: task.createdBy, taskAssignee: task.assignee, isCreator, isAssignee, isMember });
+    console.log('Permission check:', { userId, taskCreatedBy: task.createdBy, isCreator, isAssignee, isMember });
 
     if (!isCreator && !isAssignee && !isMember) {
       res.status(403).json({ error: 'You do not have access to this task' });
