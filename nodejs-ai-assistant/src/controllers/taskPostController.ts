@@ -13,10 +13,19 @@ const isChannelMember = async (channelId: string, userId: string): Promise<boole
     if (!channelId || !userId) return false;
 
     // Extract channel ID if it's in format "messaging:channel-id"
-    const extractedId = channelId.includes(':') ? channelId.split(':')[1] : channelId;
+    const extractedChannelId = channelId.includes(':') ? channelId.split(':')[1] : channelId;
 
-    const channel = serverClient.channel('messaging', extractedId);
-    const response = await channel.queryMembers({ user_id: userId });
+    // Extract user ID if it's in format "auth0|user-id"
+    const extractedUserId = userId.includes('|') ? userId.split('|')[1] : userId;
+
+    const channel = serverClient.channel('messaging', extractedChannelId);
+
+    // Try with both full ID and extracted ID
+    let response = await channel.queryMembers({ user_id: extractedUserId });
+    if (response.members.length === 0 && extractedUserId !== userId) {
+      // Try with full Auth0 ID
+      response = await channel.queryMembers({ user_id: userId });
+    }
 
     return response.members.length > 0;
   } catch (error) {
@@ -355,9 +364,22 @@ router.get('/:taskId', async (req: Request, res: Response) => {
 
     // Permission check: user must be creator, assignee, or channel member
     const userId = getUserId(req);
-    const isCreator = task.createdBy === userId;
-    const isAssignee = task.assignee?.includes(userId || '');
+
+    // Helper to compare user IDs (handles Auth0 format auth0|xxx vs plain xxx)
+    const userIdsMatch = (id1: string | null | undefined, id2: string | null | undefined): boolean => {
+      if (!id1 || !id2) return false;
+      // Direct match
+      if (id1 === id2) return true;
+      // Extract ID after pipe (auth0|xxx -> xxx)
+      const extractId = (id: string) => id.includes('|') ? id.split('|')[1] : id;
+      return extractId(id1) === extractId(id2);
+    };
+
+    const isCreator = userIdsMatch(task.createdBy, userId);
+    const isAssignee = task.assignee?.some(assigneeId => userIdsMatch(assigneeId, userId)) || false;
     const isMember = task.channelId ? await isChannelMember(task.channelId, userId || '') : false;
+
+    console.log('Permission check:', { userId, taskCreatedBy: task.createdBy, taskAssignee: task.assignee, isCreator, isAssignee, isMember });
 
     if (!isCreator && !isAssignee && !isMember) {
       res.status(403).json({ error: 'You do not have access to this task' });
