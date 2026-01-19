@@ -4,6 +4,26 @@ import { Comment } from '../models/Comment';
 import { getStreamFeedsService } from '../utils/getstreamFeedsService';
 import multer from 'multer';
 import { uploadToS3 } from '../utils/s3';
+import { getUserId } from '../middleware/auth';
+import { serverClient } from '../serverClient';
+
+// Helper function to check if user is a member of a channel
+const isChannelMember = async (channelId: string, userId: string): Promise<boolean> => {
+  try {
+    if (!channelId || !userId) return false;
+
+    // Extract channel ID if it's in format "messaging:channel-id"
+    const extractedId = channelId.includes(':') ? channelId.split(':')[1] : channelId;
+
+    const channel = serverClient.channel('messaging', extractedId);
+    const response = await channel.queryMembers({ user_id: userId });
+
+    return response.members.length > 0;
+  } catch (error) {
+    console.error('Error checking channel membership:', error);
+    return false;
+  }
+};
 
 interface TaskAttachment {
   uri: string;
@@ -330,6 +350,17 @@ router.get('/:taskId', async (req: Request, res: Response) => {
     const task = await Task.findById(taskId);
     if (!task) {
       res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+
+    // Permission check: user must be creator, assignee, or channel member
+    const userId = getUserId(req);
+    const isCreator = task.createdBy === userId;
+    const isAssignee = task.assignee?.includes(userId || '');
+    const isMember = task.channelId ? await isChannelMember(task.channelId, userId || '') : false;
+
+    if (!isCreator && !isAssignee && !isMember) {
+      res.status(403).json({ error: 'You do not have access to this task' });
       return;
     }
 
