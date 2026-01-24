@@ -108,13 +108,13 @@ router.post('/demo-login', async (req: Request, res: Response): Promise<void> =>
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        grant_type: 'password',
+        grant_type: 'http://auth0.com/oauth/grant-type/password-realm',
         client_id: AUTH0_NATIVE_CLIENT_ID,
         username: demoUserEmail,
         password: demoUserPassword,
         audience: 'https://api.convoe.ai',
         scope: 'openid profile email offline_access',
-        connection: 'Username-Password-Authentication'
+        realm: 'Username-Password-Authentication'
       }),
     });
 
