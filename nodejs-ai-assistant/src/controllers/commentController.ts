@@ -84,6 +84,13 @@ router.get('/:taskId/comments', async (req: Request, res: Response) => {
       return;
     }
 
+    // Get reactions from MongoDB (keyed by comment ID)
+    const dbComments = await Comment.find({ taskId });
+    const reactionsMap: Record<string, any[]> = {};
+    dbComments.forEach((c: any) => {
+      reactionsMap[c._id.toString()] = c.reactions || [];
+    });
+
     // Try to get comments from GetStream first
     let getstreamComments: any[] = [];
     try {
@@ -96,29 +103,33 @@ router.get('/:taskId/comments', async (req: Request, res: Response) => {
       // Fall back to database comments
     }
 
-    // If GetStream comments are available, use them
+    // If GetStream comments are available, use them and merge reactions
     if (getstreamComments && getstreamComments.length > 0) {
-      const formattedComments = getstreamComments.map((comment: any) => ({
-        _id: comment.custom?.commentId || comment.id,
-        taskId: taskId,
-        userId: comment.user_id,
-        message: comment.comment,
-        getstreamCommentId: comment.id,
-        createdAt: comment.created_at,
-        updatedAt: comment.updated_at,
-      }));
+      const formattedComments = getstreamComments.map((comment: any) => {
+        const commentId = comment.custom?.commentId || comment.id;
+        return {
+          _id: commentId,
+          taskId: taskId,
+          userId: comment.user_id,
+          message: comment.comment,
+          getstreamCommentId: comment.id,
+          createdAt: comment.created_at,
+          updatedAt: comment.updated_at,
+          reactions: reactionsMap[commentId] || [],
+        };
+      });
 
-      res.status(200).json({ 
-        status: 'success', 
+      res.status(200).json({
+        status: 'success',
         comments: formattedComments,
         source: 'getstream'
       });
     } else {
-      // Fall back to database comments
+      // Fall back to database comments (already has reactions)
       const comments = await Comment.find({ taskId }).sort({ createdAt: 1 });
-      res.status(200).json({ 
-        status: 'success', 
-        comments,
+      res.status(200).json({
+        status: 'success',
+        comments: comments.map(c => c.toObject()),
         source: 'database'
       });
     }
@@ -254,30 +265,41 @@ router.post('/:taskId/comments/:commentId/reactions', async (req: Request, res: 
       return;
     }
 
-    // Get comment to check for GetStream ID
+    // Get comment
     const comment = await Comment.findById(commentId);
     if (!comment) {
       res.status(404).json({ error: 'Comment not found' });
       return;
     }
 
-    // Add reaction in GetStream if comment has a GetStream ID
-    let reaction: any = null;
-    if (comment.getstreamCommentId) {
-      try {
-        reaction = await getStreamFeedsService.addCommentReaction(
-          comment.getstreamCommentId,
-          userId,
-          type
-        );
-      } catch (error) {
-        console.error('Error adding reaction to GetStream:', error);
-      }
+    // Check if user already reacted with this type
+    const existingReaction = comment.reactions?.find(
+      (r: any) => r.userId === userId && r.type === type
+    );
+
+    if (existingReaction) {
+      res.status(200).json({
+        status: 'success',
+        message: 'Reaction already exists',
+        comment: comment.toObject()
+      });
+      return;
     }
 
-    res.status(200).json({ 
-      status: 'success', 
-      reaction 
+    // Add reaction to MongoDB
+    const newReaction = {
+      type,
+      userId,
+      createdAt: new Date()
+    };
+
+    comment.reactions = comment.reactions || [];
+    comment.reactions.push(newReaction as any);
+    await comment.save();
+
+    res.status(200).json({
+      status: 'success',
+      comment: comment.toObject()
     });
   } catch (error) {
     console.error('Error adding reaction:', error);
@@ -303,31 +325,23 @@ router.delete('/:taskId/comments/:commentId/reactions', async (req: Request, res
       return;
     }
 
-    // Get comment to check for GetStream ID
+    // Get comment
     const comment = await Comment.findById(commentId);
     if (!comment) {
       res.status(404).json({ error: 'Comment not found' });
       return;
     }
 
-    // Remove reaction from GetStream if comment has a GetStream ID
-    let success = false;
-    if (comment.getstreamCommentId) {
-      try {
-        success = await getStreamFeedsService.deleteCommentReaction(
-          comment.getstreamCommentId,
-          userId,
-          type
-        );
-      } catch (error) {
-        console.error('Error removing reaction from GetStream:', error);
-      }
-    }
+    // Remove reaction from MongoDB
+    comment.reactions = (comment.reactions || []).filter(
+      (r: any) => !(r.userId === userId && r.type === type)
+    );
+    await comment.save();
 
-    res.status(200).json({ 
-      status: 'success', 
+    res.status(200).json({
+      status: 'success',
       message: 'Reaction removed successfully',
-      success 
+      comment: comment.toObject()
     });
   } catch (error) {
     console.error('Error removing reaction:', error);
