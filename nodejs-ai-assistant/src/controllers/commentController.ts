@@ -253,6 +253,8 @@ router.post('/:taskId/comments/:commentId/reactions', async (req: Request, res: 
     const { taskId, commentId } = req.params;
     const { userId, type } = req.body;
 
+    console.log('Add reaction request:', { taskId, commentId, userId, type });
+
     if (!taskId || !commentId || !userId || !type) {
       res.status(400).json({ error: 'Missing required fields' });
       return;
@@ -265,12 +267,19 @@ router.post('/:taskId/comments/:commentId/reactions', async (req: Request, res: 
       return;
     }
 
-    // Get comment
-    const comment = await Comment.findById(commentId);
+    // Try to find comment by _id first, then by getstreamCommentId
+    let comment = await Comment.findById(commentId).catch(() => null);
     if (!comment) {
+      // Try finding by getstreamCommentId
+      comment = await Comment.findOne({ getstreamCommentId: commentId });
+    }
+    if (!comment) {
+      console.log('Comment not found:', commentId);
       res.status(404).json({ error: 'Comment not found' });
       return;
     }
+
+    console.log('Found comment:', comment._id, 'getstreamCommentId:', comment.getstreamCommentId);
 
     // Check if user already reacted with this type
     const existingReaction = comment.reactions?.find(
@@ -286,11 +295,28 @@ router.post('/:taskId/comments/:commentId/reactions', async (req: Request, res: 
       return;
     }
 
+    // Add reaction to GetStream if comment has a GetStream activity ID
+    let getstreamReaction: any = null;
+    if (comment.getstreamCommentId) {
+      try {
+        getstreamReaction = await getStreamFeedsService.addCommentReaction(
+          comment.getstreamCommentId,
+          userId,
+          type
+        );
+        console.log('GetStream reaction added:', getstreamReaction);
+      } catch (error) {
+        console.error('Error adding reaction to GetStream:', error);
+        // Continue even if GetStream fails - we'll store in MongoDB
+      }
+    }
+
     // Add reaction to MongoDB
     const newReaction = {
       type,
       userId,
-      createdAt: new Date()
+      createdAt: new Date(),
+      getstreamReactionId: getstreamReaction?.id || null
     };
 
     comment.reactions = comment.reactions || [];
@@ -313,6 +339,8 @@ router.delete('/:taskId/comments/:commentId/reactions', async (req: Request, res
     const { taskId, commentId } = req.params;
     const { userId, type } = req.body;
 
+    console.log('Remove reaction request:', { taskId, commentId, userId, type });
+
     if (!taskId || !commentId || !userId || !type) {
       res.status(400).json({ error: 'Missing required fields' });
       return;
@@ -325,11 +353,36 @@ router.delete('/:taskId/comments/:commentId/reactions', async (req: Request, res
       return;
     }
 
-    // Get comment
-    const comment = await Comment.findById(commentId);
+    // Try to find comment by _id first, then by getstreamCommentId
+    let comment = await Comment.findById(commentId).catch(() => null);
     if (!comment) {
+      // Try finding by getstreamCommentId
+      comment = await Comment.findOne({ getstreamCommentId: commentId });
+    }
+    if (!comment) {
+      console.log('Comment not found:', commentId);
       res.status(404).json({ error: 'Comment not found' });
       return;
+    }
+
+    // Find the reaction to get its GetStream ID
+    const reactionToRemove = (comment.reactions || []).find(
+      (r: any) => r.userId === userId && r.type === type
+    );
+
+    // Remove reaction from GetStream if it has a GetStream reaction ID
+    if (reactionToRemove?.getstreamReactionId) {
+      try {
+        await getStreamFeedsService.deleteCommentReaction(
+          reactionToRemove.getstreamReactionId,
+          userId,
+          type
+        );
+        console.log('GetStream reaction deleted:', reactionToRemove.getstreamReactionId);
+      } catch (error) {
+        console.error('Error removing reaction from GetStream:', error);
+        // Continue even if GetStream fails
+      }
     }
 
     // Remove reaction from MongoDB

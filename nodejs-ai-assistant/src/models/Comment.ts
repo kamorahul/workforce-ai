@@ -4,6 +4,7 @@ export interface ICommentReaction {
   type: string;
   userId: string;
   createdAt: Date;
+  getstreamReactionId?: string; // GetStream reaction ID for sync
 }
 
 export interface IComment extends Document {
@@ -28,6 +29,10 @@ const CommentReactionSchema: Schema = new Schema({
   createdAt: {
     type: Date,
     default: Date.now,
+  },
+  getstreamReactionId: {
+    type: String,
+    required: false,
   },
 }, { _id: false });
 

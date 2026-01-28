@@ -966,51 +966,94 @@ export class GetStreamFeedsService {
   }
 
   /**
-   * Add reaction to a comment
+   * Add reaction to a comment using GetStream Reactions API
    */
-  async addCommentReaction(commentId: string, userId: string, type: string): Promise<any> {
+  async addCommentReaction(activityId: string, userId: string, type: string): Promise<any> {
     try {
       if (!this.isConnected) {
         await this.connect();
       }
 
-      console.log('Adding reaction:', type, 'to comment:', commentId, 'by user:', userId);
-      
-      // In GetStream, you would typically add a reaction to the activity
-      // This might require using the reactions API
-      // For now, we'll return a mock reaction as the actual implementation depends on your GetStream setup
-      
+      console.log('Adding GetStream reaction:', type, 'to activity:', activityId, 'by user:', userId);
+
+      // Use GetStream Reactions API to add a reaction to the activity
+      const reaction = await this.getstreamClient.reactions.add(
+        type,           // kind of reaction (like, heart, celebrate, etc.)
+        activityId,     // the activity (comment) to react to
+        {               // data payload
+          userId: userId,
+        },
+        {               // options
+          userId: userId,  // the user adding the reaction
+        }
+      );
+
+      console.log('GetStream reaction added:', reaction);
+
       return {
-        id: `reaction_${Date.now()}`,
+        id: reaction.id,
         type: type,
         user_id: userId,
-        comment_id: commentId,
+        activity_id: activityId,
+        created_at: reaction.created_at,
       };
     } catch (error) {
-      console.error('Error adding comment reaction:', error);
+      console.error('Error adding comment reaction to GetStream:', error);
       throw error;
     }
   }
 
   /**
-   * Remove reaction from a comment
+   * Remove reaction from a comment using GetStream Reactions API
    */
-  async deleteCommentReaction(commentId: string, userId: string, type: string): Promise<boolean> {
+  async deleteCommentReaction(reactionId: string, userId: string, type: string): Promise<boolean> {
     try {
       if (!this.isConnected) {
         await this.connect();
       }
 
-      console.log('Removing reaction:', type, 'from comment:', commentId, 'by user:', userId);
-      
-      // In GetStream, you would typically remove the reaction from the activity
-      // This might require using the reactions API
-      // For now, we'll return true as the actual implementation depends on your GetStream setup
-      
+      console.log('Removing GetStream reaction:', reactionId, 'type:', type, 'by user:', userId);
+
+      // Use GetStream Reactions API to delete the reaction
+      await this.getstreamClient.reactions.delete(reactionId);
+
+      console.log('GetStream reaction deleted:', reactionId);
+
       return true;
     } catch (error) {
-      console.error('Error deleting comment reaction:', error);
+      console.error('Error deleting comment reaction from GetStream:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Get reactions for an activity from GetStream
+   */
+  async getActivityReactions(activityId: string, type?: string): Promise<any[]> {
+    try {
+      if (!this.isConnected) {
+        await this.connect();
+      }
+
+      console.log('Getting GetStream reactions for activity:', activityId, 'type:', type);
+
+      // Filter reactions by activity
+      const filterParams: any = {
+        activity_id: activityId,
+      };
+
+      if (type) {
+        filterParams.kind = type;
+      }
+
+      const response = await this.getstreamClient.reactions.filter(filterParams);
+
+      console.log('GetStream reactions found:', response.results?.length || 0);
+
+      return response.results || [];
+    } catch (error) {
+      console.error('Error getting reactions from GetStream:', error);
+      return [];
     }
   }
 
