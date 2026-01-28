@@ -75,18 +75,18 @@ router.get('/', async (req: Request, res: Response) => {
       };
     }));
 
-    // Fetch activities for top 6 recent tasks IN PARALLEL (batch fetch)
-    const recentTasks = tasks.slice(0, 6);
+    // Fetch activities for top 10 recent tasks IN PARALLEL (batch fetch)
+    const recentTasks = tasks.slice(0, 10);
     const activitiesPromises = recentTasks.map(async (task) => {
       try {
         const taskId = task._id?.toString();
-        if (!taskId) return null;
+        if (!taskId) return [];
 
-        const activities = await getStreamFeedsService.getTaskActivities(taskId, 1);
-        if (!Array.isArray(activities) || activities.length === 0) return null;
+        const activities = await getStreamFeedsService.getTaskActivities(taskId, 10);
+        if (!Array.isArray(activities) || activities.length === 0) return [];
 
-        const activity = activities[0];
-        return {
+        // Return ALL activities for this task, not just the first one
+        return activities.map(activity => ({
           taskId,
           taskName: task.name || 'Untitled Task',
           channelId: task.channelId,
@@ -97,21 +97,22 @@ router.get('/', async (req: Request, res: Response) => {
             time: activity.time,
             extra: activity.extra
           }
-        };
+        }));
       } catch (error) {
         console.error(`Error fetching activity for task ${task._id}:`, error);
-        return null;
+        return [];
       }
     });
 
-    const activitiesResults = (await Promise.all(activitiesPromises)).filter(Boolean);
+    const activitiesNested = await Promise.all(activitiesPromises);
+    const activitiesResults = activitiesNested.flat().filter(Boolean);
 
-    // Sort activities by time
+    // Sort activities by time (newest first)
     let sortedActivities = activitiesResults.sort((a: any, b: any) => {
       const dateA = new Date(a?.activity?.time || 0);
       const dateB = new Date(b?.activity?.time || 0);
       return dateB.getTime() - dateA.getTime();
-    }).slice(0, 5); // Return top 5 activities
+    }).slice(0, 10); // Return top 10 activities
 
     // FALLBACK: If no GetStream activities found, create activities from recent tasks
     if (sortedActivities.length === 0 && tasks.length > 0) {
