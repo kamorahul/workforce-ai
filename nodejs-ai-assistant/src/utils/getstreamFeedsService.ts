@@ -897,10 +897,11 @@ export class GetStreamFeedsService {
           updated_at: activity.time,
           custom: {
             taskId: taskId,
-            commentId: activity.id,
+            // Use MongoDB _id from extra.commentId if available, otherwise use GetStream activity ID
+            commentId: activity.extra?.commentId || activity.id,
           },
         }));
-        
+
         return comments;
       }
       
