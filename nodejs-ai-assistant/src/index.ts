@@ -20,6 +20,7 @@ import channelMemberRolePostControllerRouter from './controllers/channelMemberRo
 import homescreenControllerRouter from './controllers/homescreenController';
 import teamActivityControllerRouter from './controllers/teamActivityController';
 import contactsControllerRouter from './controllers/contactsController';
+import eventControllerRouter from './controllers/eventController';
 import { requireAuth, authErrorHandler } from './middleware/auth';
 
 const app = express();
@@ -71,6 +72,9 @@ app.use('/teamactivity', teamActivityControllerRouter);
 // Tasks
 app.use('/task', taskPostControllerRouter);
 app.use('/task', commentControllerRouter);
+
+// Events
+app.use('/event', eventControllerRouter);
 
 // Attendance
 app.use('/attendance', attendancePostControllerRouter);
