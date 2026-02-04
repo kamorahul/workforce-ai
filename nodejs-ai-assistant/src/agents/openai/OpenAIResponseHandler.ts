@@ -593,7 +593,12 @@ export class OpenAIResponseHandler {
 
     // Try to parse as JSON - new classification format
     try {
-      const data = JSON.parse(trimmedText);
+      // Strip markdown code blocks if present (e.g., ```json ... ```)
+      let jsonText = trimmedText;
+      if (jsonText.startsWith('```')) {
+        jsonText = jsonText.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+      }
+      const data = JSON.parse(jsonText);
 
       // New format: { type: "task" | "event" | "none", ... }
       if (data && data.type) {

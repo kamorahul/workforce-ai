@@ -577,7 +577,12 @@ export class ClaudeResponseHandler {
     }
 
     try {
-      const data = JSON.parse(trimmedText);
+      // Strip markdown code blocks if present (e.g., ```json ... ```)
+      let jsonText = trimmedText;
+      if (jsonText.startsWith('```')) {
+        jsonText = jsonText.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+      }
+      const data = JSON.parse(jsonText);
 
       if (data && data.type) {
         switch (data.type) {
