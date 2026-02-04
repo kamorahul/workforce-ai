@@ -1,13 +1,37 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export interface IConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+}
+
 export interface IThread extends Document {
   channelId: string;
   openAiThreadId: string;
   userId: string;
+  provider: 'openai' | 'claude';
+  conversationHistory: IConversationMessage[];
   createdAt: Date;
   updatedAt: Date;
   expiresAt: Date;
 }
+
+const ConversationMessageSchema = new Schema({
+  role: {
+    type: String,
+    enum: ['user', 'assistant'],
+    required: true,
+  },
+  content: {
+    type: String,
+    required: true,
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now,
+  },
+}, { _id: false });
 
 const ThreadSchema: Schema = new Schema({
   channelId: {
@@ -25,6 +49,15 @@ const ThreadSchema: Schema = new Schema({
     type: String,
     required: true,
     index: true,
+  },
+  provider: {
+    type: String,
+    enum: ['openai', 'claude'],
+    default: 'openai',
+  },
+  conversationHistory: {
+    type: [ConversationMessageSchema],
+    default: [],
   },
   expiresAt: {
     type: Date,

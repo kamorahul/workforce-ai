@@ -60,7 +60,8 @@ export class ClaudeResponseHandler {
     private readonly assistantType?: AssistantType,
     private readonly conversationHistory?: ConversationMessage[],
     private readonly systemPrompt?: string,
-    private readonly tools?: any[]
+    private readonly tools?: any[],
+    private readonly onComplete?: () => Promise<void>
   ) {
     this.chatClient.on('ai_indicator.stop', this.handleStopGenerating);
   }
@@ -102,6 +103,11 @@ export class ClaudeResponseHandler {
           user: { id: 'kai' },
         });
         console.log('Cleared AI state');
+      }
+
+      // Call onComplete callback to save conversation history
+      if (this.onComplete) {
+        await this.onComplete();
       }
     } catch (error) {
       console.error('ClaudeResponseHandler: Error in run():', error);

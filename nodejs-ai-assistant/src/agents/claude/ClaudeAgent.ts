@@ -3,7 +3,7 @@ import { ClaudeResponseHandler } from './ClaudeResponseHandler';
 import type { AIAgent } from '../types';
 import type { Channel, StreamChat } from 'stream-chat';
 import { User } from '../createAgent';
-import { Thread } from '../../models/Thread';
+import { Thread, IThread } from '../../models/Thread';
 import { Task } from '../../models/Task';
 import {
   AssistantType,
@@ -26,6 +26,7 @@ export class ClaudeAgent implements AIAgent {
   private assistantType?: AssistantType;
   private conversationHistory: ConversationMessage[] = [];
   private lastInteractionTs = Date.now();
+  private threadDoc?: IThread;
 
   private handlers: ClaudeResponseHandler[] = [];
 
@@ -67,29 +68,45 @@ export class ClaudeAgent implements AIAgent {
     console.log(`Using Claude with assistant type: ${this.assistantType}`);
     console.log(`Assistant name: ${this.assistantConfig.name}`);
 
-    // Load conversation history from Thread model if exists
-    const existingThread = await Thread.findOne({
-      channelId: this.channel.id,
-      userId: this.user.id,
-    });
-
-    if (existingThread) {
-      console.log('Found existing thread, loading conversation history...');
-      // Note: For Claude, we manage conversation history in-memory or could store in DB
-      // The Thread model stores OpenAI thread IDs, but we can use it to track Claude sessions
-    } else {
-      // Create a thread record for tracking
-      const threadRecord = new Thread({
+    // Load or create thread with conversation history support
+    // Use findOneAndUpdate with upsert to handle race conditions atomically
+    const threadDoc = await Thread.findOneAndUpdate(
+      {
         channelId: this.channel.id,
-        openAiThreadId: `claude_${Date.now()}`, // Using a Claude-specific identifier
         userId: this.user.id,
-      });
-      await threadRecord.save();
-      console.log('Created new Claude session tracking record');
-    }
+      },
+      {
+        $setOnInsert: {
+          channelId: this.channel.id,
+          userId: this.user.id,
+          openAiThreadId: `claude_${this.channel.id}_${this.user.id}_${Date.now()}`,
+          conversationHistory: [],
+        },
+        $set: {
+          provider: 'claude',
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
+      },
+      {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true,
+      }
+    );
 
-    // Reset conversation history for new sessions
-    this.conversationHistory = [];
+    this.threadDoc = threadDoc;
+
+    // Load persisted conversation history
+    if (threadDoc.conversationHistory && threadDoc.conversationHistory.length > 0) {
+      this.conversationHistory = threadDoc.conversationHistory.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+      console.log(`Loaded ${this.conversationHistory.length} messages from conversation history`);
+    } else {
+      this.conversationHistory = [];
+      console.log('Started new conversation (no history)');
+    }
   };
 
   public handleMessage = async (
@@ -210,7 +227,9 @@ export class ClaudeAgent implements AIAgent {
         this.assistantType!,
         this.conversationHistory,
         systemPrompt,
-        tools
+        tools,
+        // Save conversation history after response is complete
+        usePersistentThread ? this.saveConversationHistory : undefined
       );
 
       void handler.run();
@@ -437,5 +456,38 @@ export class ClaudeAgent implements AIAgent {
     }
 
     return taskContext;
+  };
+
+  private saveConversationHistory = async (): Promise<void> => {
+    if (!this.threadDoc) {
+      console.warn('No thread document found, cannot save conversation history');
+      return;
+    }
+
+    try {
+      // Convert conversation history to the format expected by the model
+      const historyToSave = this.conversationHistory.map((msg) => ({
+        role: msg.role as 'user' | 'assistant',
+        content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+        timestamp: new Date(),
+      }));
+
+      // Keep only the last 50 messages to prevent unbounded growth
+      const trimmedHistory = historyToSave.slice(-50);
+
+      await Thread.updateOne(
+        { _id: this.threadDoc._id },
+        {
+          $set: {
+            conversationHistory: trimmedHistory,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Refresh TTL
+          },
+        }
+      );
+
+      console.log(`Saved ${trimmedHistory.length} messages to conversation history`);
+    } catch (error) {
+      console.error('Error saving conversation history:', error);
+    }
   };
 }

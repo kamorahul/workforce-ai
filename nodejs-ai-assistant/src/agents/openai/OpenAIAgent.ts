@@ -44,26 +44,43 @@ export class OpenAIAgent implements AIAgent {
     this.assistant = await this.openai.beta.assistants.retrieve(agentId);
     
     // Check if thread already exists for this channel and user
-    const existingThread = await Thread.findOne({ 
-      channelId: this.channel.id, 
-      userId: this.user.id 
+    const existingThread = await Thread.findOne({
+      channelId: this.channel.id,
+      userId: this.user.id
     });
-    
-    if (existingThread) {
+
+    if (existingThread && existingThread.openAiThreadId && !existingThread.openAiThreadId.startsWith('claude_')) {
+      // Use existing OpenAI thread
       this.openAiThread = await this.openai.beta.threads.retrieve(existingThread.openAiThreadId);
       console.log("Using existing thread:", existingThread.openAiThreadId);
     } else {
-      // Create new thread
+      // Create new OpenAI thread
       this.openAiThread = await this.openai.beta.threads.create();
-      
-      // Save thread mapping to MongoDB
-      const threadRecord = new Thread({
-        channelId: this.channel.id,
-        openAiThreadId: this.openAiThread.id,
-        userId: this.user.id
-      });
-      await threadRecord.save();
-      console.log("Created new thread and saved to MongoDB:", this.openAiThread.id);
+
+      // Use atomic upsert to prevent race conditions
+      await Thread.findOneAndUpdate(
+        {
+          channelId: this.channel.id,
+          userId: this.user.id,
+        },
+        {
+          $set: {
+            openAiThreadId: this.openAiThread.id,
+            provider: 'openai',
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          },
+          $setOnInsert: {
+            channelId: this.channel.id,
+            userId: this.user.id,
+            conversationHistory: [],
+          },
+        },
+        {
+          upsert: true,
+          new: true,
+        }
+      );
+      console.log("Created/updated thread in MongoDB:", this.openAiThread.id);
     }
   };
 
