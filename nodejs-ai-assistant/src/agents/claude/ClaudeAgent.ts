@@ -328,7 +328,13 @@ export class ClaudeAgent implements AIAgent {
         });
 
         const formatted = result.messages
-          .filter((msg) => msg.type !== 'system' && msg.user?.name && msg.created_at)
+          .filter((msg) =>
+            msg.type !== 'system' &&
+            msg.user?.name &&
+            msg.created_at &&
+            msg.user?.id !== 'kai' &&  // Exclude Kai bot messages (they are summaries)
+            !msg.ai_generated  // Exclude AI-generated messages
+          )
           .map((msg) => {
             const date = new Date(msg.created_at!).toISOString().split('T')[0];
             return `[${date}] ${msg.user?.name}: ${msg.text}`;
@@ -465,15 +471,36 @@ export class ClaudeAgent implements AIAgent {
     }
 
     try {
-      // Convert conversation history to the format expected by the model
-      const historyToSave = this.conversationHistory.map((msg) => ({
-        role: msg.role as 'user' | 'assistant',
-        content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
-        timestamp: new Date(),
-      }));
+      // Convert conversation history to text-only format (exclude images to save space)
+      const historyToSave = this.conversationHistory.map((msg) => {
+        let textContent: string;
 
-      // Keep only the last 50 messages to prevent unbounded growth
-      const trimmedHistory = historyToSave.slice(-50);
+        if (typeof msg.content === 'string') {
+          textContent = msg.content;
+        } else if (Array.isArray(msg.content)) {
+          // Extract only text blocks, skip images
+          textContent = msg.content
+            .filter((block): block is Anthropic.TextBlockParam => block.type === 'text')
+            .map((block) => block.text)
+            .join('\n');
+        } else {
+          textContent = '[Non-text content]';
+        }
+
+        // Limit each message to 2000 characters to prevent token explosion
+        if (textContent.length > 2000) {
+          textContent = textContent.substring(0, 2000) + '... [truncated]';
+        }
+
+        return {
+          role: msg.role as 'user' | 'assistant',
+          content: textContent,
+          timestamp: new Date(),
+        };
+      });
+
+      // Keep only the last 20 messages to prevent token limit issues
+      const trimmedHistory = historyToSave.slice(-20);
 
       await Thread.updateOne(
         { _id: this.threadDoc._id },
