@@ -20,6 +20,15 @@ interface ConversationMessage {
   content: MessageContent;
 }
 
+interface UserContextCache {
+  data: string;
+  fetchedAt: number;
+}
+
+// Global cache for user context (5 minute TTL)
+const userContextCache = new Map<string, UserContextCache>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 export class ClaudeAgent implements AIAgent {
   private anthropic?: Anthropic;
   private assistantConfig?: AssistantConfig;
@@ -159,8 +168,8 @@ export class ClaudeAgent implements AIAgent {
         console.error('Error building daily summary context:', error);
       }
     } else if (isKaiUser && usePersistentThread) {
-      // FOR Q&A AGENT: Use persistent conversation history
-      console.log('Using persistent conversation for Q&A');
+      // FOR Q&A AGENT: Use persistent conversation history with cached context
+      console.log('Using persistent conversation for Q&A with cached context');
 
       const today = new Date().toISOString().split('T')[0];
 
@@ -169,20 +178,16 @@ export class ClaudeAgent implements AIAgent {
         messageContent = await this.buildMessageWithAttachments(e, attachments);
       }
 
-      // Check if asking about tasks
-      const isAskingAboutTasks =
-        e &&
-        (e.toLowerCase().includes('task') ||
-          e.toLowerCase().includes('todo') ||
-          e.toLowerCase().includes('completed') ||
-          e.toLowerCase().includes('in progress'));
+      // Always fetch cached user context for intelligent responses
+      const userContext = await this.getCachedUserContext();
 
-      if (isAskingAboutTasks) {
-        const taskContext = await this.buildTaskContext();
-        systemPrompt += `\n\nToday is ${today}. The user is asking about tasks. Here is their current task summary:${taskContext}\n\nFormat your response cleanly with proper task names and due dates. Be conversational and helpful.`;
-      } else {
-        systemPrompt += `\n\nToday is ${today}. Answer the user's question based on the conversation history. Be helpful and conversational.`;
-      }
+      systemPrompt += `\n\nToday is ${today}. You have access to the user's workspace data below. Use this information to answer any questions about their tasks, conversations, team activity, or anything else they ask about. Be conversational, helpful, and specific.
+
+=== USER'S WORKSPACE DATA ===
+${userContext}
+=== END WORKSPACE DATA ===
+
+Analyze this data to answer the user's question. Reference specific tasks, conversations, or details when relevant.`;
     } else {
       // FOR REGULAR USERS: Standard handling
       const today = new Date().toISOString().split('T')[0];
@@ -264,13 +269,32 @@ export class ClaudeAgent implements AIAgent {
           const arrayBuffer = await response.arrayBuffer();
           const base64 = Buffer.from(arrayBuffer).toString('base64');
 
-          // Determine media type
+          // Determine media type from response Content-Type header, attachment mime_type, or magic bytes
           let mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' = 'image/jpeg';
-          if (attachment.mime_type) {
-            if (attachment.mime_type.includes('png')) mediaType = 'image/png';
-            else if (attachment.mime_type.includes('gif')) mediaType = 'image/gif';
-            else if (attachment.mime_type.includes('webp')) mediaType = 'image/webp';
+          const contentType = response.headers.get('content-type') || attachment.mime_type || '';
+
+          if (contentType.includes('png')) {
+            mediaType = 'image/png';
+          } else if (contentType.includes('gif')) {
+            mediaType = 'image/gif';
+          } else if (contentType.includes('webp')) {
+            mediaType = 'image/webp';
+          } else if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+            mediaType = 'image/jpeg';
+          } else {
+            // Detect from magic bytes as fallback
+            const bytes = new Uint8Array(arrayBuffer.slice(0, 4));
+            if (bytes[0] === 0x89 && bytes[1] === 0x50) {
+              mediaType = 'image/png';
+            } else if (bytes[0] === 0x47 && bytes[1] === 0x49) {
+              mediaType = 'image/gif';
+            } else if (bytes[0] === 0x52 && bytes[1] === 0x49) {
+              mediaType = 'image/webp';
+            }
+            // Default remains image/jpeg for JFIF/EXIF
           }
+
+          console.log(`Image media type detected: ${mediaType} (from: ${contentType || 'magic bytes'})`);
 
           content.push({
             type: 'image',
@@ -280,7 +304,6 @@ export class ClaudeAgent implements AIAgent {
               data: base64,
             },
           });
-          console.log('Added image attachment to message');
         } catch (error) {
           console.error('Error processing image attachment:', error);
           content.push({
@@ -516,5 +539,150 @@ export class ClaudeAgent implements AIAgent {
     } catch (error) {
       console.error('Error saving conversation history:', error);
     }
+  };
+
+  private getCachedUserContext = async (): Promise<string> => {
+    const cacheKey = `${this.user.id}_context`;
+    const cached = userContextCache.get(cacheKey);
+
+    // Return cached data if still valid
+    if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+      console.log('Using cached user context (expires in', Math.round((CACHE_TTL_MS - (Date.now() - cached.fetchedAt)) / 1000), 'seconds)');
+      return cached.data;
+    }
+
+    console.log('Fetching fresh user context...');
+    const context = await this.buildFullUserContext();
+
+    // Cache the context
+    userContextCache.set(cacheKey, {
+      data: context,
+      fetchedAt: Date.now(),
+    });
+
+    console.log('Cached user context for 5 minutes');
+    return context;
+  };
+
+  private buildFullUserContext = async (): Promise<string> => {
+    const sections: string[] = [];
+    const today = new Date().toISOString().split('T')[0];
+
+    // Fetch tasks
+    try {
+      const tasks = await Task.find({
+        $or: [{ assignee: { $in: [this.user.id] } }, { createdBy: this.user.id }],
+      })
+        .select('name status completed createdAt completionDate assignee description priority')
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .lean();
+
+      const completedTasks = tasks.filter((t) => t.status === 'completed' || t.completed);
+      const inProgressTasks = tasks.filter((t) => t.status === 'in_progress' && !t.completed);
+      const todoTasks = tasks.filter((t) => t.status === 'todo' && !t.completed);
+
+      let taskSection = `[TASKS - as of ${today}]\n`;
+      taskSection += `Total: ${tasks.length} tasks (${completedTasks.length} completed, ${inProgressTasks.length} in progress, ${todoTasks.length} to do)\n\n`;
+
+      if (completedTasks.length > 0) {
+        taskSection += `Completed (${completedTasks.length}):\n`;
+        completedTasks.slice(0, 15).forEach((t) => {
+          taskSection += `- ${t.name}\n`;
+        });
+        if (completedTasks.length > 15) {
+          taskSection += `... and ${completedTasks.length - 15} more completed\n`;
+        }
+        taskSection += '\n';
+      }
+
+      if (inProgressTasks.length > 0) {
+        taskSection += `In Progress (${inProgressTasks.length}):\n`;
+        inProgressTasks.forEach((t) => {
+          const dueDate = t.completionDate
+            ? new Date(t.completionDate).toISOString().split('T')[0]
+            : 'No due date';
+          taskSection += `- ${t.name} (Due: ${dueDate})${t.priority ? ` [${t.priority}]` : ''}\n`;
+        });
+        taskSection += '\n';
+      }
+
+      if (todoTasks.length > 0) {
+        taskSection += `To Do (${todoTasks.length}):\n`;
+        todoTasks.slice(0, 20).forEach((t) => {
+          const dueDate = t.completionDate
+            ? new Date(t.completionDate).toISOString().split('T')[0]
+            : 'No due date';
+          taskSection += `- ${t.name} (Due: ${dueDate})${t.priority ? ` [${t.priority}]` : ''}\n`;
+        });
+        if (todoTasks.length > 20) {
+          taskSection += `... and ${todoTasks.length - 20} more to do\n`;
+        }
+      }
+
+      sections.push(taskSection);
+    } catch (error) {
+      console.error('Error fetching tasks for context:', error);
+      sections.push('[TASKS] Error fetching tasks\n');
+    }
+
+    // Fetch recent conversations
+    try {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const channels = await this.chatClient.queryChannels({
+        members: { $in: [this.user.id] },
+      });
+
+      let conversationSection = `[RECENT CONVERSATIONS - last 7 days]\n`;
+      let messageCount = 0;
+      const maxMessages = 50;
+
+      for (const channel of channels) {
+        if (channel.id?.indexOf('kai') === 0) continue; // Skip Kai channels
+        if (messageCount >= maxMessages) break;
+
+        const result = await channel.query({
+          messages: {
+            created_at_after_or_equal: sevenDaysAgo.toISOString(),
+            limit: 30,
+          },
+        });
+
+        const filtered = result.messages.filter(
+          (msg) =>
+            msg.type !== 'system' &&
+            msg.user?.name &&
+            msg.created_at &&
+            msg.user?.id !== 'kai' &&
+            !msg.ai_generated &&
+            msg.text
+        );
+
+        if (filtered.length > 0) {
+          const channelName = (channel.data?.name as string) || channel.id || 'Unknown';
+          conversationSection += `\nChannel: ${channelName}\n`;
+
+          filtered.slice(0, 10).forEach((msg) => {
+            const date = new Date(msg.created_at!).toISOString().split('T')[0];
+            const text = msg.text!.length > 200 ? msg.text!.substring(0, 200) + '...' : msg.text;
+            conversationSection += `[${date}] ${msg.user?.name}: ${text}\n`;
+            messageCount++;
+          });
+        }
+      }
+
+      if (messageCount === 0) {
+        conversationSection += 'No recent conversations found.\n';
+      }
+
+      sections.push(conversationSection);
+    } catch (error) {
+      console.error('Error fetching conversations for context:', error);
+      sections.push('[RECENT CONVERSATIONS] Error fetching conversations\n');
+    }
+
+    return sections.join('\n');
   };
 }
