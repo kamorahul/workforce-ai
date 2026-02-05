@@ -1,5 +1,11 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export interface IAttendee {
+  userId: string;
+  status: 'pending' | 'yes' | 'no' | 'maybe';
+  respondedAt?: Date;
+}
+
 export interface IEvent extends Document {
   title: string;
   description?: string;
@@ -7,7 +13,7 @@ export interface IEvent extends Document {
   endDate?: Date;
   allDay: boolean;
   location?: string;
-  attendees: string[]; // Array of userIds
+  attendees: IAttendee[]; // Array of attendees with RSVP status
   organizer: string; // userId of the event creator
   channelId?: string;
   messageId?: string; // Reference to the original message
@@ -60,10 +66,17 @@ const EventSchema: Schema = new Schema({
     required: false,
   },
   attendees: {
-    type: [String],
+    type: [{
+      userId: { type: String, required: true },
+      status: {
+        type: String,
+        enum: ['pending', 'yes', 'no', 'maybe'],
+        default: 'pending'
+      },
+      respondedAt: { type: Date, required: false }
+    }],
     required: true,
     default: [],
-    index: true,
   },
   organizer: {
     type: String,
@@ -120,6 +133,6 @@ const EventSchema: Schema = new Schema({
 
 // Index for querying events by date range
 EventSchema.index({ startDate: 1, endDate: 1 });
-EventSchema.index({ attendees: 1, startDate: 1 });
+EventSchema.index({ 'attendees.userId': 1, startDate: 1 });
 
 export const Event = mongoose.model<IEvent>('Event', EventSchema);

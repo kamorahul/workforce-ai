@@ -5,6 +5,7 @@ import { User } from '../createAgent';
 import { Task } from '../../models/Task';
 import { Event } from '../../models/Event';
 import { AssistantType } from '../../config/prompts';
+import { getStreamFeedsService } from '../../utils/getstreamFeedsService';
 
 interface FetchGroupConversationArguments {
   groupId: string;
@@ -517,6 +518,15 @@ export class ClaudeResponseHandler {
       await task.save();
       console.log('Task created:', task._id, 'Assignees:', assigneeIds, 'Timezone:', timezone);
 
+      // Send notifications to assignees
+      try {
+        await getStreamFeedsService.createTaskActivity(task._id.toString(), task);
+        console.log('📬 Task notifications sent to assignees');
+      } catch (notifError) {
+        console.error('Failed to send task notifications:', notifError);
+        // Don't fail the task creation if notifications fail
+      }
+
       return {
         success: true,
         task: {
@@ -550,13 +560,19 @@ export class ClaudeResponseHandler {
       // Use timezone from context, fallback to UTC
       const timezone = this.timezoneContext?.timezone || 'UTC';
 
+      // Convert attendeeIds to attendee objects with pending status
+      const attendeesWithStatus = attendeeIds.map(userId => ({
+        userId,
+        status: 'pending' as const,
+      }));
+
       const event = new Event({
         title: args.title,
         description: args.description || '',
         startDate: new Date(args.startDate),
         endDate: args.endDate ? new Date(args.endDate) : null,
         location: args.location || '',
-        attendees: attendeeIds,
+        attendees: attendeesWithStatus,
         organizer: this.user.id,
         channelId: this.channel.id,
         status: 'scheduled',
@@ -567,6 +583,15 @@ export class ClaudeResponseHandler {
 
       await event.save();
       console.log('Event created:', event._id, 'Attendees:', attendeeIds, 'Timezone:', timezone);
+
+      // Send notifications to attendees and schedule reminder
+      try {
+        await getStreamFeedsService.createEventActivity(event._id.toString(), event);
+        console.log('📬 Event notifications sent to attendees');
+      } catch (notifError) {
+        console.error('Failed to send event notifications:', notifError);
+        // Don't fail the event creation if notifications fail
+      }
 
       return {
         success: true,

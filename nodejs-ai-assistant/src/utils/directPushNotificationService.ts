@@ -126,9 +126,12 @@ export class DirectPushNotificationService {
           stringData.type = payload.category || 'task';
           stringData.timestamp = new Date().toISOString();
           
-          // Ensure taskId is in data for navigation
+          // Ensure IDs are in data for navigation
           if (payload.data?.taskId) {
             stringData.taskId = String(payload.data.taskId);
+          }
+          if (payload.data?.eventId) {
+            stringData.eventId = String(payload.data.eventId);
           }
           if (payload.data?.channelId) {
             stringData.channelId = String(payload.data.channelId);

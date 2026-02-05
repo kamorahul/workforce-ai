@@ -484,6 +484,124 @@ export class GetStreamFeedsService {
   }
 
   /**
+   * Create activity when an event is created and notify attendees
+   */
+  async createEventActivity(eventId: string, event: any): Promise<string> {
+    try {
+      if (!this.isConnected) {
+        await this.connect();
+      }
+
+      const organizerFeed = this.getstreamClient.feed('user', event.organizer);
+
+      // Create the event activity
+      const activity = await organizerFeed.addActivity({
+        actor: event.organizer,
+        verb: 'event_created',
+        object: eventId,
+        foreign_id: `event:${eventId}`,
+        extra: {
+          eventId: eventId,
+          eventTitle: event.title,
+          startDate: event.startDate,
+          endDate: event.endDate,
+          location: event.location,
+          attendees: event.attendees,
+          organizer: event.organizer,
+          channelId: event.channelId,
+          reminder: event.reminder,
+        }
+      });
+
+      // Notify each attendee (except the organizer)
+      // Handle both old format (string[]) and new format ({userId, status}[])
+      if (event.attendees && Array.isArray(event.attendees)) {
+        for (const attendee of event.attendees) {
+          // Support both formats: string or {userId, status}
+          const attendeeId = typeof attendee === 'string' ? attendee : attendee.userId;
+
+          // Skip if attendee is the organizer
+          if (attendeeId === event.organizer) {
+            console.log(`Skipping notification for event organizer ${attendeeId}`);
+            continue;
+          }
+
+          // Add activity to attendee's notification feed
+          const attendeeFeed = this.getstreamClient.feed('notification', attendeeId);
+          await attendeeFeed.addActivity({
+            actor: event.organizer,
+            verb: 'event_invited',
+            object: eventId,
+            extra: {
+              eventId: eventId,
+              eventTitle: event.title,
+              startDate: event.startDate,
+              endDate: event.endDate,
+              location: event.location,
+              organizer: event.organizer,
+              channelId: event.channelId,
+              feedGroup: 'notification'
+            }
+          });
+
+          // Also create push notification
+          await this.createNotification(attendeeId, 'event_invited', eventId, {
+            eventId: eventId,
+            eventTitle: event.title,
+            startDate: event.startDate,
+            location: event.location,
+            organizer: event.organizer,
+            channelId: event.channelId
+          });
+
+          console.log(`📅 Added event_invited notification to attendee ${attendeeId}'s feed`);
+        }
+      }
+
+      // Schedule reminder notification if reminder is set
+      if (event.reminder && event.startDate) {
+        const reminderTime = new Date(event.startDate).getTime() - (event.reminder * 60 * 1000);
+        const now = Date.now();
+
+        if (reminderTime > now) {
+          // Extract userIds from attendees (handle both formats)
+          const attendeeIds = (event.attendees || []).map((a: any) =>
+            typeof a === 'string' ? a : a.userId
+          );
+
+          // Schedule reminder for all attendees including organizer
+          const allUsers = [event.organizer, ...attendeeIds];
+          const uniqueUsers = [...new Set(allUsers)];
+
+          setTimeout(async () => {
+            for (const userId of uniqueUsers) {
+              try {
+                await this.createNotification(userId, 'event_reminder', eventId, {
+                  eventId: eventId,
+                  eventTitle: event.title,
+                  startDate: event.startDate,
+                  location: event.location,
+                  minutesUntil: event.reminder
+                });
+                console.log(`⏰ Sent event reminder to ${userId} for "${event.title}"`);
+              } catch (err) {
+                console.error(`Failed to send reminder to ${userId}:`, err);
+              }
+            }
+          }, reminderTime - now);
+
+          console.log(`⏰ Scheduled reminder for "${event.title}" in ${Math.round((reminderTime - now) / 60000)} minutes`);
+        }
+      }
+
+      return activity.id;
+    } catch (error) {
+      console.error('Error creating event activity:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Create notifications for task updates
    */
   async createTaskUpdateNotifications(originalTask: any, updatedTask: any, updateData: any): Promise<void> {

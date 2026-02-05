@@ -2,6 +2,7 @@ import express, { Request, Response, Router } from 'express';
 import { Event, IEvent } from '../models/Event';
 import { getStreamUserId } from '../middleware/auth';
 import { serverClient } from '../serverClient';
+import { getStreamFeedsService } from '../utils/getstreamFeedsService';
 
 // Helper function to check if user is a member of a channel
 const isChannelMember = async (channelId: string, userId: string): Promise<boolean> => {
@@ -110,12 +111,12 @@ router.get('/', async (req: Request, res: Response) => {
     if (attendee && organizer) {
       andConditions.push({
         $or: [
-          { attendees: { $in: [attendee as string] } },
+          { 'attendees.userId': { $in: [attendee as string] } },
           { organizer: organizer as string }
         ]
       });
     } else if (attendee) {
-      query.attendees = { $in: [attendee as string] };
+      query['attendees.userId'] = { $in: [attendee as string] };
     } else if (organizer) {
       query.organizer = organizer as string;
     }
@@ -198,7 +199,7 @@ router.get('/calendar', async (req: Request, res: Response) => {
     // Get events where user is attendee or organizer
     const events = await Event.find({
       $or: [
-        { attendees: { $in: [userId as string] } },
+        { 'attendees.userId': { $in: [userId as string] } },
         { organizer: userId as string }
       ],
       $and: [
@@ -244,7 +245,7 @@ router.get('/upcoming', async (req: Request, res: Response) => {
 
     const events = await Event.find({
       $or: [
-        { attendees: { $in: [userId as string] } },
+        { 'attendees.userId': { $in: [userId as string] } },
         { organizer: userId as string }
       ],
       startDate: { $gte: now },
@@ -379,7 +380,7 @@ router.put('/:eventId', async (req: Request, res: Response) => {
 router.patch('/:eventId/rsvp', async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
-    const { userId, response: rsvpResponse } = req.body;
+    const { userId, response: rsvpResponse, userName } = req.body;
 
     if (!eventId || !userId || !rsvpResponse) {
       res.status(400).json({ error: 'Missing required fields: eventId, userId, response' });
@@ -397,21 +398,52 @@ router.patch('/:eventId/rsvp', async (req: Request, res: Response) => {
       return;
     }
 
-    // Check if user is an attendee
-    if (!event.attendees.includes(userId)) {
+    // Find the attendee in the array
+    const attendeeIndex = event.attendees.findIndex(a => a.userId === userId);
+    if (attendeeIndex === -1) {
       res.status(403).json({ error: 'User is not an attendee of this event' });
       return;
     }
 
-    // Note: For proper RSVP tracking, you might want to add an rsvpStatus field
-    // to the Event model. For now, we'll just log it.
+    // Update the attendee's RSVP status
+    event.attendees[attendeeIndex].status = rsvpResponse as 'yes' | 'no' | 'maybe';
+    event.attendees[attendeeIndex].respondedAt = new Date();
+
+    await event.save();
     console.log(`📅 RSVP for event ${eventId}: User ${userId} responded ${rsvpResponse}`);
+
+    // Notify the organizer about the RSVP response
+    try {
+      const responseEmoji = rsvpResponse === 'yes' ? '✅' : rsvpResponse === 'no' ? '❌' : '🤔';
+      const responseText = rsvpResponse === 'yes' ? 'accepted' : rsvpResponse === 'no' ? 'declined' : 'responded maybe to';
+
+      await getStreamFeedsService.createNotification(event.organizer, 'event_rsvp', eventId, {
+        eventId: eventId,
+        eventTitle: event.title,
+        responderId: userId,
+        responderName: userName || userId,
+        response: rsvpResponse,
+        message: `${responseEmoji} ${userName || userId} ${responseText} your event "${event.title}"`
+      });
+      console.log(`📬 Notified organizer ${event.organizer} about RSVP`);
+    } catch (notifError) {
+      console.error('Failed to notify organizer:', notifError);
+    }
+
+    // Calculate RSVP counts
+    const rsvpCounts = {
+      yes: event.attendees.filter(a => a.status === 'yes').length,
+      no: event.attendees.filter(a => a.status === 'no').length,
+      maybe: event.attendees.filter(a => a.status === 'maybe').length,
+      pending: event.attendees.filter(a => a.status === 'pending').length,
+    };
 
     res.status(200).json({
       status: 'success',
       eventId,
       userId,
       rsvpResponse,
+      rsvpCounts,
       message: 'RSVP recorded successfully'
     });
   } catch (error) {
@@ -498,7 +530,7 @@ router.get('/count/upcoming', async (req: Request, res: Response) => {
 
     const count = await Event.countDocuments({
       $or: [
-        { attendees: { $in: [userId as string] } },
+        { 'attendees.userId': { $in: [userId as string] } },
         { organizer: userId as string }
       ],
       startDate: { $gte: now },
