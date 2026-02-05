@@ -147,6 +147,7 @@ async function doAnalyzeMessage(agent: AIAgent, user: User, message: any, thread
       id: message.id,
       text: message.text,
       user_id: user.id,
+      attachments: message.attachments, // Preserve attachments during processing update
       extraData: { processing: true }
     });
     console.log('🔄 Marked message as processing');
