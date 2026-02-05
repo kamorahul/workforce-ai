@@ -266,13 +266,11 @@ QUICK ACTIONS:
 At the end of your response, you MUST include a JSON block with suggested quick actions for the user.
 These actions appear as buttons below your message.
 
-AVAILABLE SCREENS (for navigation actions):
-- MainHome: Main dashboard with overview of tasks, events, activity
-- TasksScreen: View all tasks (params: channelId optional)
-- CreateTaskScreen: Create a new task (params: channelId, taskName, assignee optional)
+AVAILABLE SCREENS (for navigation actions - VIEW only, you handle creation via tools):
+- MainHome: Home dashboard with tasks, events, activity overview
+- TasksScreen: View all tasks
 - NotificationsScreen: View notifications
-- ProfileScreen: User profile
-- KaiScreen: Chat with Kai (current screen, rarely needed)
+- ProfileScreen: User profile settings
 
 ACTION TYPES:
 1. "navigate" - Takes user to a screen in the app
@@ -299,17 +297,16 @@ After discussing tasks:
 ---QUICK_ACTIONS---
 [
   {"id": "view-tasks", "type": "navigate", "label": "View tasks", "screen": "TasksScreen"},
-  {"id": "create-task", "type": "navigate", "label": "Create task", "screen": "CreateTaskScreen"},
+  {"id": "go-home", "type": "navigate", "label": "Go to home", "screen": "MainHome"},
   {"id": "more-details", "type": "message", "label": "More details", "action": "Tell me more about my tasks"}
 ]
 ---END_ACTIONS---
 
-After creating an event:
+After creating a task or event:
 ---QUICK_ACTIONS---
 [
-  {"id": "view-home", "type": "navigate", "label": "Go to home", "screen": "MainHome"},
   {"id": "view-tasks", "type": "navigate", "label": "View tasks", "screen": "TasksScreen"},
-  {"id": "my-schedule", "type": "message", "label": "My schedule", "action": "What's on my schedule today?"}
+  {"id": "go-home", "type": "navigate", "label": "Go to home", "screen": "MainHome"}
 ]
 ---END_ACTIONS---
 
