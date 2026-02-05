@@ -87,36 +87,8 @@ export class GetStreamFeedsService {
         withOwnReactions: false
       });
       
-      let feedGroup = 'notification';
-      
-      // If notification feed is empty, try user feed
-      if (!response.results || response.results.length === 0) {
-        feedGroup = 'user';
-        const userFeed = this.getstreamClient.feed('user', userId);
-        response = await userFeed.get({ 
-          limit,
-          offset: 0,
-          withReactionCounts: false,
-          withRecentReactions: false,
-          withOwnReactions: false
-        });
-        console.log(`📭 ${feedGroup} feed results:`, response.results?.length || 0);
-      }
-      
-      // If still empty, try timeline feed
-      if (!response.results || response.results.length === 0) {
-        feedGroup = 'timeline';
-        const timelineFeed = this.getstreamClient.feed('timeline', userId);
-        response = await timelineFeed.get({ 
-          limit,
-          offset: 0,
-          withReactionCounts: false,
-          withRecentReactions: false,
-          withOwnReactions: false
-        });
-        console.log(`📭 ${feedGroup} feed results:`, response.results?.length || 0);
-      }
-      
+      console.log(`📭 notification feed results:`, response.results?.length || 0);
+
       if (response.results && response.results.length > 0) {  
         // Extract individual activities from grouped results
         let allActivities: any[] = [];
@@ -492,26 +464,7 @@ export class GetStreamFeedsService {
         await this.connect();
       }
 
-      const organizerFeed = this.getstreamClient.feed('user', event.organizer);
-
-      // Create the event activity
-      const activity = await organizerFeed.addActivity({
-        actor: event.organizer,
-        verb: 'event_created',
-        object: eventId,
-        foreign_id: `event:${eventId}`,
-        extra: {
-          eventId: eventId,
-          eventTitle: event.title,
-          startDate: event.startDate,
-          endDate: event.endDate,
-          location: event.location,
-          attendees: event.attendees,
-          organizer: event.organizer,
-          channelId: event.channelId,
-          reminder: event.reminder,
-        }
-      });
+      let activityId = `event:${eventId}`;
 
       // Notify each attendee (except the organizer)
       // Handle both old format (string[]) and new format ({userId, status}[])
@@ -594,7 +547,7 @@ export class GetStreamFeedsService {
         }
       }
 
-      return activity.id;
+      return activityId;
     } catch (error) {
       console.error('Error creating event activity:', error);
       throw error;
