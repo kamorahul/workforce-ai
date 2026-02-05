@@ -586,7 +586,9 @@ export class ClaudeResponseHandler {
 
       // Send notifications to attendees and schedule reminder
       try {
-        await getStreamFeedsService.createEventActivity(event._id.toString(), event);
+        // Convert Mongoose document to plain object to avoid circular reference issues with GetStream
+        const eventPlain = event.toObject();
+        await getStreamFeedsService.createEventActivity(event._id.toString(), eventPlain);
         console.log('📬 Event notifications sent to attendees');
       } catch (notifError) {
         console.error('Failed to send event notifications:', notifError);
