@@ -300,7 +300,7 @@ router.get('/:eventId', async (req: Request, res: Response) => {
     // Permission check: user must be organizer, attendee, or channel member
     const userId = getStreamUserId(req);
     const isOrganizer = event.organizer === userId;
-    const isAttendee = event.attendees?.includes(userId || '');
+    const isAttendee = event.attendees?.some(a => a.userId === userId);
     const isMember = event.channelId ? await isChannelMember(event.channelId, userId || '') : false;
 
     if (!isOrganizer && !isAttendee && !isMember) {

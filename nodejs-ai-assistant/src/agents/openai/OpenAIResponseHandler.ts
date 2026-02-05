@@ -498,11 +498,12 @@ export class OpenAIResponseHandler {
       });
 
       await task.save();
-      console.log('✅ Task created:', task._id, 'Assignees:', assigneeIds, 'Timezone:', timezone);
+      const taskId = (task._id as any).toString();
+      console.log('✅ Task created:', taskId, 'Assignees:', assigneeIds, 'Timezone:', timezone);
 
       // Send notifications to assignees
       try {
-        await getStreamFeedsService.createTaskActivity(task._id.toString(), task);
+        await getStreamFeedsService.createTaskActivity(taskId, task);
         console.log('📬 Task notifications sent to assignees');
       } catch (notifError) {
         console.error('Failed to send task notifications:', notifError);
@@ -511,7 +512,7 @@ export class OpenAIResponseHandler {
       return {
         success: true,
         task: {
-          id: task._id,
+          id: taskId,
           title: task.name,
           priority: task.priority,
           dueDate: task.completionDate,
@@ -564,13 +565,14 @@ export class OpenAIResponseHandler {
       });
 
       await event.save();
-      console.log('✅ Event created:', event._id, 'Attendees:', attendeeIds, 'Timezone:', timezone);
+      const eventId = (event._id as any).toString();
+      console.log('✅ Event created:', eventId, 'Attendees:', attendeeIds, 'Timezone:', timezone);
 
       // Send notifications to attendees and schedule reminder
       try {
         // Convert Mongoose document to plain object to avoid circular reference issues with GetStream
         const eventPlain = event.toObject();
-        await getStreamFeedsService.createEventActivity(event._id.toString(), eventPlain);
+        await getStreamFeedsService.createEventActivity(eventId, eventPlain);
         console.log('📬 Event notifications sent to attendees');
       } catch (notifError) {
         console.error('Failed to send event notifications:', notifError);
@@ -579,7 +581,7 @@ export class OpenAIResponseHandler {
       return {
         success: true,
         event: {
-          id: event._id,
+          id: eventId,
           title: event.title,
           startDate: event.startDate,
           endDate: event.endDate,

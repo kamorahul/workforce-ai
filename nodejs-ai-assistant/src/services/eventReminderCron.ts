@@ -42,7 +42,8 @@ async function processEventReminders(): Promise<void> {
 
       // Check if it's time to send the reminder
       if (now >= reminderTime) {
-        console.log(`⏰ Processing reminder for event: "${event.title}" (${event._id})`);
+        const eventId = (event._id as any).toString();
+        console.log(`⏰ Processing reminder for event: "${event.title}" (${eventId})`);
 
         // Get all users to notify (organizer + attendees)
         const attendeeIds = event.attendees.map(a => a.userId);
@@ -58,8 +59,8 @@ async function processEventReminders(): Promise<void> {
             // Format event time in user's timezone
             const eventTimeFormatted = formatEventTimeForUser(event.startDate, userTimezone);
 
-            await getStreamFeedsService.createNotification(userId, 'event_reminder', event._id.toString(), {
-              eventId: event._id.toString(),
+            await getStreamFeedsService.createNotification(userId, 'event_reminder', eventId, {
+              eventId: eventId,
               eventTitle: event.title,
               startDate: event.startDate.toISOString(),
               location: event.location,
@@ -75,8 +76,8 @@ async function processEventReminders(): Promise<void> {
         }
 
         // Mark reminder as sent
-        await Event.findByIdAndUpdate(event._id, { reminderSent: true });
-        console.log(`  📌 Marked reminderSent=true for event ${event._id}`);
+        await Event.findByIdAndUpdate(eventId, { reminderSent: true });
+        console.log(`  📌 Marked reminderSent=true for event ${eventId}`);
       }
     }
   } catch (error) {
