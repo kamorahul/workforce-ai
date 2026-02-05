@@ -341,6 +341,16 @@ export class GetStreamFeedsService {
           title: 'Event Reminder',
           message: `"${reminderTitle}" starts in ${minutesUntil} minutes`
         };
+      case 'event_rsvp':
+        const rsvpEventTitle = extra.eventTitle || 'your event';
+        const responderName = extra.responderName || 'Someone';
+        const rsvpResponse = extra.response;
+        const rsvpEmoji = rsvpResponse === 'yes' ? '✅' : rsvpResponse === 'no' ? '❌' : '🤔';
+        const rsvpText = rsvpResponse === 'yes' ? 'accepted' : rsvpResponse === 'no' ? 'declined' : 'responded maybe to';
+        return {
+          title: 'Event RSVP',
+          message: `${rsvpEmoji} ${responderName} ${rsvpText} "${rsvpEventTitle}"`
+        };
       default:
         return {
           title: 'Convoe Notification',
