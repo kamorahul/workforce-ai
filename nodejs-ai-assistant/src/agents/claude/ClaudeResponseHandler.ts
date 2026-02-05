@@ -40,6 +40,12 @@ interface MentionedUser {
 }
 
 /**
+ * Valid screens for navigation - must match mobile app navigation stack
+ */
+const VALID_SCREENS = ['MainHome', 'TasksScreen', 'NotificationsScreen', 'ProfileScreen'] as const;
+type ValidScreen = typeof VALID_SCREENS[number];
+
+/**
  * Quick action types for Kai chat buttons
  */
 interface QuickActionMessage {
@@ -53,7 +59,7 @@ interface QuickActionNavigate {
   id: string;
   type: 'navigate';
   label: string;
-  screen: string;
+  screen: ValidScreen;
   params?: Record<string, any>;
 }
 
@@ -347,7 +353,13 @@ export class ClaudeResponseHandler {
       // Filter to valid actions only
       const validActions = quickActions.filter((action) => {
         if (!action.id || !action.type || !action.label) return false;
-        if (action.type === 'navigate' && !action.screen) return false;
+        if (action.type === 'navigate') {
+          // Validate screen name exists in allowed list
+          if (!action.screen || !VALID_SCREENS.includes(action.screen as ValidScreen)) {
+            console.warn(`Invalid screen name: ${action.screen}`);
+            return false;
+          }
+        }
         if (action.type === 'message' && !action.action) return false;
         return true;
       });
