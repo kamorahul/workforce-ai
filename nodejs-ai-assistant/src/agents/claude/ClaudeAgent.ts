@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { ClaudeResponseHandler } from './ClaudeResponseHandler';
-import type { AIAgent } from '../types';
+import type { AIAgent, TimezoneContext } from '../types';
 import type { Channel, StreamChat } from 'stream-chat';
 import { User } from '../createAgent';
 import { Thread, IThread } from '../../models/Thread';
@@ -123,7 +123,8 @@ export class ClaudeAgent implements AIAgent {
     messageId?: string,
     attachments?: any[],
     usePersistentThread: boolean = false,
-    mentionedUsers?: { id: string; name: string }[]
+    mentionedUsers?: { id: string; name: string }[],
+    timezoneContext?: TimezoneContext
   ) => {
     if (!this.anthropic || !this.assistantConfig) {
       console.error('Claude not initialized');
@@ -234,7 +235,8 @@ Analyze this data to answer the user's question. Reference specific tasks, conve
         systemPrompt,
         tools,
         // Save conversation history after response is complete
-        usePersistentThread ? this.saveConversationHistory : undefined
+        usePersistentThread ? this.saveConversationHistory : undefined,
+        timezoneContext
       );
 
       void handler.run();

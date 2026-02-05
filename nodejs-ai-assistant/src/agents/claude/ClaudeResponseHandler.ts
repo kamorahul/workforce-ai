@@ -38,6 +38,23 @@ interface MentionedUser {
   name: string;
 }
 
+/**
+ * Timezone context sent by the mobile app with user messages
+ * Used for proper timezone handling when creating events/tasks
+ */
+interface TimezoneContext {
+  /** User's timezone identifier (e.g., "Asia/Kolkata", "America/New_York") */
+  timezone: string;
+  /** User's current local time in ISO format */
+  localTime: string;
+  /** Timezone offset in minutes */
+  offsetMinutes: number;
+  /** Formatted offset string (e.g., "+05:30", "-08:00") */
+  offsetString: string;
+  /** Abbreviated timezone name (e.g., "IST", "PST") */
+  abbreviation: string;
+}
+
 type MessageContent = string | Array<Anthropic.TextBlockParam | Anthropic.ImageBlockParam>;
 
 interface ConversationMessage {
@@ -61,7 +78,8 @@ export class ClaudeResponseHandler {
     private readonly conversationHistory?: ConversationMessage[],
     private readonly systemPrompt?: string,
     private readonly tools?: any[],
-    private readonly onComplete?: () => Promise<void>
+    private readonly onComplete?: () => Promise<void>,
+    private readonly timezoneContext?: TimezoneContext
   ) {
     this.chatClient.on('ai_indicator.stop', this.handleStopGenerating);
   }
@@ -472,9 +490,13 @@ export class ClaudeResponseHandler {
   ): Promise<{ success: boolean; task?: any; error?: string }> => {
     try {
       console.log('Creating task via Claude:', args.title);
+      console.log('Timezone context:', this.timezoneContext?.timezone || 'UTC (default)');
 
       const assigneeIds = this.getAssigneeIds(args.assignees);
       const assigneeNames = this.getAssigneeNames(assigneeIds);
+
+      // Use timezone from context, fallback to UTC
+      const timezone = this.timezoneContext?.timezone || 'UTC';
 
       const task = new Task({
         name: args.title,
@@ -488,10 +510,12 @@ export class ClaudeResponseHandler {
         channelId: this.channel.id,
         status: 'todo',
         completed: false,
+        // Store creator's timezone for proper display across timezones
+        timezone: timezone,
       });
 
       await task.save();
-      console.log('Task created:', task._id, 'Assignees:', assigneeIds);
+      console.log('Task created:', task._id, 'Assignees:', assigneeIds, 'Timezone:', timezone);
 
       return {
         success: true,
@@ -501,6 +525,7 @@ export class ClaudeResponseHandler {
           priority: task.priority,
           dueDate: task.completionDate,
           assignees: assigneeNames,
+          timezone: timezone,
         },
       };
     } catch (error) {
@@ -517,9 +542,13 @@ export class ClaudeResponseHandler {
   ): Promise<{ success: boolean; event?: any; error?: string }> => {
     try {
       console.log('Creating event via Claude:', args.title);
+      console.log('Timezone context:', this.timezoneContext?.timezone || 'UTC (default)');
 
       const attendeeIds = this.getAssigneeIds(args.attendees);
       const attendeeNames = this.getAssigneeNames(attendeeIds);
+
+      // Use timezone from context, fallback to UTC
+      const timezone = this.timezoneContext?.timezone || 'UTC';
 
       const event = new Event({
         title: args.title,
@@ -532,10 +561,12 @@ export class ClaudeResponseHandler {
         channelId: this.channel.id,
         status: 'scheduled',
         reminder: args.reminder || 15,
+        // Store creator's timezone for proper display across timezones
+        timezone: timezone,
       });
 
       await event.save();
-      console.log('Event created:', event._id, 'Attendees:', attendeeIds);
+      console.log('Event created:', event._id, 'Attendees:', attendeeIds, 'Timezone:', timezone);
 
       return {
         success: true,
@@ -546,6 +577,7 @@ export class ClaudeResponseHandler {
           endDate: event.endDate,
           location: event.location,
           attendees: attendeeNames,
+          timezone: timezone,
         },
       };
     } catch (error) {

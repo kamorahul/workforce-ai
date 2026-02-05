@@ -7,11 +7,35 @@ export interface MentionedUser {
   name: string;
 }
 
+/**
+ * Timezone context sent by the mobile app with user messages
+ * Used for proper timezone handling when creating events/tasks
+ */
+export interface TimezoneContext {
+  /** User's timezone identifier (e.g., "Asia/Kolkata", "America/New_York") */
+  timezone: string;
+  /** User's current local time in ISO format */
+  localTime: string;
+  /** Timezone offset in minutes */
+  offsetMinutes: number;
+  /** Formatted offset string (e.g., "+05:30", "-08:00") */
+  offsetString: string;
+  /** Abbreviated timezone name (e.g., "IST", "PST") */
+  abbreviation: string;
+}
+
 export interface AIAgent {
   init(agentId: string): Promise<void>;
   dispose(): Promise<void>;
   getLastInteraction(): number;
-  handleMessage(e: string, messageId?: string, attachments?: any[], usePersistentThread?: boolean, mentionedUsers?: MentionedUser[]): Promise<void>;
+  handleMessage(
+    e: string,
+    messageId?: string,
+    attachments?: any[],
+    usePersistentThread?: boolean,
+    mentionedUsers?: MentionedUser[],
+    timezoneContext?: TimezoneContext
+  ): Promise<void>;
 
   chatClient: StreamChat;
   channel: Channel;

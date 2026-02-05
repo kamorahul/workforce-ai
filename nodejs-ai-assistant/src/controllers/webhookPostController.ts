@@ -1,7 +1,7 @@
 import express, { Request, Response, Router } from 'express';
 import { createAgent, User } from '../agents/createAgent';
 import { agent } from 'supertest';
-import { AIAgent } from '../agents/types';
+import { AIAgent, TimezoneContext } from '../agents/types';
 import { serverClient } from '../serverClient';
 
 const router: Router = express.Router();
@@ -88,7 +88,9 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         console.log('📎 Attachments for task/event detection:', attachments.length, 'file(s)');
       }
 
-      doAnalyzeMessage(agent, user, message, threadContext, attachments);
+      // Extract timezone context for task/event detection
+      const timezoneContext: TimezoneContext | undefined = message.timezone_context;
+      doAnalyzeMessage(agent, user, message, threadContext, attachments, timezoneContext);
       res.json(req.body);
       return;
     }
@@ -129,8 +131,15 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       console.log('👥 Mentioned users:', mentionedUsers.map((u: any) => `${u.name} (${u.id})`).join(', '));
     }
 
+    // Extract timezone context from message (sent by mobile app via useKaiMessaging hook)
+    // This is used for creating events/tasks with proper timezone handling
+    const timezoneContext: TimezoneContext | undefined = message.timezone_context;
+    if (timezoneContext) {
+      console.log('🌍 Timezone context:', timezoneContext.timezone, `(${timezoneContext.abbreviation})`);
+    }
+
     // Use persistent thread = true for Q&A agent (remembers conversation)
-    await agent.handleMessage(messageText, message.id, attachments, true, mentionedUsers);
+    await agent.handleMessage(messageText, message.id, attachments, true, mentionedUsers, timezoneContext);
 
     res.status(200).json({ message: "Webhook processed successfully" });
   } catch (error) {
@@ -140,7 +149,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-async function doAnalyzeMessage(agent: AIAgent, user: User, message: any, threadContext?: any, attachments?: any[]) {
+async function doAnalyzeMessage(agent: AIAgent, user: User, message: any, threadContext?: any, attachments?: any[], timezoneContext?: TimezoneContext) {
   // Mark message as processing immediately so mobile can show analyzing UI
   try {
     await serverClient.updateMessage({
@@ -188,8 +197,8 @@ Analyze if this thread contains a task or event. Consider the parent message con
     }
   }
 
-  // Pass attachments for Vision API processing
-  await agent.handleMessage(messageToAnalyze, message.id, attachments || []);
+  // Pass attachments for Vision API processing, and timezone context
+  await agent.handleMessage(messageToAnalyze, message.id, attachments || [], false, undefined, timezoneContext);
 }
 
 export default router;

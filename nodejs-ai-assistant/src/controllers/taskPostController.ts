@@ -60,7 +60,7 @@ const upload = multer({
 
 export const handleTaskPost = async (req: Request, res: Response) => {
   try {
-    const { name, assignee, priority, completionDate, channelId, description, subtasks, createdBy, parentTaskId, attachments } = req.body;
+    const { name, assignee, priority, completionDate, channelId, description, subtasks, createdBy, parentTaskId, attachments, timezone } = req.body;
 
     if (!name || !assignee || !Array.isArray(assignee) || assignee.length === 0 || !priority) {
       res.status(400).json({ error: 'Missing required fields or assignee must be a non-empty array' });
@@ -77,6 +77,8 @@ export const handleTaskPost = async (req: Request, res: Response) => {
       createdBy: createdBy || assignee[0],
       parentTaskId,
       attachments: attachments || [],
+      // Store the creator's timezone for proper display across timezones
+      timezone: timezone || 'UTC',
     });
     await task.save();
 
@@ -92,6 +94,8 @@ export const handleTaskPost = async (req: Request, res: Response) => {
           description: subtask.description,
           createdBy: createdBy || assignee[0],
           parentTaskId: task._id,
+          // Inherit timezone from parent task
+          timezone: subtask.timezone || timezone || 'UTC',
         });
         await newSubtask.save();
 
@@ -459,7 +463,7 @@ router.put('/:taskId', async (req: Request, res: Response) => {
     const {
       name, assignee, priority, completionDate, channelId,
       description, completed, status, parentTaskId, attachments,
-      userId
+      userId, timezone
     } = req.body;
 
     const updateData: any = {};
@@ -482,6 +486,7 @@ router.put('/:taskId', async (req: Request, res: Response) => {
     if (status !== undefined) updateData.status = status;
     if (parentTaskId !== undefined) updateData.parentTaskId = parentTaskId;
     if (attachments !== undefined) updateData.attachments = attachments;
+    if (timezone !== undefined) updateData.timezone = timezone;
 
     const updatedTask = await Task.findByIdAndUpdate(
       taskId,

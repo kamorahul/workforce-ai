@@ -13,6 +13,12 @@ export interface IEvent extends Document {
   messageId?: string; // Reference to the original message
   status: 'scheduled' | 'cancelled' | 'completed';
   reminder?: number; // Minutes before event to remind
+  /**
+   * Timezone where the event was created (IANA timezone identifier)
+   * e.g., "Asia/Kolkata", "America/New_York", "Europe/London"
+   * Used for displaying the original event time context to users in different timezones
+   */
+  timezone?: string;
   recurrence?: {
     type: 'daily' | 'weekly' | 'monthly' | 'yearly';
     interval: number;
@@ -82,6 +88,13 @@ const EventSchema: Schema = new Schema({
   reminder: {
     type: Number,
     required: false,
+  },
+  timezone: {
+    type: String,
+    required: false,
+    // IANA timezone identifier (e.g., "Asia/Kolkata", "America/New_York")
+    // Defaults to UTC if not provided
+    default: 'UTC',
   },
   recurrence: {
     type: {

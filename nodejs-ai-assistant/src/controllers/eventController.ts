@@ -42,7 +42,8 @@ router.post('/', async (req: Request, res: Response) => {
       channelId,
       messageId,
       reminder,
-      recurrence
+      recurrence,
+      timezone
     } = req.body;
 
     // Validation
@@ -69,7 +70,9 @@ router.post('/', async (req: Request, res: Response) => {
       messageId,
       status: 'scheduled',
       reminder: reminder || 15,
-      recurrence
+      recurrence,
+      // Store the creator's timezone for proper display across timezones
+      timezone: timezone || 'UTC',
     });
 
     await event.save();
@@ -325,7 +328,8 @@ router.put('/:eventId', async (req: Request, res: Response) => {
       attendees,
       status,
       reminder,
-      recurrence
+      recurrence,
+      timezone
     } = req.body;
 
     const updateData: any = {};
@@ -346,6 +350,7 @@ router.put('/:eventId', async (req: Request, res: Response) => {
     if (status !== undefined) updateData.status = status;
     if (reminder !== undefined) updateData.reminder = reminder;
     if (recurrence !== undefined) updateData.recurrence = recurrence;
+    if (timezone !== undefined) updateData.timezone = timezone;
 
     const updatedEvent = await Event.findByIdAndUpdate(
       eventId,

@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { OpenAIResponseHandler } from './OpenAIResponseHandler';
-import type { AIAgent } from '../types';
+import type { AIAgent, TimezoneContext } from '../types';
 import type { Channel, StreamChat } from 'stream-chat';
 import {User} from "../createAgent";
 import { Thread } from '../../models/Thread';
@@ -84,7 +84,7 @@ export class OpenAIAgent implements AIAgent {
     }
   };
 
-  public handleMessage = async (e: string, messageId?: string, attachments?: any[], usePersistentThread: boolean = false, mentionedUsers?: { id: string; name: string }[]) => {
+  public handleMessage = async (e: string, messageId?: string, attachments?: any[], usePersistentThread: boolean = false, mentionedUsers?: { id: string; name: string }[], timezoneContext?: TimezoneContext) => {
     if (!this.openai || !this.openAiThread || !this.assistant) {
       console.error('OpenAI not initialized');
       return;
@@ -564,6 +564,7 @@ export class OpenAIAgent implements AIAgent {
         this.user,
         messageId,
         mentionedUsers,
+        timezoneContext,
       );
 
       void handler.run();

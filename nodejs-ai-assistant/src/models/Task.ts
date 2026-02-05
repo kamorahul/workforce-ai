@@ -13,6 +13,12 @@ export interface ITask extends Document {
   description?: string; // Optional long text description
   createdBy: string; // userId of the task creator
   parentTaskId?: string; // Reference to parent task if this is a subtask
+  /**
+   * Timezone where the task was created (IANA timezone identifier)
+   * e.g., "Asia/Kolkata", "America/New_York", "Europe/London"
+   * Used for displaying the original due date context to users in different timezones
+   */
+  timezone?: string;
   attachments?: Array<{
     uri: string;
     name: string;
@@ -72,6 +78,13 @@ const TaskSchema: Schema = new Schema({
     ref: 'Task',
     required: false,
     index: true,
+  },
+  timezone: {
+    type: String,
+    required: false,
+    // IANA timezone identifier (e.g., "Asia/Kolkata", "America/New_York")
+    // Defaults to UTC if not provided
+    default: 'UTC',
   },
   attachments: {
     type: [{
