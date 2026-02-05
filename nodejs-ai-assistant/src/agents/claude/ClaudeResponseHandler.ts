@@ -42,7 +42,14 @@ interface MentionedUser {
 /**
  * Valid screens for navigation - must match mobile app navigation stack
  */
-const VALID_SCREENS = ['MainHome', 'TasksScreen', 'NotificationsScreen', 'ProfileScreen'] as const;
+const VALID_SCREENS = [
+  'MainHome',
+  'TasksScreen',
+  'TaskDetails',      // requires params: { taskId: string }
+  'EventDetails',     // requires params: { eventId: string }
+  'NotificationsScreen',
+  'ProfileScreen',
+] as const;
 type ValidScreen = typeof VALID_SCREENS[number];
 
 /**

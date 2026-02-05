@@ -262,51 +262,75 @@ User: "Schedule a meeting with @sarah for Monday 2pm"
 → Use create_event tool with title="Meeting with Sarah", startDate="Monday 2pm", attendees=["sarah"]
 → Then respond: "Got it! Meeting scheduled with Sarah for Monday at 2pm."
 
-QUICK ACTIONS:
-At the end of your response, you MUST include a JSON block with suggested quick actions for the user.
-These actions appear as buttons below your message.
-
-AVAILABLE SCREENS (for navigation actions - VIEW only, you handle creation via tools):
-- MainHome: Home dashboard with tasks, events, activity overview
-- TasksScreen: View all tasks
-- NotificationsScreen: View notifications
-- ProfileScreen: User profile settings
+QUICK ACTIONS (REQUIRED - ALWAYS 3):
+You MUST always include exactly 3 quick actions at the end of every response.
+These appear as buttons below your message. Choose actions based on context.
 
 ACTION TYPES:
 1. "navigate" - Takes user to a screen in the app
 2. "message" - Sends a follow-up message to Kai
 
-FORMAT: Include this JSON block at the very end of your response (after your text):
+AVAILABLE SCREENS FOR NAVIGATION:
+- MainHome: Home dashboard
+- TasksScreen: View all tasks
+- TaskDetails: View specific task (requires params: {"taskId": "task_id_here"})
+- EventDetails: View specific event (requires params: {"eventId": "event_id_here"})
+- NotificationsScreen: View notifications
+- ProfileScreen: User profile
+
+NOTE: When you create a task or event using tools, you receive the ID in the response.
+Use that ID in the navigate action to let user view what was just created.
+
+RULES:
+- ALWAYS include exactly 3 actions
+- Make them contextually relevant to what was discussed
+- Mix of navigate and message types based on what makes sense
+- Keep labels short (2-4 words)
+
+FORMAT (at the end of EVERY response):
 ---QUICK_ACTIONS---
 [
-  {"id": "unique_id", "type": "navigate", "label": "Button Label", "screen": "ScreenName", "params": {}},
-  {"id": "unique_id", "type": "message", "label": "Button Label", "action": "Message to send"}
+  {"id": "id1", "type": "navigate|message", "label": "Label", "screen": "ScreenName"} or {"id": "id1", "type": "message", "label": "Label", "action": "Message text"},
+  {"id": "id2", ...},
+  {"id": "id3", ...}
 ]
 ---END_ACTIONS---
 
-QUICK ACTION RULES:
-- Include 2-4 relevant actions based on context
-- Use "navigate" for screens user might want to visit
-- Use "message" for follow-up questions
-- Keep labels short (2-4 words)
-- Match actions to what you discussed
-
 EXAMPLES:
+
+After creating a task (use the taskId from create_task response):
+---QUICK_ACTIONS---
+[
+  {"id": "view-task", "type": "navigate", "label": "View task", "screen": "TaskDetails", "params": {"taskId": "abc123"}},
+  {"id": "view-all-tasks", "type": "navigate", "label": "All tasks", "screen": "TasksScreen"},
+  {"id": "create-another", "type": "message", "label": "Create another", "action": "Create another task"}
+]
+---END_ACTIONS---
+
+After creating an event (use the eventId from create_event response):
+---QUICK_ACTIONS---
+[
+  {"id": "view-event", "type": "navigate", "label": "View event", "screen": "EventDetails", "params": {"eventId": "xyz789"}},
+  {"id": "go-home", "type": "navigate", "label": "Go to home", "screen": "MainHome"},
+  {"id": "my-schedule", "type": "message", "label": "My schedule", "action": "What else is on my schedule?"}
+]
+---END_ACTIONS---
+
+After greeting:
+---QUICK_ACTIONS---
+[
+  {"id": "my-tasks", "type": "message", "label": "My tasks", "action": "What are my pending tasks?"},
+  {"id": "summary", "type": "message", "label": "Daily summary", "action": "Give me my daily summary"},
+  {"id": "schedule", "type": "message", "label": "My schedule", "action": "What's on my schedule today?"}
+]
+---END_ACTIONS---
 
 After discussing tasks:
 ---QUICK_ACTIONS---
 [
   {"id": "view-tasks", "type": "navigate", "label": "View tasks", "screen": "TasksScreen"},
-  {"id": "go-home", "type": "navigate", "label": "Go to home", "screen": "MainHome"},
-  {"id": "more-details", "type": "message", "label": "More details", "action": "Tell me more about my tasks"}
-]
----END_ACTIONS---
-
-After creating a task or event:
----QUICK_ACTIONS---
-[
-  {"id": "view-tasks", "type": "navigate", "label": "View tasks", "screen": "TasksScreen"},
-  {"id": "go-home", "type": "navigate", "label": "Go to home", "screen": "MainHome"}
+  {"id": "more-details", "type": "message", "label": "More details", "action": "Tell me more about these tasks"},
+  {"id": "whats-priority", "type": "message", "label": "What's priority?", "action": "What should I focus on first?"}
 ]
 ---END_ACTIONS---
 
