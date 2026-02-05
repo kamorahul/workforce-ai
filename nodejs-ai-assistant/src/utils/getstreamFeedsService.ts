@@ -345,11 +345,10 @@ export class GetStreamFeedsService {
         const rsvpEventTitle = extra.eventTitle || 'your event';
         const responderName = extra.responderName || 'Someone';
         const rsvpResponse = extra.response;
-        const rsvpEmoji = rsvpResponse === 'yes' ? '✅' : rsvpResponse === 'no' ? '❌' : '🤔';
         const rsvpText = rsvpResponse === 'yes' ? 'accepted' : rsvpResponse === 'no' ? 'declined' : 'responded maybe to';
         return {
           title: 'Event RSVP',
-          message: `${rsvpEmoji} ${responderName} ${rsvpText} "${rsvpEventTitle}"`
+          message: `${responderName} ${rsvpText} "${rsvpEventTitle}"`
         };
       default:
         return {

@@ -414,18 +414,18 @@ router.patch('/:eventId/rsvp', async (req: Request, res: Response) => {
 
     // Notify the organizer about the RSVP response
     try {
-      const responseEmoji = rsvpResponse === 'yes' ? '✅' : rsvpResponse === 'no' ? '❌' : '🤔';
+      // Get the responder's display name from Stream (not the phone number)
+      const responderDisplayName = await getStreamFeedsService.getUserName(userId);
       const responseText = rsvpResponse === 'yes' ? 'accepted' : rsvpResponse === 'no' ? 'declined' : 'responded maybe to';
 
       await getStreamFeedsService.createNotification(event.organizer, 'event_rsvp', eventId, {
         eventId: eventId,
         eventTitle: event.title,
         responderId: userId,
-        responderName: userName || userId,
-        response: rsvpResponse,
-        message: `${responseEmoji} ${userName || userId} ${responseText} your event "${event.title}"`
+        responderName: responderDisplayName,
+        response: rsvpResponse
       });
-      console.log(`📬 Notified organizer ${event.organizer} about RSVP`);
+      console.log(`📬 Notified organizer ${event.organizer} about RSVP from ${responderDisplayName}`);
     } catch (notifError) {
       console.error('Failed to notify organizer:', notifError);
     }
