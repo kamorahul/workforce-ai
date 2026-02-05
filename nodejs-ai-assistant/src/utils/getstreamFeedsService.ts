@@ -325,6 +325,22 @@ export class GetStreamFeedsService {
           title: 'You Were Mentioned',
           message: `${actor} mentioned you in a comment on "${taskName}"`
         };
+      case 'event_invited':
+        const eventTitle = extra.eventTitle || 'an event';
+        const eventDate = extra.startDate
+          ? new Date(extra.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+          : '';
+        return {
+          title: 'Event Invitation',
+          message: `${actor} invited you to "${eventTitle}"${eventDate ? ` on ${eventDate}` : ''}`
+        };
+      case 'event_reminder':
+        const reminderTitle = extra.eventTitle || 'an event';
+        const minutesUntil = extra.minutesUntil || 15;
+        return {
+          title: 'Event Reminder',
+          message: `"${reminderTitle}" starts in ${minutesUntil} minutes`
+        };
       default:
         return {
           title: 'Convoe Notification',
