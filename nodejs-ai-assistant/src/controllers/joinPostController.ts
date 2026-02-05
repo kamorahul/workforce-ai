@@ -2,16 +2,40 @@ import express, { Request, Response, Router } from 'express';
 import { serverClient } from '../serverClient'; // Adjusted path
 import { UserJoinLog } from '../models/UserJoinLog';
 import { DailyEventLog } from '../models/DailyEventLog';
+import { User } from '../models/User';
 import { createAgent, User as AgentUser } from '../agents/createAgent';
 
 const router: Router = express.Router();
 
 router.post('/', async (req: Request, res: Response): Promise<void> => {
-  // Use 'name' and 'image' from req.body
-  const { username, name, image } = req.body;
+  // Use 'name', 'image', and timezone from req.body
+  const { username, name, image, timezone, timezoneOffset, timezoneAbbreviation } = req.body;
   if (!username) {
     res.status(400).json({ err: "Username is required" });
     return;
+  }
+
+  // Upsert user with timezone info
+  try {
+    await User.findOneAndUpdate(
+      { userId: username },
+      {
+        $set: {
+          name: name || undefined,
+          image: image || undefined,
+          timezone: timezone || 'UTC',
+          timezoneOffset: timezoneOffset,
+          timezoneAbbreviation: timezoneAbbreviation,
+        },
+        $setOnInsert: {
+          userId: username,
+        },
+      },
+      { upsert: true, new: true }
+    );
+    console.log(`User ${username} timezone updated: ${timezone || 'UTC'}`);
+  } catch (err) {
+    console.error('Error upserting user:', err);
   }
 
   // Track unique user join

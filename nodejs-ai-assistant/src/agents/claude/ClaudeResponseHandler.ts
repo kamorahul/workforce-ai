@@ -40,6 +40,26 @@ interface MentionedUser {
 }
 
 /**
+ * Quick action types for Kai chat buttons
+ */
+interface QuickActionMessage {
+  id: string;
+  type: 'message';
+  label: string;
+  action: string;
+}
+
+interface QuickActionNavigate {
+  id: string;
+  type: 'navigate';
+  label: string;
+  screen: string;
+  params?: Record<string, any>;
+}
+
+type QuickAction = QuickActionMessage | QuickActionNavigate;
+
+/**
  * Timezone context sent by the mobile app with user messages
  * Used for proper timezone handling when creating events/tasks
  */
@@ -299,18 +319,64 @@ export class ClaudeResponseHandler {
     }
   };
 
-  private sendFinalResponse = async () => {
-    const text = this.messageText?.trim() || '';
-    console.log(`Final AI Response: "${text}"`);
+  /**
+   * Parse quick actions from AI response text
+   * Format: ---QUICK_ACTIONS---\n[...json...]\n---END_ACTIONS---
+   */
+  private parseQuickActions(text: string): { cleanText: string; quickActions: QuickAction[] } {
+    const quickActionsPattern = /---QUICK_ACTIONS---\s*([\s\S]*?)\s*---END_ACTIONS---/;
+    const match = text.match(quickActionsPattern);
 
-    if (!text || text.length === 0) {
+    if (!match) {
+      return { cleanText: text, quickActions: [] };
+    }
+
+    // Remove the quick actions block from the text
+    const cleanText = text.replace(quickActionsPattern, '').trim();
+
+    try {
+      const actionsJson = match[1].trim();
+      const quickActions = JSON.parse(actionsJson) as QuickAction[];
+
+      // Validate the structure
+      if (!Array.isArray(quickActions)) {
+        console.warn('Quick actions is not an array');
+        return { cleanText, quickActions: [] };
+      }
+
+      // Filter to valid actions only
+      const validActions = quickActions.filter((action) => {
+        if (!action.id || !action.type || !action.label) return false;
+        if (action.type === 'navigate' && !action.screen) return false;
+        if (action.type === 'message' && !action.action) return false;
+        return true;
+      });
+
+      console.log(`Parsed ${validActions.length} quick actions from response`);
+      return { cleanText, quickActions: validActions.slice(0, 4) }; // Max 4 actions
+    } catch (error) {
+      console.error('Failed to parse quick actions JSON:', error);
+      return { cleanText, quickActions: [] };
+    }
+  }
+
+  private sendFinalResponse = async () => {
+    const rawText = this.messageText?.trim() || '';
+    console.log(`Final AI Response: "${rawText}"`);
+
+    if (!rawText || rawText.length === 0) {
       console.warn('Skipping empty message');
       return;
     }
 
     const isKaiChannel = this.channel.id?.indexOf('kai') === 0;
 
-    // Add assistant response to conversation history
+    // Parse quick actions from response (for Kai channels)
+    const { cleanText: text, quickActions } = isKaiChannel
+      ? this.parseQuickActions(rawText)
+      : { cleanText: rawText, quickActions: [] };
+
+    // Add assistant response to conversation history (clean text without quick actions block)
     if (this.conversationHistory) {
       this.conversationHistory.push({
         role: 'assistant',
@@ -319,12 +385,23 @@ export class ClaudeResponseHandler {
     }
 
     if (isKaiChannel) {
-      // Send message to Kai channel
-      await this.channel.sendMessage({
+      // Build message payload with optional quick actions
+      const messagePayload: any = {
         text,
         user: { id: 'kai' },
         ai_generated: true,
-      });
+      };
+
+      // Include quick actions in extraData if present
+      if (quickActions.length > 0) {
+        messagePayload.extraData = {
+          quick_actions: quickActions,
+        };
+        console.log(`Including ${quickActions.length} quick actions in message`);
+      }
+
+      // Send message to Kai channel
+      await this.channel.sendMessage(messagePayload);
       console.log('Sent Kai response');
     } else if (this.messageId) {
       // Update original message with task/event detection
