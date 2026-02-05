@@ -536,41 +536,8 @@ export class GetStreamFeedsService {
         }
       }
 
-      // Schedule reminder notification if reminder is set
-      if (event.reminder && event.startDate) {
-        const reminderTime = new Date(event.startDate).getTime() - (event.reminder * 60 * 1000);
-        const now = Date.now();
-
-        if (reminderTime > now) {
-          // Extract userIds from attendees (handle both formats)
-          const attendeeIds = (event.attendees || []).map((a: any) =>
-            typeof a === 'string' ? a : a.userId
-          );
-
-          // Schedule reminder for all attendees including organizer
-          const allUsers = [event.organizer, ...attendeeIds];
-          const uniqueUsers = [...new Set(allUsers)];
-
-          setTimeout(async () => {
-            for (const userId of uniqueUsers) {
-              try {
-                await this.createNotification(userId, 'event_reminder', eventId, {
-                  eventId: eventId,
-                  eventTitle: event.title,
-                  startDate: event.startDate,
-                  location: event.location,
-                  minutesUntil: event.reminder
-                });
-                console.log(`⏰ Sent event reminder to ${userId} for "${event.title}"`);
-              } catch (err) {
-                console.error(`Failed to send reminder to ${userId}:`, err);
-              }
-            }
-          }, reminderTime - now);
-
-          console.log(`⏰ Scheduled reminder for "${event.title}" in ${Math.round((reminderTime - now) / 60000)} minutes`);
-        }
-      }
+      // Note: Reminders are now handled by the eventReminderCron service
+      // which runs every minute and checks for events needing reminders
 
       return activityId;
     } catch (error) {

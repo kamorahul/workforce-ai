@@ -19,6 +19,7 @@ export interface IEvent extends Document {
   messageId?: string; // Reference to the original message
   status: 'scheduled' | 'cancelled' | 'completed';
   reminder?: number; // Minutes before event to remind
+  reminderSent?: boolean; // Track if reminder notification was sent
   /**
    * Timezone where the event was created (IANA timezone identifier)
    * e.g., "Asia/Kolkata", "America/New_York", "Europe/London"
@@ -102,6 +103,10 @@ const EventSchema: Schema = new Schema({
     type: Number,
     required: false,
   },
+  reminderSent: {
+    type: Boolean,
+    default: false,
+  },
   timezone: {
     type: String,
     required: false,
@@ -134,5 +139,7 @@ const EventSchema: Schema = new Schema({
 // Index for querying events by date range
 EventSchema.index({ startDate: 1, endDate: 1 });
 EventSchema.index({ 'attendees.userId': 1, startDate: 1 });
+// Index for reminder cron job - finds events needing reminders efficiently
+EventSchema.index({ reminder: 1, reminderSent: 1, status: 1, startDate: 1 });
 
 export const Event = mongoose.model<IEvent>('Event', EventSchema);
