@@ -77,7 +77,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
   },
   create_task: {
     name: 'create_task',
-    description: 'Create a new task for the user',
+    description: 'Create a new task for the user. IMPORTANT: Convert user\'s local time to UTC before calling this tool.',
     parameters: {
       type: 'object',
       properties: {
@@ -96,7 +96,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
         },
         dueDate: {
           type: 'string',
-          description: 'Due date in ISO format (e.g., 2025-12-27T17:00:00Z)',
+          description: 'Due date in UTC ISO format (must end with Z). Convert user\'s local time to UTC based on their timezone.',
         },
         assignees: {
           type: 'array',
@@ -109,7 +109,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
   },
   create_event: {
     name: 'create_event',
-    description: 'Create a new calendar event or meeting',
+    description: 'Create a new calendar event or meeting. IMPORTANT: Convert user\'s local time to UTC before calling this tool.',
     parameters: {
       type: 'object',
       properties: {
@@ -123,11 +123,11 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
         },
         startDate: {
           type: 'string',
-          description: 'Start date/time in ISO format',
+          description: 'Start date/time in UTC ISO format (must end with Z). Convert user\'s local time to UTC. Example: If user says "3pm" in America/Denver (UTC-7), use "2026-02-05T22:00:00Z" (3pm + 7 hours = 10pm UTC)',
         },
         endDate: {
           type: 'string',
-          description: 'End date/time in ISO format',
+          description: 'End date/time in UTC ISO format (must end with Z)',
         },
         location: {
           type: 'string',

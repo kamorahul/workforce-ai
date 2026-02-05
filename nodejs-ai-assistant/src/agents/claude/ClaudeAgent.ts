@@ -182,7 +182,23 @@ export class ClaudeAgent implements AIAgent {
       // Always fetch cached user context for intelligent responses
       const userContext = await this.getCachedUserContext();
 
-      systemPrompt += `\n\nToday is ${today}. You have access to the user's workspace data below. Use this information to answer any questions about their tasks, conversations, team activity, or anything else they ask about. Be conversational, helpful, and specific.
+      // Add timezone context for accurate time handling
+      let timezoneInfo = '';
+      if (timezoneContext) {
+        timezoneInfo = `\n\n=== USER'S TIMEZONE ===
+Timezone: ${timezoneContext.timezone}
+Current local time: ${timezoneContext.localTime}
+Offset from UTC: ${timezoneContext.offsetString}
+
+IMPORTANT: When creating events or tasks with dates/times:
+- The user's times (like "3pm", "tomorrow at 2pm") are in their LOCAL timezone (${timezoneContext.timezone})
+- You MUST convert these to UTC when using the create_event or create_task tools
+- Example: If user says "3pm" and they're in ${timezoneContext.timezone} (${timezoneContext.offsetString}), calculate the UTC time accordingly
+- Always output startDate/endDate/dueDate in UTC ISO format (ending with Z)
+=== END TIMEZONE ===`;
+      }
+
+      systemPrompt += `\n\nToday is ${today}.${timezoneInfo} You have access to the user's workspace data below. Use this information to answer any questions about their tasks, conversations, team activity, or anything else they ask about. Be conversational, helpful, and specific.
 
 === USER'S WORKSPACE DATA ===
 ${userContext}
@@ -197,7 +213,13 @@ Analyze this data to answer the user's question. Reference specific tasks, conve
         messageContent = await this.buildMessageWithAttachments(e, attachments);
       }
 
-      systemPrompt += `\n\nToday's date is ${today}.`;
+      // Add timezone context for accurate time handling
+      let timezoneInfo = '';
+      if (timezoneContext) {
+        timezoneInfo = ` User's timezone: ${timezoneContext.timezone} (${timezoneContext.offsetString}). When creating events/tasks, convert user's local times to UTC.`;
+      }
+
+      systemPrompt += `\n\nToday's date is ${today}.${timezoneInfo}`;
     }
 
     // Add user message to history
