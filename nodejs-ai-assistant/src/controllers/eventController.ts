@@ -4,6 +4,21 @@ import { getStreamUserId } from '../middleware/auth';
 import { serverClient } from '../serverClient';
 import { getStreamFeedsService } from '../utils/getstreamFeedsService';
 
+// Helper function to normalize user IDs (remove prefixes like auth0|, sms|, +)
+const normalizeUserId = (id: string): string => {
+  if (!id) return '';
+  let normalized = id;
+  // Remove pipe prefixes (auth0|xxx, sms|xxx)
+  if (normalized.includes('|')) {
+    normalized = normalized.split('|').pop() || normalized;
+  }
+  // Remove + prefix
+  if (normalized.startsWith('+')) {
+    normalized = normalized.substring(1);
+  }
+  return normalized;
+};
+
 // Helper function to check if user is a member of a channel
 const isChannelMember = async (channelId: string, userId: string): Promise<boolean> => {
   try {
@@ -398,12 +413,18 @@ router.patch('/:eventId/rsvp', async (req: Request, res: Response) => {
       return;
     }
 
-    // Find the attendee in the array
-    const attendeeIndex = event.attendees.findIndex(a => a.userId === userId);
+    // Find the attendee in the array (use normalized IDs for flexible matching)
+    const normalizedUserId = normalizeUserId(userId);
+    const attendeeIndex = event.attendees.findIndex(a =>
+      a.userId === userId || normalizeUserId(a.userId) === normalizedUserId
+    );
     if (attendeeIndex === -1) {
+      console.log(`❌ RSVP failed: User ${userId} (normalized: ${normalizedUserId}) not found in attendees:`,
+        event.attendees.map(a => a.userId));
       res.status(403).json({ error: 'User is not an attendee of this event' });
       return;
     }
+    console.log(`✅ RSVP: Found attendee at index ${attendeeIndex} for user ${userId}`);
 
     // Update the attendee's RSVP status
     event.attendees[attendeeIndex].status = rsvpResponse as 'yes' | 'no' | 'maybe';
