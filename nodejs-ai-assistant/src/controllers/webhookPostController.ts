@@ -135,7 +135,11 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     // This is used for creating events/tasks with proper timezone handling
     const timezoneContext: TimezoneContext | undefined = message.timezone_context;
     if (timezoneContext) {
-      console.log('🌍 Timezone context:', timezoneContext.timezone, `(${timezoneContext.abbreviation})`);
+      console.log('🌍 Timezone context received:', timezoneContext.timezone, `(${timezoneContext.abbreviation})`);
+      console.log('   Local time:', timezoneContext.localTime, '| Offset:', timezoneContext.offsetString);
+    } else {
+      console.log('⚠️ No timezone_context in message - using UTC default');
+      console.log('   Message keys:', Object.keys(message).join(', '));
     }
 
     // Use persistent thread = true for Q&A agent (remembers conversation)
