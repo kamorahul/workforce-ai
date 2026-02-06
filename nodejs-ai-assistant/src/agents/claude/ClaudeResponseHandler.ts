@@ -34,6 +34,17 @@ interface CreateEventArguments {
   reminder?: number;
 }
 
+interface GetTasksArguments {
+  status?: 'todo' | 'in_progress' | 'completed' | 'all';
+  limit?: number;
+}
+
+interface GetEventsArguments {
+  status?: 'scheduled' | 'cancelled' | 'completed' | 'all';
+  upcoming?: boolean;
+  limit?: number;
+}
+
 interface MentionedUser {
   id: string;
   name: string;
@@ -256,6 +267,18 @@ export class ClaudeResponseHandler {
           const eventArgs = toolUse.input as CreateEventArguments;
           const eventResult = await this.createEvent(eventArgs);
           result = JSON.stringify(eventResult);
+          break;
+
+        case 'get_tasks':
+          const getTasksArgs = toolUse.input as GetTasksArguments;
+          const tasksResult = await this.getTasks(getTasksArgs);
+          result = JSON.stringify(tasksResult);
+          break;
+
+        case 'get_events':
+          const getEventsArgs = toolUse.input as GetEventsArguments;
+          const eventsResult = await this.getEvents(getEventsArgs);
+          result = JSON.stringify(eventsResult);
           break;
 
         default:
@@ -710,6 +733,114 @@ export class ClaudeResponseHandler {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to create event',
+      };
+    }
+  };
+
+  private getTasks = async (
+    args: GetTasksArguments
+  ): Promise<{ success: boolean; tasks?: any[]; error?: string }> => {
+    try {
+      console.log('Fetching tasks via Claude:', args);
+
+      // Build query based on args
+      const query: any = {
+        $or: [
+          { assignee: { $in: [this.user.id] } },
+          { createdBy: this.user.id },
+        ],
+      };
+
+      // Filter by status
+      if (args.status && args.status !== 'all') {
+        query.status = args.status;
+      }
+
+      const limit = args.limit || 50;
+
+      const tasks = await Task.find(query)
+        .select('name description status completed createdAt completionDate assignee priority timezone')
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .lean();
+
+      console.log(`Found ${tasks.length} tasks`);
+
+      const taskData = tasks.map((task: any) => ({
+        id: task._id.toString(),
+        title: task.name,
+        description: task.description,
+        priority: task.priority || 'medium',
+        dueDate: task.completionDate,
+        status: task.status || (task.completed ? 'completed' : 'todo'),
+      }));
+
+      return {
+        success: true,
+        tasks: taskData,
+      };
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch tasks',
+      };
+    }
+  };
+
+  private getEvents = async (
+    args: GetEventsArguments
+  ): Promise<{ success: boolean; events?: any[]; error?: string }> => {
+    try {
+      console.log('Fetching events via Claude:', args);
+
+      // Build query based on args
+      const query: any = {
+        $or: [
+          { organizer: this.user.id },
+          { 'attendees.userId': this.user.id },
+        ],
+      };
+
+      // Filter by status
+      if (args.status && args.status !== 'all') {
+        query.status = args.status;
+      }
+
+      // Filter for upcoming events
+      if (args.upcoming) {
+        query.startDate = { $gte: new Date() };
+      }
+
+      const limit = args.limit || 50;
+
+      const events = await Event.find(query)
+        .select('title description startDate endDate location attendees organizer status timezone')
+        .sort({ startDate: 1 })
+        .limit(limit)
+        .lean();
+
+      console.log(`Found ${events.length} events`);
+
+      const eventData = events.map((event: any) => ({
+        id: event._id.toString(),
+        title: event.title,
+        description: event.description,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        location: event.location,
+        status: event.status,
+      }));
+
+      return {
+        success: true,
+        events: eventData,
+      };
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch events',
       };
     }
   };

@@ -146,6 +146,48 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       required: ['title', 'startDate'],
     },
   },
+  get_tasks: {
+    name: 'get_tasks',
+    description: 'Get tasks for the current user. Can filter by status (todo, in_progress, completed, all).',
+    parameters: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          enum: ['todo', 'in_progress', 'completed', 'all'],
+          description: 'Filter tasks by status. Use "all" for all statuses.',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of tasks to return (default: 50)',
+        },
+      },
+      required: [],
+    },
+  },
+  get_events: {
+    name: 'get_events',
+    description: 'Get calendar events for the current user. Can filter by status and date range.',
+    parameters: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          enum: ['scheduled', 'cancelled', 'completed', 'all'],
+          description: 'Filter events by status. Use "all" for all statuses.',
+        },
+        upcoming: {
+          type: 'boolean',
+          description: 'Only return upcoming events (from now onwards)',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of events to return (default: 50)',
+        },
+      },
+      required: [],
+    },
+  },
 };
 
 // Assistant configurations with system prompts
@@ -229,9 +271,10 @@ PERSONALITY:
 YOUR CAPABILITIES:
 1. Answer questions about conversations, tasks, and team activity
 2. Create tasks and events when asked (use the create_task and create_event tools)
-3. Summarize conversations and highlight what matters
-4. Analyze images and documents
-5. Help prioritize work and suggest next actions
+3. Fetch tasks and events (use the get_tasks and get_events tools when user asks about their tasks or schedule)
+4. Summarize conversations and highlight what matters
+5. Analyze images and documents
+6. Help prioritize work and suggest next actions
 
 RESPONSE STYLE:
 
@@ -335,7 +378,7 @@ After discussing tasks:
 ---END_ACTIONS---
 
 Be helpful, be human, be Kai.`,
-    tools: [TOOL_DEFINITIONS.create_task, TOOL_DEFINITIONS.create_event],
+    tools: [TOOL_DEFINITIONS.create_task, TOOL_DEFINITIONS.create_event, TOOL_DEFINITIONS.get_tasks, TOOL_DEFINITIONS.get_events],
   },
 
   task_detection: {
