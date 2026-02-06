@@ -26,19 +26,30 @@ const defaultConfig: OpenClawConfig = {
 
 /**
  * Get OpenClaw configuration from environment variables
+ * When OPENCLAW_ENABLED=true, all core skills are enabled by default
  */
 export function getOpenClawConfig(): OpenClawConfig {
+  const isEnabled = process.env.OPENCLAW_ENABLED === 'true';
+
+  // Helper to check skill config - defaults to true when OPENCLAW_ENABLED
+  const isSkillEnabled = (envVar: string, defaultWhenEnabled: boolean = true): boolean => {
+    const value = process.env[envVar];
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return isEnabled && defaultWhenEnabled;
+  };
+
   const config: OpenClawConfig = {
-    enabled: process.env.OPENCLAW_ENABLED === 'true',
+    enabled: isEnabled,
     gateway: process.env.OPENCLAW_GATEWAY || 'ws://localhost:18789',
-    apiKey: process.env.OPENCLAW_API_KEY,
+    apiKey: process.env.OPENCLAW_GATEWAY_TOKEN || process.env.OPENCLAW_API_KEY,
     skills: {
-      create_task: process.env.OPENCLAW_SKILL_CREATE_TASK === 'true',
-      create_event: process.env.OPENCLAW_SKILL_CREATE_EVENT === 'true',
-      get_tasks: process.env.OPENCLAW_SKILL_GET_TASKS === 'true',
-      get_events: process.env.OPENCLAW_SKILL_GET_EVENTS === 'true',
-      send_email: process.env.OPENCLAW_SKILL_SEND_EMAIL === 'true',
-      sync_calendar: process.env.OPENCLAW_SKILL_SYNC_CALENDAR === 'true',
+      create_task: isSkillEnabled('OPENCLAW_SKILL_CREATE_TASK'),
+      create_event: isSkillEnabled('OPENCLAW_SKILL_CREATE_EVENT'),
+      get_tasks: isSkillEnabled('OPENCLAW_SKILL_GET_TASKS'),
+      get_events: isSkillEnabled('OPENCLAW_SKILL_GET_EVENTS'),
+      send_email: isSkillEnabled('OPENCLAW_SKILL_SEND_EMAIL', false), // Not yet implemented
+      sync_calendar: isSkillEnabled('OPENCLAW_SKILL_SYNC_CALENDAR', false), // Not yet implemented
     },
   };
 

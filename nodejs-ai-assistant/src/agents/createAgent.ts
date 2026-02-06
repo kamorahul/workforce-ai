@@ -1,6 +1,7 @@
 import { StreamChat } from 'stream-chat';
 import { OpenAIAgent } from './openai/OpenAIAgent';
 import { ClaudeAgent } from './claude/ClaudeAgent';
+import { OpenClawAgent } from './openclaw/OpenClawAgent';
 import { apiKey, apiSecret } from '../serverClient';
 import { AIAgent, AIProvider, getAIProvider } from './types';
 
@@ -22,7 +23,7 @@ export interface User {
  * @param user - The user making the request
  * @param channel_type - Stream channel type
  * @param channel_id - Stream channel ID
- * @param provider - Optional provider override ('openai' | 'claude')
+ * @param provider - Optional provider override ('openai' | 'claude' | 'openclaw')
  */
 export const createAgent = async (
   user: User,
@@ -41,9 +42,13 @@ export const createAgent = async (
 
   console.log(`Creating AI agent with provider: ${selectedProvider}`);
 
-  if (selectedProvider === 'claude') {
-    return new ClaudeAgent(serverClient, channel, user);
+  switch (selectedProvider) {
+    case 'openclaw':
+      return new OpenClawAgent(serverClient, channel, user);
+    case 'claude':
+      return new ClaudeAgent(serverClient, channel, user);
+    case 'openai':
+    default:
+      return new OpenAIAgent(serverClient, channel, user);
   }
-
-  return new OpenAIAgent(serverClient, channel, user);
 };

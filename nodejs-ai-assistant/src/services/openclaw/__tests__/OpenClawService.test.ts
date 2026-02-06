@@ -337,7 +337,8 @@ describe('OpenClawService', () => {
       expect(config.apiKey).toBe('test_key');
       expect(config.skills.create_task).toBe(true);
       expect(config.skills.create_event).toBe(true);
-      expect(config.skills.get_tasks).toBe(false);
+      // When OPENCLAW_ENABLED=true, skills default to enabled
+      expect(config.skills.get_tasks).toBe(true);
     });
 
     it('should use defaults when env vars not set', () => {

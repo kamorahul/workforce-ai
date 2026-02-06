@@ -27,7 +27,7 @@
  * Configuration (environment variables):
  * - OPENCLAW_ENABLED=true - Enable OpenClaw integration
  * - OPENCLAW_GATEWAY=ws://localhost:18789 - OpenClaw gateway URL
- * - OPENCLAW_API_KEY=your_key - OpenClaw API key
+ * - OPENCLAW_GATEWAY_TOKEN=your_token - OpenClaw gateway auth token
  * - OPENCLAW_SKILL_CREATE_TASK=true - Enable create_task skill
  * - OPENCLAW_SKILL_CREATE_EVENT=true - Enable create_event skill
  * - OPENCLAW_SKILL_GET_TASKS=true - Enable get_tasks skill
@@ -42,6 +42,12 @@ export {
   getOpenClawConfig,
   resetOpenClawService,
 } from './OpenClawService';
+
+export {
+  OpenClawClient,
+  getOpenClawClient,
+  initOpenClawClient,
+} from './OpenClawClient';
 
 export * from './types';
 export * from './skills';

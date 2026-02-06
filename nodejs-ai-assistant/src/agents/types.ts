@@ -1,6 +1,6 @@
 import type { Channel, StreamChat } from 'stream-chat';
 
-export type AIProvider = 'openai' | 'claude';
+export type AIProvider = 'openai' | 'claude' | 'openclaw';
 
 export interface MentionedUser {
   id: string;
@@ -43,12 +43,15 @@ export interface AIAgent {
 
 /**
  * Get the current AI provider from environment or default
- * Default is now 'claude' - set AI_PROVIDER=openai to use OpenAI
+ * Default is now 'claude' - set AI_PROVIDER=openai to use OpenAI, or AI_PROVIDER=openclaw for OpenClaw
  */
 export function getAIProvider(): AIProvider {
   const provider = process.env.AI_PROVIDER?.toLowerCase();
   if (provider === 'openai' || provider === 'gpt') {
     return 'openai';
+  }
+  if (provider === 'openclaw' || provider === 'claw') {
+    return 'openclaw';
   }
   // Default to Claude
   return 'claude';
