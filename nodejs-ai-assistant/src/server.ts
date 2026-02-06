@@ -3,6 +3,7 @@ import { app } from './index'; // Import the configured app instance
 import { connectDB } from './config/mongodb';
 import { setupAutoAttendanceCronJob } from './cron/autoAttendance';
 import { startEventReminderCron } from './services/eventReminderCron';
+import { startTelegramBot } from './services/telegramBot';
 
 const port = process.env.PORT || 3000;
 
@@ -23,6 +24,12 @@ const startServer = async () => {
         console.log('Auto attendance cron job started.');
 
         startEventReminderCron(); // Start event reminder cron job
+
+        // Start Telegram bot if configured
+        if (process.env.TELEGRAM_BOT_TOKEN) {
+          startTelegramBot();
+          console.log('🤖 Telegram bot started');
+        }
       }
     });
   } catch (error) {
