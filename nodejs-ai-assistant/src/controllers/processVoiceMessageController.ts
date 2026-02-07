@@ -36,7 +36,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     const channelType = channelParts[0] || 'messaging';
     const channelIdOnly = channelParts[1] || channelId;
 
-    // Get the original message to check if already processed
+    // Get the original message to check if already processed and preserve attachments
+    let originalAttachments: any[] = [];
     try {
       const originalMessage = await serverClient.getMessage(messageId);
       const extraData = originalMessage?.message?.extraData as Record<string, any> | undefined;
@@ -45,6 +46,9 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         res.status(200).json({ message: "Message already processed" });
         return;
       }
+      // Store original attachments to preserve them during updates
+      originalAttachments = originalMessage?.message?.attachments || [];
+      console.log(`📎 Preserved ${originalAttachments.length} attachments from original message`);
     } catch (err) {
       console.error('Error fetching original message:', err);
       // Continue processing even if we can't fetch the message
@@ -102,15 +106,16 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       // FOR REGULAR CHANNELS: Use task detection
       console.log('📋 Processing voice message for task/event detection');
 
-      // Mark message as processing
+      // Mark message as processing (preserve attachments!)
       try {
         await serverClient.updateMessage({
           id: messageId,
           text: '', // Voice messages don't have text
           user_id: userId,
+          attachments: originalAttachments, // Preserve voice message attachments
           extraData: { processing: true }
         });
-        console.log('🔄 Marked message as processing');
+        console.log('🔄 Marked message as processing (preserved attachments)');
       } catch (err) {
         console.error('Failed to mark message as processing:', err);
       }
