@@ -22,6 +22,7 @@ import teamActivityControllerRouter from './controllers/teamActivityController';
 import contactsControllerRouter from './controllers/contactsController';
 import eventControllerRouter from './controllers/eventController';
 import transcriptionControllerRouter from './controllers/transcriptionController';
+import processVoiceMessageControllerRouter from './controllers/processVoiceMessageController';
 import { requireAuth, authErrorHandler } from './middleware/auth';
 
 const app = express();
@@ -92,6 +93,9 @@ app.use('/upload', audioUploadPostControllerRouter);
 
 // Voice Transcription (Whisper API)
 app.use('/transcribe', transcriptionControllerRouter);
+
+// Process Voice Message (triggers AI processing after transcription)
+app.use('/process-voice-message', processVoiceMessageControllerRouter);
 
 // =============================================================================
 // ERROR HANDLING
