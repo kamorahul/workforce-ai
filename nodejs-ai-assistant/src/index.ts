@@ -21,7 +21,6 @@ import homescreenControllerRouter from './controllers/homescreenController';
 import teamActivityControllerRouter from './controllers/teamActivityController';
 import contactsControllerRouter from './controllers/contactsController';
 import eventControllerRouter from './controllers/eventController';
-import openclawWebhookControllerRouter from './controllers/openclawWebhookController';
 import { requireAuth, authErrorHandler } from './middleware/auth';
 
 const app = express();
@@ -44,7 +43,6 @@ app.get('/', (req, res) => {
 // Webhook endpoints (called by external services with their own auth)
 app.use('/getstream/webhooks', getstreamWebhooksPostControllerRouter);
 app.use('/webhook', webhookPostControllerRouter);
-app.use('/openclaw', openclawWebhookControllerRouter);
 
 // Auth endpoints - public (handles phone/SMS verification)
 app.use('/auth', authControllerRouter);
