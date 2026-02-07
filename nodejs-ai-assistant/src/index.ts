@@ -21,6 +21,7 @@ import homescreenControllerRouter from './controllers/homescreenController';
 import teamActivityControllerRouter from './controllers/teamActivityController';
 import contactsControllerRouter from './controllers/contactsController';
 import eventControllerRouter from './controllers/eventController';
+import transcriptionControllerRouter from './controllers/transcriptionController';
 import { requireAuth, authErrorHandler } from './middleware/auth';
 
 const app = express();
@@ -88,6 +89,9 @@ app.use('/projects', projectsGetControllerRouter);
 // Notifications & Uploads
 app.use('/notifications', notificationsControllerRouter);
 app.use('/upload', audioUploadPostControllerRouter);
+
+// Voice Transcription (Whisper API)
+app.use('/transcribe', transcriptionControllerRouter);
 
 // =============================================================================
 // ERROR HANDLING
